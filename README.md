@@ -24,7 +24,7 @@ If you can improve the code, feel free to fork it!
 ## Installation
 1. Clone this repository:  
    ```bash
-   git clone https://github.com/gabyu/infinite-planner.git```
+   git clone https://github.com/gabyu/infinite-planner.git
    
 2. Upload the files to your web server (Apache, Nginx, etc.).
 3. Ensure uploads/ and processed/ directories are writable.
