@@ -1,7 +1,9 @@
-# infinite-cleaner
-Flight Plan Cleaner for Infinite Flight
+# infinite-planner
+Infinite Planner is the name of a series of tools built to improve and ease the Flight Planning experience for Infinite Flight
 
+# FPL Cleaner / Optimizer
 The script converts a FlightRadar24 KML file to an optimized KML file with the limitations of Infinite Flight.
+Currently supports FlightRadar24 and will also soon manage KML files from FlightAware.
 
 - Properly extracts waypoints from KML files.
 - Handles missing namespaces in different KML structures.
