@@ -1,4 +1,4 @@
-# infinite-planner
+# Infinite Planner
 Infinite Planner is the name of a series of tools built to improve and ease the Flight Planning experience for Infinite Flight
 
 # FPL Cleaner / Optimizer
