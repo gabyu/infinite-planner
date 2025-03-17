@@ -19,3 +19,12 @@ Soon, it may:
 
 Try it now, and let me know if it works as expected! 🚀
 If you can improve the code, feel free to fork it!
+
+
+## Installation
+1. Clone this repository:  
+   ```bash
+   git clone https://github.com/yourusername/KML-Simplifier.git```
+   
+2. Upload the files to your web server (Apache, Nginx, etc.).
+3. Ensure uploads/ and processed/ directories are writable.
