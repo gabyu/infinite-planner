@@ -16,6 +16,7 @@ Soon, it may:
 - Detecting and rounding altitudes to the nearest 100 ft.
 - Allow user to custom-rename waypoints with a custom format (e.g., AFKLM028-###).
 - Manage KML files from FlightAware.
+- Add the original airport and destination airport ICAO and add them as 1st and last waypoints.
 
 Try it now, and let me know if it works as expected! 🚀
 If you can improve the code, feel free to fork it!
