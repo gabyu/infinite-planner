@@ -11,7 +11,7 @@ Flight Planner enhances the flight planning experience in Infinite Flight by opt
 - Limiting waypoints to improve efficiency (max 250).
 - Streamline your flight planning with Flight Planner and focus on a smoother Infinite Flight experience. 🚀✈️
 
-Soon, it may:
+Roadmap:
 - Identifying step climbs, marking TOC (Top of Climb) & TOD (Top of Descent).
 - Detecting and rounding altitudes to the nearest 100 ft.
 - Allow user to custom-rename waypoints with a custom format (e.g., AFKLM028-###).
