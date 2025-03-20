@@ -15,7 +15,7 @@ Soon, it may:
 - Identifying step climbs, marking TOC (Top of Climb) & TOD (Top of Descent).
 - Detecting and rounding altitudes to the nearest 100 ft.
 - Allow user to custom-rename waypoints with a custom format (e.g., AFKLM028-###).
-- Manage KML files from FlightAware.
+- Manage KML files from FlightAware and automatically detect the origin of the KML file based on their different structure.
 - Add the original airport and destination airport ICAO and add them as 1st and last waypoints.
 
 Try it now, and let me know if it works as expected! 🚀
