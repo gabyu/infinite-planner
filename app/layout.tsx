@@ -14,6 +14,30 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
   },
+  // Add OpenGraph metadata for social media sharing
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://infinite-planner.vercel.app/",
+    title: "Infinite Planner - Flight Plan Editor",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
+    siteName: "Infinite Planner",
+    images: [
+      {
+        url: "/og-image.png", // This will be generated from the favicon
+        width: 1200,
+        height: 630,
+        alt: "Infinite Planner",
+      },
+    ],
+  },
+  // Add Twitter card metadata
+  twitter: {
+    card: "summary_large_image",
+    title: "Infinite Planner - Flight Plan Editor",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
+    images: ["/og-image.png"],
+  },
     generator: 'v0.dev'
 }
 

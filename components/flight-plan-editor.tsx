@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle } from "lucide-react"
+import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle, Plane } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -232,11 +232,16 @@ export function FlightPlanEditor() {
       <Card className="bg-background shadow-sm border-border">
         <CardHeader className="pb-4 border-b">
           <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-xl font-semibold text-foreground">Infinite Planner</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Turn real-world flights into Infinite Flight custom flight plans!
-              </CardDescription>
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-primary rounded-md">
+                <Plane className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-semibold text-foreground">Infinite Planner</CardTitle>
+                <CardDescription className="text-muted-foreground">
+                  Turn real-world flights into Infinite Flight custom flight plans!
+                </CardDescription>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button
