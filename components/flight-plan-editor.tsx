@@ -228,7 +228,7 @@ export function FlightPlanEditor() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4 bg-white dark:bg-slate-900">
+    <div className="container mx-auto py-8 px-4">
       <Card className="bg-background shadow-sm border-border">
         <CardHeader className="pb-4 border-b">
           <div className="flex items-center justify-between">
@@ -446,11 +446,6 @@ export function FlightPlanEditor() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Footer */}
-      <footer className="mt-8 text-center text-sm text-muted-foreground border-t pt-4">
-        <p>Infinite Planner is not affiliated with FlightRadar24, FlightAware, or Infinite Flight.</p>
-      </footer>
     </div>
   )
 }

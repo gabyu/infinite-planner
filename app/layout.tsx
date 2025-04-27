@@ -7,9 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Infinite Planner - Flight Plan Editor",
+  title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
   description:
-    "Create, edit, and optimize flight plans with ease. Import from FlightRadar24 or FlightAware and export to your favorite simulator.",
+    "Turn real-world flights into Infinite Flight custom flight plans! Import KML files from FlightRadar24 or FlightAware and export to Infinite Flight.",
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
@@ -19,12 +19,12 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "https://infinite-planner.vercel.app/",
-    title: "Infinite Planner - Flight Plan Editor",
+    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
     description: "Turn real-world flights into Infinite Flight custom flight plans!",
     siteName: "Infinite Planner",
     images: [
       {
-        url: "/og-image.png", // This will be generated from the favicon
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "Infinite Planner",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   // Add Twitter card metadata
   twitter: {
     card: "summary_large_image",
-    title: "Infinite Planner - Flight Plan Editor",
+    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
     description: "Turn real-world flights into Infinite Flight custom flight plans!",
     images: ["/og-image.png"],
   },
