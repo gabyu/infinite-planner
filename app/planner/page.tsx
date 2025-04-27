@@ -1,7 +1,8 @@
 import { FlightPlanEditor } from "@/components/flight-plan-editor"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Home } from "lucide-react"
+import { Home, Plane } from "lucide-react"
+import { DiscordIcon } from "@/components/discord-icon"
 
 export default function PlannerPage() {
   return (
@@ -10,19 +11,22 @@ export default function PlannerPage() {
       <header className="border-b bg-white dark:bg-slate-900">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-lg font-bold">IP</span>
-            </div>
+            <Link href="/" className="no-underline hover:opacity-80 transition-opacity">
+              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+                <Plane className="h-5 w-5 text-primary-foreground" />
+              </div>
+            </Link>
             <h1 className="text-xl font-bold">Infinite Planner</h1>
           </div>
           <nav className="flex items-center gap-4">
             <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" className="h-10 flex items-center gap-2">
+                <DiscordIcon className="w-5 h-5" />
                 Join Discord
               </Button>
             </Link>
             <Link href="/">
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="h-10 flex items-center gap-2">
                 <Home size={16} />
                 Back to Home
               </Button>

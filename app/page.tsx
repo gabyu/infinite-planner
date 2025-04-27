@@ -1,7 +1,8 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Plane, Map, Download } from "lucide-react"
+import { Plane, Map, Download, MapPin } from "lucide-react"
+import { DiscordIcon } from "@/components/discord-icon"
 
 export default function HomePage() {
   return (
@@ -10,19 +11,25 @@ export default function HomePage() {
       <header className="border-b">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-lg font-bold">IP</span>
-            </div>
+            <Link href="/" className="no-underline hover:opacity-80 transition-opacity">
+              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
+                <Plane className="h-5 w-5 text-primary-foreground" />
+              </div>
+            </Link>
             <h1 className="text-xl font-bold">Infinite Planner</h1>
           </div>
           <nav className="flex items-center gap-4">
             <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" className="h-10 flex items-center gap-2">
+                <DiscordIcon className="w-5 h-5" />
                 Join Discord
               </Button>
             </Link>
             <Link href="/planner">
-              <Button>Open Planner Tool</Button>
+              <Button className="h-10 flex items-center gap-2">
+                <MapPin size={16} />
+                Open Planner Tool
+              </Button>
             </Link>
           </nav>
         </div>
@@ -35,11 +42,14 @@ export default function HomePage() {
           <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
             Turn real-world flights into Infinite Flight custom flight plans!
           </p>
-          <Link href="/planner">
-            <Button size="lg" className="text-lg px-8 py-6">
-              Start Planning
-            </Button>
-          </Link>
+          <div className="flex justify-center">
+            <Link href="/planner">
+              <Button size="lg" className="text-lg px-8 py-6 flex items-center gap-2">
+                <MapPin size={20} />
+                Start Planning
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -185,11 +195,14 @@ export default function HomePage() {
             Connect with other Infinite Flight enthusiasts, get help with flight planning, and stay updated on new
             features.
           </p>
-          <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
-            <Button variant="secondary" size="lg">
-              Join Our Discord
-            </Button>
-          </Link>
+          <div className="flex justify-center">
+            <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
+              <Button variant="secondary" size="lg" className="flex items-center gap-2">
+                <DiscordIcon className="w-6 h-6" />
+                Join Our Discord
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
