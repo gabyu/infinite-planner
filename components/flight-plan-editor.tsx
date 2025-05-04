@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle } from "lucide-react"
+import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
+import { Toaster } from "@/components/ui/toaster"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview"), {
@@ -49,8 +50,19 @@ export function FlightPlanEditor() {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [showMapPreview, setShowMapPreview] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { theme } = useTheme()
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage(null)
+      }, 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [successMessage])
 
   // Validate the flight plan when waypoints change
   useEffect(() => {
@@ -116,6 +128,7 @@ export function FlightPlanEditor() {
     setIsLoading(true)
     setError(null)
     setWarning(null)
+    setSuccessMessage(null)
 
     try {
       const text = await file.text()
@@ -177,6 +190,8 @@ export function FlightPlanEditor() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+
+      setSuccessMessage("Flight plan exported successfully!")
     } catch (error) {
       console.error("Error exporting FPL file:", error)
       setError(`Error exporting FPL file: ${error instanceof Error ? error.message : String(error)}`)
@@ -193,6 +208,7 @@ export function FlightPlanEditor() {
       altitude: 0,
     }
     setWaypoints([...waypoints, newWaypoint])
+    setSuccessMessage("New waypoint added!")
   }
 
   // Update waypoint field
@@ -211,6 +227,13 @@ export function FlightPlanEditor() {
 
   // Delete selected waypoints
   const deleteSelectedWaypoints = () => {
+    const selectedCount = waypoints.filter((wp) => wp.selected).length
+
+    if (selectedCount === 0) {
+      setError("No waypoints selected for deletion")
+      return
+    }
+
     const newWaypoints = waypoints.filter((wp) => !wp.selected)
 
     // Renumber waypoints after deletion
@@ -220,6 +243,7 @@ export function FlightPlanEditor() {
     }))
 
     setWaypoints(renamedWaypoints)
+    setSuccessMessage(`${selectedCount} waypoint${selectedCount !== 1 ? "s" : ""} removed successfully!`)
   }
 
   // Select/deselect all waypoints
@@ -232,16 +256,17 @@ export function FlightPlanEditor() {
       <Card className="bg-background shadow-sm border-border">
         <CardHeader className="pb-4 border-b">
           <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 h-10 px-3 sm:px-4"
                 disabled={isLoading}
               >
                 <Upload size={14} />
-                {isLoading ? "Importing..." : "Import KML"}
+                <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
+                <span className="sm:hidden">Import</span>
               </Button>
               <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
 
@@ -249,22 +274,23 @@ export function FlightPlanEditor() {
                 onClick={() => setShowMapPreview(true)}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 h-10 px-3 sm:px-4"
                 disabled={waypoints.length === 0 || isLoading}
               >
                 <Map size={14} />
-                Preview
+                <span className="hidden sm:inline">Preview</span>
               </Button>
 
               <Button
                 onClick={handleExportFPL}
                 variant="outline"
                 size="sm"
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 h-10 px-3 sm:px-4"
                 disabled={waypoints.length === 0 || isLoading}
               >
                 <Download size={14} />
-                Export FPL
+                <span className="hidden sm:inline">Export FPL</span>
+                <span className="sm:hidden">Export</span>
               </Button>
             </div>
           </div>
@@ -286,6 +312,14 @@ export function FlightPlanEditor() {
             </Alert>
           )}
 
+          {successMessage && (
+            <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+              <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
+              <AlertDescription className="text-green-600 dark:text-green-300">{successMessage}</AlertDescription>
+            </Alert>
+          )}
+
           {simplificationInfo && (
             <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
               <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
@@ -303,7 +337,7 @@ export function FlightPlanEditor() {
             </Alert>
           )}
 
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
             <div className="flex items-center space-x-2">
               <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
               <Label htmlFor="selectAll" className="text-sm font-medium">
@@ -311,13 +345,13 @@ export function FlightPlanEditor() {
               </Label>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="destructive"
                 size="sm"
                 onClick={deleteSelectedWaypoints}
                 disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                className="flex items-center gap-1 h-8"
+                className="flex items-center gap-1 h-10"
               >
                 <Trash2 size={14} />
                 Delete Selected
@@ -327,7 +361,7 @@ export function FlightPlanEditor() {
                 variant="default"
                 size="sm"
                 onClick={addWaypoint}
-                className="flex items-center gap-1 h-8"
+                className="flex items-center gap-1 h-10"
                 disabled={isLoading}
               >
                 <Plus size={14} />
@@ -336,7 +370,7 @@ export function FlightPlanEditor() {
             </div>
           </div>
 
-          <div className="border rounded-md overflow-hidden">
+          <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
@@ -435,6 +469,8 @@ export function FlightPlanEditor() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Toaster />
     </div>
   )
 }
