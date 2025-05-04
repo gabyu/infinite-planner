@@ -51,6 +51,8 @@ export function FlightPlanEditor() {
   const [warning, setWarning] = useState<string | null>(null)
   const [showMapPreview, setShowMapPreview] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [waypointPrefix, setWaypointPrefix] = useState("")
+  const [importedFileName, setImportedFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { theme } = useTheme()
 
@@ -72,6 +74,29 @@ export function FlightPlanEditor() {
       setWarning(null)
     }
   }, [waypoints])
+
+  // Handle tab key navigation for waypoint names
+  const handleTabKeyNavigation = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    waypointId: string,
+    fieldName: keyof Waypoint,
+  ) => {
+    if (e.key === "Tab" && !e.shiftKey && fieldName === "name") {
+      e.preventDefault()
+
+      // Find the current waypoint index
+      const currentIndex = waypoints.findIndex((wp) => wp.id === waypointId)
+
+      // If there's a next waypoint, focus its name input
+      if (currentIndex < waypoints.length - 1) {
+        const nextWaypointId = waypoints[currentIndex + 1].id
+        const nextInput = document.getElementById(`name-${nextWaypointId}`)
+        if (nextInput) {
+          nextInput.focus()
+        }
+      }
+    }
+  }
 
   // Validate the flight plan for potential issues
   const validateFlightPlan = (waypoints: Waypoint[]) => {
@@ -130,6 +155,10 @@ export function FlightPlanEditor() {
     setWarning(null)
     setSuccessMessage(null)
 
+    // Store the original file name without extension for later use
+    const fileName = file.name.replace(/\.[^/.]+$/, "")
+    setImportedFileName(fileName)
+
     try {
       const text = await file.text()
       console.log("KML file loaded, parsing...")
@@ -185,13 +214,17 @@ export function FlightPlanEditor() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = "flightplan.fpl"
+
+      // Use the imported file name if available, otherwise use default
+      const fileName = importedFileName ? `${importedFileName}.fpl` : "flightplan.fpl"
+      a.download = fileName
+
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      setSuccessMessage("Flight plan exported successfully!")
+      setSuccessMessage(`Flight plan exported as ${fileName}!`)
     } catch (error) {
       console.error("Error exporting FPL file:", error)
       setError(`Error exporting FPL file: ${error instanceof Error ? error.message : String(error)}`)
@@ -249,6 +282,22 @@ export function FlightPlanEditor() {
   // Select/deselect all waypoints
   const toggleSelectAll = (checked: boolean) => {
     setWaypoints(waypoints.map((wp) => ({ ...wp, selected: checked })))
+  }
+
+  // Apply prefix to all waypoint names
+  const applyWaypointPrefix = () => {
+    if (waypoints.length === 0) {
+      setError("No waypoints to rename")
+      return
+    }
+
+    const renamedWaypoints = waypoints.map((wp, index) => ({
+      ...wp,
+      name: `${waypointPrefix}${String(index + 1).padStart(3, "0")}`,
+    }))
+
+    setWaypoints(renamedWaypoints)
+    setSuccessMessage(`Prefix "${waypointPrefix}" applied to all waypoints!`)
   }
 
   return (
@@ -406,8 +455,10 @@ export function FlightPlanEditor() {
                       </TableCell>
                       <TableCell>
                         <Input
+                          id={`name-${waypoint.id}`}
                           value={waypoint.name}
                           onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
+                          onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
                           className="h-8 border-input"
                         />
                       </TableCell>
@@ -447,12 +498,32 @@ export function FlightPlanEditor() {
           </div>
 
           {waypoints.length > 0 && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              <p>
-                Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
-              </p>
-              <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
-            </div>
+            <>
+              <div className="mt-4 text-sm text-muted-foreground">
+                <p>
+                  Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
+                </p>
+                <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <div className="flex-grow max-w-xs">
+                  <Label htmlFor="waypointPrefix" className="text-sm font-medium mb-1 block">
+                    Waypoint Prefix
+                  </Label>
+                  <Input
+                    id="waypointPrefix"
+                    value={waypointPrefix}
+                    onChange={(e) => setWaypointPrefix(e.target.value)}
+                    placeholder="Enter prefix (e.g., WP)"
+                    className="h-10"
+                  />
+                </div>
+                <Button onClick={applyWaypointPrefix} className="mt-6" disabled={isLoading}>
+                  Apply Prefix
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

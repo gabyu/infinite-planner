@@ -16,19 +16,19 @@ export default function PlannerPage() {
                 <Plane className="h-5 w-5 text-primary-foreground" />
               </div>
             </Link>
-            <h1 className="text-xl font-bold">Infinite Planner</h1>
+            <h1 className="text-xl font-bold hidden sm:block">Infinite Planner</h1>
           </div>
           <nav className="flex items-center gap-4">
             <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-10 flex items-center gap-2">
                 <DiscordIcon className="w-5 h-5" />
-                Join Discord
+                <span className="hidden sm:inline">Join Discord</span>
               </Button>
             </Link>
             <Link href="/">
               <Button variant="outline" className="h-10 flex items-center gap-2">
                 <Home size={16} />
-                Back to Home
+                <span className="hidden sm:inline">Back to Home</span>
               </Button>
             </Link>
           </nav>

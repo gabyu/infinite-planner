@@ -57,7 +57,13 @@ export function parseKML(kmlString: string): SimplificationResult {
           const gxCoords = track.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "coord")
           console.log(`Found ${gxCoords.length} gx:coord elements in track ${i + 1}`)
 
+          // In the FlightAware processing block, replace the existing waypoint creation code with this improved version:
           if (gxCoords && gxCoords.length > 0) {
+            console.log(`Processing ${gxCoords.length} FlightAware coordinates...`)
+
+            // First pass - collect all raw waypoints
+            const rawWaypoints: Waypoint[] = []
+
             for (let j = 0; j < gxCoords.length; j++) {
               if (gxCoords[j].textContent) {
                 // FlightAware format: longitude latitude altitude (space-separated)
@@ -71,9 +77,9 @@ export function parseKML(kmlString: string): SimplificationResult {
                   const altitude = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
 
                   if (!isNaN(lat) && !isNaN(lng)) {
-                    originalWaypoints.push({
+                    rawWaypoints.push({
                       id: `${Date.now()}-fa-${i}-${j}`,
-                      name: String(originalWaypoints.length + 1).padStart(3, "0"),
+                      name: String(rawWaypoints.length + 1).padStart(3, "0"),
                       lat,
                       lng,
                       altitude,
@@ -82,6 +88,16 @@ export function parseKML(kmlString: string): SimplificationResult {
                   }
                 }
               }
+            }
+
+            // Second pass - validate and detect anomalies
+            if (rawWaypoints.length > 0) {
+              // Filter out zigzags and anomalous points
+              const filteredWaypoints = detectAndRemoveAnomalies(rawWaypoints)
+              originalWaypoints.push(...filteredWaypoints)
+              console.log(
+                `Added ${filteredWaypoints.length} waypoints after filtering anomalies from ${rawWaypoints.length} raw waypoints`,
+              )
             }
           }
         } catch (err) {
@@ -294,6 +310,111 @@ function processCoordinates(coordLines: string[], placemarkIndex: number, startI
   return waypoints
 }
 
+// Function to detect and remove anomalous points that cause zigzags
+function detectAndRemoveAnomalies(waypoints: Waypoint[]): Waypoint[] {
+  if (waypoints.length <= 3) return waypoints
+
+  // Calculate average distance between consecutive waypoints
+  let totalDistance = 0
+  for (let i = 1; i < waypoints.length; i++) {
+    const prev = waypoints[i - 1]
+    const curr = waypoints[i]
+    totalDistance += calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng)
+  }
+  const avgDistance = totalDistance / (waypoints.length - 1)
+
+  // Calculate average bearing change between segments
+  let totalBearingChange = 0
+  let bearingChangeCount = 0
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = waypoints[i - 1]
+    const curr = waypoints[i]
+    const next = waypoints[i + 1]
+
+    const bearing1 = calculateBearing(prev.lat, prev.lng, curr.lat, curr.lng)
+    const bearing2 = calculateBearing(curr.lat, curr.lng, next.lat, next.lng)
+
+    let bearingChange = Math.abs(bearing2 - bearing1)
+    if (bearingChange > 180) bearingChange = 360 - bearingChange
+
+    totalBearingChange += bearingChange
+    bearingChangeCount++
+  }
+  const avgBearingChange = bearingChangeCount > 0 ? totalBearingChange / bearingChangeCount : 0
+
+  // Identify anomalous points based on abrupt bearing changes and distance anomalies
+  const goodWaypoints: Waypoint[] = [waypoints[0]] // Always include first waypoint
+
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = goodWaypoints[goodWaypoints.length - 1] // Last good waypoint
+    const curr = waypoints[i]
+    const next = waypoints[i + 1]
+
+    const distanceFromPrev = calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng)
+    const bearing1 = calculateBearing(prev.lat, prev.lng, curr.lat, curr.lng)
+    const bearing2 = calculateBearing(curr.lat, curr.lng, next.lat, next.lng)
+
+    let bearingChange = Math.abs(bearing2 - bearing1)
+    if (bearingChange > 180) bearingChange = 360 - bearingChange
+
+    // Check if this point creates a suspicious zigzag (large bearing change)
+    // or if it's an outlier in terms of distance
+    const isZigzag = bearingChange > Math.max(45, avgBearingChange * 3)
+    const isDistanceAnomaly = distanceFromPrev > avgDistance * 5
+
+    if (!isZigzag && !isDistanceAnomaly) {
+      goodWaypoints.push(curr)
+    } else {
+      console.log(
+        `Filtering out anomalous waypoint ${curr.name}: bearingChange=${bearingChange.toFixed(2)}°, distanceFromPrev=${distanceFromPrev.toFixed(2)}km`,
+      )
+    }
+  }
+
+  // Always add the last waypoint
+  goodWaypoints.push(waypoints[waypoints.length - 1])
+
+  return goodWaypoints
+}
+
+// Add this helper function to calculate bearing between two points
+function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const lat1Rad = deg2rad(lat1)
+  const lat2Rad = deg2rad(lat2)
+  const lonDiffRad = deg2rad(lon2 - lon1)
+
+  const y = Math.sin(lonDiffRad) * Math.cos(lat2Rad)
+  const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(lonDiffRad)
+
+  let bearing = Math.atan2(y, x)
+  bearing = bearing * (180 / Math.PI) // Convert to degrees
+  bearing = (bearing + 360) % 360 // Normalize to 0-360
+
+  return bearing
+}
+
+// Helper function to convert degrees to radians
+function deg2rad(degrees: number): number {
+  return degrees * (Math.PI / 180)
+}
+
+// Helper function to calculate distance between two points using Haversine formula
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371 // Radius of the Earth in kilometers
+  const lat1Rad = deg2rad(lat1)
+  const lat2Rad = deg2rad(lat2)
+  const latDiffRad = deg2rad(lat2 - lat1)
+  const lonDiffRad = deg2rad(lon2 - lon1)
+
+  const a =
+    Math.sin(latDiffRad / 2) * Math.sin(latDiffRad / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(lonDiffRad / 2) * Math.sin(lonDiffRad / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  const distance = R * c
+  return distance
+}
+
 // Function to validate and clean the route
 function validateAndCleanRoute(waypoints: Waypoint[]): Waypoint[] {
   if (waypoints.length <= 2) {
@@ -483,8 +604,12 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
       finalWaypoints.push(waypoints[waypoints.length - 1])
     }
 
+    // Apply a final smoothing pass to remove any remaining zigzags
+    const smoothedWaypoints = smoothRoute(finalWaypoints)
+    console.log(`Applied smoothing: ${finalWaypoints.length} waypoints -> ${smoothedWaypoints.length} waypoints`)
+
     // Rename waypoints to ensure sequential numbering (001, 002, 003...)
-    const renamedWaypoints = finalWaypoints.map((wp, index) => ({
+    const renamedWaypoints = smoothedWaypoints.map((wp, index) => ({
       ...wp,
       name: String(index + 1).padStart(3, "0"),
     }))
@@ -732,4 +857,38 @@ function perpendicularDistance(point: Waypoint, lineStart: Waypoint, lineEnd: Wa
   const denominator = Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2))
 
   return numerator / denominator
+}
+
+// Function to smooth a route by removing unnecessary zigzags
+function smoothRoute(waypoints: Waypoint[]): Waypoint[] {
+  if (waypoints.length <= 3) return waypoints
+
+  // Create a copy of the waypoints
+  const result: Waypoint[] = [waypoints[0]]
+
+  // Douglas-Peucker simplification with small tolerance to remove collinear points
+  const tolerance = 0.00001
+
+  // Analyze segments of the route to detect and smooth zigzags
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = result[result.length - 1]
+    const curr = waypoints[i]
+    const next = waypoints[i + 1]
+
+    // Check if the current point significantly deviates from a straight line
+    const distance = perpendicularDistance(curr, prev, next)
+
+    // If the deviation is small, skip this point (it's likely part of a zigzag)
+    if (distance <= tolerance) {
+      continue
+    }
+
+    // Otherwise, keep this point
+    result.push(curr)
+  }
+
+  // Always add the last waypoint
+  result.push(waypoints[waypoints.length - 1])
+
+  return result
 }
