@@ -14,12 +14,12 @@ Flight Planner enhances the flight planning experience in Infinite Flight by opt
 Roadmap:
 - Identifying step climbs, marking TOC (Top of Climb) & TOD (Top of Descent).
 - Detecting and rounding altitudes to the nearest 100 ft.
-- Allow user to custom-rename waypoints with a custom format (e.g., AFKLM028-###).
-- Import and process KML files from FlightAware
-- Determine the source of the KML file by leveraging the distinct structures of FlightAware and FlightRadar 24 for accurate and efficient identification.
+✔️ Allow user to custom-rename waypoints with a custom format (e.g., AFKLM028-###).
+✔️ Import and process KML files from FlightAware
+✔️ Determine the source of the KML file by leveraging the distinct structures of FlightAware and FlightRadar 24 for accurate and efficient identification.
 - Add the original airport and destination airport ICAO as 1st and last waypoints.
-- Exports the KML into a ready-to-use Infinite Flight plan file (FPL format).
-- Show a map with the flight plan.
+✔️ Exports the KML into a ready-to-use Infinite Flight plan file (FPL format).
+✔️ Show a map with the flight plan.
 
 Try it now, and let me know if it works as expected! 🚀
 If you can improve the code, feel free to fork it!
