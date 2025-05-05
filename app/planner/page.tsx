@@ -45,8 +45,12 @@ export default function PlannerPage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-6 border-t">
+      <footer className="mt-auto py-8 border-t">
         <div className="container mx-auto px-4 text-center">
+          <p className="text-gray-500 dark:text-gray-400 mb-2">
+            Stats last updated: <span id="stats-last-updated">--</span> | Total flight plans:{" "}
+            <span id="footer-total-plans">--</span> | Version: <span id="app-version">--</span>
+          </p>
           <p className="text-gray-600 dark:text-gray-400">
             Infinite Planner is not affiliated with FlightRadar24, FlightAware, or Infinite Flight.
           </p>
