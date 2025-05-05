@@ -1,12 +1,15 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Plane, Map, Download, MapPin } from "lucide-react"
+import { Plane, Map, Download, MapPin, BarChart3, Route, TrendingUp } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
+import { StatsLoader } from "@/components/stats-loader"
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
+      <StatsLoader />
+
       {/* Navigation */}
       <header className="border-b">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
@@ -69,8 +72,77 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Facts and Figures Section */}
       <section className="py-16 bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">Facts and Figures</h2>
+            <div className="flex justify-center items-center gap-2 mb-8">
+              <div className="h-[2px] w-12 bg-gray-300"></div>
+              <div className="h-[2px] w-24 bg-primary"></div>
+              <div className="h-[2px] w-12 bg-gray-300"></div>
+            </div>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Our community is growing every day. Here's what we've accomplished together.
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-16">
+            {/* Flight Plans This Month */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
+                <TrendingUp className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2" id="monthly-plans">
+                --
+              </h3>
+              <p className="text-lg font-medium mb-1">Flight Plans</p>
+              <p className="text-gray-600 dark:text-gray-300">This month</p>
+            </div>
+
+            {/* Total Flight Plans */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
+                <BarChart3 className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2" id="total-plans">
+                --
+              </h3>
+              <p className="text-lg font-medium mb-1">Flight Plans</p>
+              <p className="text-gray-600 dark:text-gray-300">Since launch</p>
+            </div>
+
+            {/* Total Waypoints */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
+                <MapPin className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2" id="total-waypoints">
+                --
+              </h3>
+              <p className="text-lg font-medium mb-1">Waypoints</p>
+              <p className="text-gray-600 dark:text-gray-300">Processed and served</p>
+            </div>
+
+            {/* Popular Routes */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
+                <Route className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold mb-2">Top Routes</h3>
+              <ul className="text-gray-600 dark:text-gray-300 space-y-1" id="top-routes">
+                <li>--</li>
+                <li>--</li>
+                <li>--</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 bg-white dark:bg-gray-800">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Features</h2>
