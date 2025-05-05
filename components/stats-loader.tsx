@@ -1,15 +1,17 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 export function StatsLoader() {
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+
   useEffect(() => {
     async function loadStats() {
       try {
         const response = await fetch("/api/stats")
         const data = await response.json()
 
-        // Update the DOM with the fetched statistics
+        // Update statistics in the DOM
         if (data.monthlyPlans) {
           document.getElementById("monthly-plans")!.textContent = data.monthlyPlans.toString()
         }
@@ -29,12 +31,17 @@ export function StatsLoader() {
           const topRoutesElement = document.getElementById("top-routes")
           if (topRoutesElement) {
             topRoutesElement.innerHTML = ""
-            data.topRoutes.slice(0, 3).forEach((route) => {
+            data.topRoutes.forEach((route) => {
               const li = document.createElement("li")
               li.textContent = route
               topRoutesElement.appendChild(li)
             })
           }
+        }
+
+        // Store the last updated timestamp
+        if (data.lastUpdated) {
+          setLastUpdated(data.lastUpdated)
         }
       } catch (error) {
         console.error("Failed to load statistics:", error)
@@ -44,5 +51,13 @@ export function StatsLoader() {
     loadStats()
   }, [])
 
-  return null
+  return (
+    <>
+      {lastUpdated && (
+        <div className="text-xs text-gray-500 text-center mt-2" id="last-updated">
+          Stats last updated: {new Date(lastUpdated).toLocaleString()}
+        </div>
+      )}
+    </>
+  )
 }

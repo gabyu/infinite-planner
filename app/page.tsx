@@ -56,34 +56,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-16 container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-4">About</h2>
-          <div className="flex justify-center items-center gap-2 mb-8">
-            <div className="h-[2px] w-12 bg-gray-300"></div>
-            <div className="h-[2px] w-24 bg-primary"></div>
-            <div className="h-[2px] w-12 bg-gray-300"></div>
-          </div>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            This site is used to convert KML flight plans from Flight radar or Flight Aware into flight plans on
-            Infinite Flight.
-          </p>
-        </div>
-      </section>
-
-      {/* Facts and Figures Section */}
+      {/* About Infinite Planner Section */}
       <section className="py-16 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Facts and Figures</h2>
+            <h2 className="text-3xl font-bold mb-4">About Infinite Planner</h2>
             <div className="flex justify-center items-center gap-2 mb-8">
               <div className="h-[2px] w-12 bg-gray-300"></div>
               <div className="h-[2px] w-24 bg-primary"></div>
               <div className="h-[2px] w-12 bg-gray-300"></div>
             </div>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-4">
+              Making flight planning easier to use, with ready-to-fly solutions. This site is used to convert KML flight
+              plans from Flight Radar or Flight Aware into flight plans on Infinite Flight.
+            </p>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Our community is growing every day. Here's what we've accomplished together.
+              Our community is growing every day.
             </p>
           </div>
 
