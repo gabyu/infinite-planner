@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button"
 import { Home, Plane } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 
+export const metadata = {
+  title: "Infinite Planner ● Flight Plan Converter for Infinite Flight",
+}
+
 export default function PlannerPage() {
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-slate-900">
