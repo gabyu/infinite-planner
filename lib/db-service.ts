@@ -1,12 +1,13 @@
-// Simple in-memory counter for demo purposes
-// In a production app, this would connect to a real database
-let flightPlanCounter = 0
+"use server"
 
+import { incrementCount, getCount } from "./actions"
+
+// Server-side function to increment the flight plan counter
 export async function incrementFlightPlanCounter(): Promise<number> {
-  flightPlanCounter += 1
-  return flightPlanCounter
+  return incrementCount()
 }
 
+// Server-side function to get the current flight plan count
 export async function getFlightPlanCount(): Promise<number> {
-  return flightPlanCounter
+  return getCount()
 }

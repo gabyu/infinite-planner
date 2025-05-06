@@ -244,7 +244,7 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      // Increment the flight plan counter
+      // Increment the flight plan counter on the server
       await incrementFlightPlanCounter()
 
       setSuccessMessage(`Flight plan exported as ${fileName}!`)
@@ -430,17 +430,20 @@ export function FlightPlanEditor() {
                 <span className="sm:hidden">Delete</span>
               </Button>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={addWaypoint}
-                className="flex items-center gap-1 h-10"
-                disabled={isLoading}
-              >
-                <Plus size={14} />
-                <span className="hidden sm:inline">Add Waypoint</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
+              {/* Only show Add Waypoint button on non-mobile devices */}
+              {!isMobile && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={addWaypoint}
+                  className="flex items-center gap-1 h-10"
+                  disabled={isLoading}
+                >
+                  <Plus size={14} />
+                  <span className="hidden sm:inline">Add Waypoint</span>
+                  <span className="sm:hidden">Add</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -484,7 +487,8 @@ export function FlightPlanEditor() {
                           value={waypoint.name}
                           onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
                           onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
-                          className="h-8 border-input"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -493,7 +497,8 @@ export function FlightPlanEditor() {
                           step="0.0001"
                           value={waypoint.lat}
                           onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
-                          className="h-8 border-input"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -502,7 +507,8 @@ export function FlightPlanEditor() {
                           step="0.0001"
                           value={waypoint.lng}
                           onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
-                          className="h-8 border-input"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -512,7 +518,8 @@ export function FlightPlanEditor() {
                           onChange={(e) =>
                             updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
                           }
-                          className="h-8 border-input"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
                     </TableRow>
@@ -541,7 +548,8 @@ export function FlightPlanEditor() {
                     value={waypointPrefix}
                     onChange={(e) => setWaypointPrefix(e.target.value)}
                     placeholder="Enter prefix (e.g., WP)"
-                    className="h-10"
+                    className="h-10 font-[var(--font-ibm-plex-mono)]"
+                    style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                   />
                 </div>
                 <Button onClick={applyWaypointPrefix} className="mt-6" disabled={isLoading}>

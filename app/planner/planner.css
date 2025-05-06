@@ -1,0 +1,4 @@
+/* Custom styles for the planner page */
+input {
+  font-family: var(--font-ibm-plex-mono), monospace !important;
+}

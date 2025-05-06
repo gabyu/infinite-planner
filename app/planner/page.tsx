@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Home, Plane } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
+import "./planner.css" // Import the planner-specific CSS
 
 export default function PlannerPage() {
   return (
