@@ -11,3 +11,5 @@ export async function incrementFlightPlanCounter(): Promise<number> {
 export async function getFlightPlanCount(): Promise<number> {
   return getCount()
 }
+
+// Re-export the server actions for backward compatibility from './actions';

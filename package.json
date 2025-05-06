@@ -61,7 +61,8 @@
     "leaflet": "latest",
     "xmldom": "latest",
     "fs": "latest",
-    "path": "latest"
+    "path": "latest",
+    "os": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

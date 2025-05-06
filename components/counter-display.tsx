@@ -5,11 +5,20 @@ import { useEffect, useState } from "react"
 export function CounterDisplay({ initialCount }: { initialCount: number }) {
   const [count, setCount] = useState(initialCount)
 
-  // Refresh the count every minute
   useEffect(() => {
+    // Function to fetch the latest count
     const fetchCount = async () => {
       try {
-        const response = await fetch("/api/counter", { cache: "no-store" })
+        // Add a cache-busting query parameter to prevent caching
+        const response = await fetch(`/api/counter?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        })
+
         if (response.ok) {
           const data = await response.json()
           setCount(data.count)
@@ -19,8 +28,13 @@ export function CounterDisplay({ initialCount }: { initialCount: number }) {
       }
     }
 
-    // Set up polling to refresh the count every minute
-    const intervalId = setInterval(fetchCount, 60000)
+    // Fetch immediately on mount
+    fetchCount()
+
+    // Set up polling to refresh the count every 10 seconds
+    const intervalId = setInterval(fetchCount, 10000)
+
+    // Clean up on unmount
     return () => clearInterval(intervalId)
   }, [])
 

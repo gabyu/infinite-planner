@@ -244,8 +244,21 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      // Increment the flight plan counter on the server
-      await incrementFlightPlanCounter()
+      // Increment the counter using the API endpoint to ensure it works in production
+      try {
+        await fetch("/api/counter", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+          },
+        })
+
+        // Also try the server action as a fallback
+        await incrementFlightPlanCounter()
+      } catch (counterError) {
+        console.error("Error incrementing counter:", counterError)
+      }
 
       setSuccessMessage(`Flight plan exported as ${fileName}!`)
     } catch (error) {

@@ -47,3 +47,13 @@ export async function incrementCount(): Promise<number> {
     return getCount() // Return current count if increment fails
   }
 }
+
+// Server action to get the current count
+export async function getFlightPlanCount(): Promise<number> {
+  return getCount()
+}
+
+// Server action to increment the count
+export async function incrementFlightPlanCounter(): Promise<number> {
+  return incrementCount()
+}

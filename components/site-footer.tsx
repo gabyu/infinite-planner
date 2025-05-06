@@ -2,7 +2,7 @@ import { getFlightPlanCount } from "@/lib/db-service"
 import { CounterDisplay } from "./counter-display"
 
 export async function SiteFooter() {
-  // Fetch the count server-side for initial render
+  // Fetch the count server-side for initial render with cache disabled
   const flightPlanCount = await getFlightPlanCount()
 
   return (

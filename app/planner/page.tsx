@@ -21,7 +21,7 @@ export default function PlannerPage() {
             <h1 className="text-xl font-bold text-xs sm:text-xl">Infinite Planner</h1>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
-            <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
+            <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4">
                 <DiscordIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Join Discord</span>
