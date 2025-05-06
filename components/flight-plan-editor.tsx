@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
+import { incrementFlightPlanCounter } from "@/lib/db-service"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview"), {
@@ -55,6 +56,21 @@ export function FlightPlanEditor() {
   const [importedFileName, setImportedFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { theme } = useTheme()
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+
+    return () => {
+      window.removeEventListener("resize", checkMobile)
+    }
+  }, [])
 
   // Clear success message after 5 seconds
   useEffect(() => {
@@ -187,6 +203,10 @@ export function FlightPlanEditor() {
         if (renamedWaypoints.length > 0) {
           setShowMapPreview(true)
         }
+
+        setSuccessMessage(
+          `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source || "KML file"}`,
+        )
       }
     } catch (error) {
       console.error("Error importing KML file:", error)
@@ -202,7 +222,7 @@ export function FlightPlanEditor() {
   }
 
   // Generate and download FPL file
-  const handleExportFPL = () => {
+  const handleExportFPL = async () => {
     if (waypoints.length === 0) {
       setError("No waypoints to export")
       return
@@ -223,6 +243,9 @@ export function FlightPlanEditor() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+
+      // Increment the flight plan counter
+      await incrementFlightPlanCounter()
 
       setSuccessMessage(`Flight plan exported as ${fileName}!`)
     } catch (error) {
@@ -403,7 +426,8 @@ export function FlightPlanEditor() {
                 className="flex items-center gap-1 h-10"
               >
                 <Trash2 size={14} />
-                Delete Selected
+                <span className="hidden sm:inline">Delete Selected</span>
+                <span className="sm:hidden">Delete</span>
               </Button>
 
               <Button
@@ -414,7 +438,8 @@ export function FlightPlanEditor() {
                 disabled={isLoading}
               >
                 <Plus size={14} />
-                Add Waypoint
+                <span className="hidden sm:inline">Add Waypoint</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
           </div>
@@ -425,21 +450,21 @@ export function FlightPlanEditor() {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-12"></TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Latitude</TableHead>
-                  <TableHead>Longitude</TableHead>
-                  <TableHead>Altitude (ft)</TableHead>
+                  <TableHead className="hidden md:table-cell">Latitude</TableHead>
+                  <TableHead className="hidden md:table-cell">Longitude</TableHead>
+                  <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
                       Loading waypoints...
                     </TableCell>
                   </TableRow>
                 ) : waypoints.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
                       No waypoints added. Import a KML file or add waypoints manually.
                     </TableCell>
                   </TableRow>
@@ -462,7 +487,7 @@ export function FlightPlanEditor() {
                           className="h-8 border-input"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Input
                           type="number"
                           step="0.0001"
@@ -471,7 +496,7 @@ export function FlightPlanEditor() {
                           className="h-8 border-input"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Input
                           type="number"
                           step="0.0001"
@@ -480,7 +505,7 @@ export function FlightPlanEditor() {
                           className="h-8 border-input"
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Input
                           type="number"
                           value={waypoint.altitude}

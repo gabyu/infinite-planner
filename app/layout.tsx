@@ -3,58 +3,40 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Analytics } from "@/components/analytics"
-import { Suspense } from "react"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Infinite Planner ● Turn real-world flights into Infinite Flight custom flight plans!",
+  title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
   description:
     "Turn real-world flights into Infinite Flight custom flight plans! Import KML files from FlightRadar24 or FlightAware and export to Infinite Flight.",
-  keywords: "Infinite Flight, flight plan converter, FlightRadar24, FlightAware, KML, flight simulator, aviation",
-  authors: [{ name: "Infinite Planner Team" }],
-  creator: "Infinite Planner",
-  publisher: "Infinite Planner",
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
   },
-  // Open Graph metadata for social media sharing
+  // Add OpenGraph metadata for social media sharing
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://infinite-planner.vercel.app/",
-    title: "Infinite Planner ● Turn real-world flights into Infinite Flight custom flight plans!",
-    description:
-      "Turn real-world flights into Infinite Flight custom flight plans! Import KML files from FlightRadar24 or FlightAware and export to Infinite Flight.",
+    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
     siteName: "Infinite Planner",
     images: [
       {
-        url: "/infinite-planner-og.png",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Infinite Planner - Flight Plan Converter for Infinite Flight",
+        alt: "Infinite Planner",
       },
     ],
   },
-  // Twitter card metadata
+  // Add Twitter card metadata
   twitter: {
     card: "summary_large_image",
-    title: "Infinite Planner ● Turn real-world flights into Infinite Flight custom flight plans!",
-    description:
-      "Turn real-world flights into Infinite Flight custom flight plans! Import KML files from FlightRadar24 or FlightAware and export to Infinite Flight.",
-    images: ["/infinite-planner-og.png"],
-    creator: "@InfinitePlanner",
-  },
-  // Canonical URL
-  alternates: {
-    canonical: "https://infinite-planner.vercel.app/",
-  },
-  // Robots directive
-  robots: {
-    index: true,
-    follow: true,
+    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
+    images: ["/og-image.png"],
   },
     generator: 'v0.dev'
 }
@@ -68,9 +50,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Suspense>{children}</Suspense>
+          {children}
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )

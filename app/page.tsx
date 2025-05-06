@@ -1,15 +1,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Plane, Map, Download, MapPin, BarChart3, Route, TrendingUp } from "lucide-react"
+import { Plane, Map, Download, MapPin } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
-import { StatsLoader } from "@/components/stats-loader"
+import { SiteFooter } from "@/components/site-footer"
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
-      <StatsLoader />
-
       {/* Navigation */}
       <header className="border-b">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
@@ -19,17 +17,17 @@ export default function HomePage() {
                 <Plane className="h-5 w-5 text-primary-foreground" />
               </div>
             </Link>
-            <h1 className="text-xl font-bold hidden sm:block">Infinite Planner</h1>
+            <h1 className="text-xl font-bold text-xs sm:text-xl">Infinite Planner</h1>
           </div>
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-2 sm:gap-4">
             <Link href="https://discord.gg/HmJVmYfM" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="h-10 flex items-center gap-2">
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4">
                 <DiscordIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Join Discord</span>
               </Button>
             </Link>
             <Link href="/planner">
-              <Button className="h-10 flex items-center gap-2">
+              <Button className="h-10 flex items-center gap-2 px-2 sm:px-4">
                 <MapPin size={16} />
                 <span className="hidden sm:inline">Open Planner Tool</span>
               </Button>
@@ -56,81 +54,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* About Infinite Planner Section */}
-      <section className="py-16 bg-gray-50 dark:bg-gray-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">About Infinite Planner</h2>
-            <div className="flex justify-center items-center gap-2 mb-8">
-              <div className="h-[2px] w-12 bg-gray-300"></div>
-              <div className="h-[2px] w-24 bg-primary"></div>
-              <div className="h-[2px] w-12 bg-gray-300"></div>
-            </div>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-4">
-              Making flight planning easier to use, with ready-to-fly solutions. This site is used to convert KML flight
-              plans from Flight Radar or Flight Aware into flight plans on Infinite Flight.
-            </p>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Our community is growing every day.
-            </p>
+      {/* About Section */}
+      <section className="py-16 container mx-auto px-4">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold mb-4">About</h2>
+          <div className="flex justify-center items-center gap-2 mb-8">
+            <div className="h-[2px] w-12 bg-gray-300"></div>
+            <div className="h-[2px] w-24 bg-primary"></div>
+            <div className="h-[2px] w-12 bg-gray-300"></div>
           </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-16">
-            {/* Flight Plans This Month */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
-                <TrendingUp className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-2" id="monthly-plans">
-                --
-              </h3>
-              <p className="text-lg font-medium mb-1">Flight Plans</p>
-              <p className="text-gray-600 dark:text-gray-300">This month</p>
-            </div>
-
-            {/* Total Flight Plans */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
-                <BarChart3 className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-2" id="total-plans">
-                --
-              </h3>
-              <p className="text-lg font-medium mb-1">Flight Plans</p>
-              <p className="text-gray-600 dark:text-gray-300">Since launch</p>
-            </div>
-
-            {/* Total Waypoints */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
-                <MapPin className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-2" id="total-waypoints">
-                --
-              </h3>
-              <p className="text-lg font-medium mb-1">Waypoints</p>
-              <p className="text-gray-600 dark:text-gray-300">Processed and served</p>
-            </div>
-
-            {/* Popular Routes */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center mb-6">
-                <Route className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-2xl font-bold mb-2">Top Routes</h3>
-              <ul className="text-gray-600 dark:text-gray-300 space-y-1" id="top-routes">
-                <li>--</li>
-                <li>--</li>
-                <li>--</li>
-              </ul>
-            </div>
-          </div>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+            This site is used to convert KML flight plans from Flight radar or Flight Aware into flight plans on
+            Infinite Flight.
+          </p>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-16 bg-white dark:bg-gray-800">
+      <section className="py-16 bg-gray-50 dark:bg-gray-900">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold mb-4">Features</h2>
@@ -267,20 +208,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-auto py-8 border-t">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-2">
-            Stats last updated: <span id="stats-last-updated">--</span> | Total flight plans:{" "}
-            <span id="footer-total-plans">--</span> | Version: <span id="app-version">--</span>
-          </p>
-          <p className="text-gray-600 dark:text-gray-400">
-            Infinite Planner is not affiliated with FlightRadar24, FlightAware, or Infinite Flight.
-          </p>
-          <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">
-            © {new Date().getFullYear()} Infinite Planner. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }
