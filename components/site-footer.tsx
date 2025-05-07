@@ -3,14 +3,7 @@ import { CounterDisplay } from "./counter-display"
 
 export async function SiteFooter() {
   // Fetch the count server-side for initial render with cache disabled
-  let flightPlanCount = 0
-
-  try {
-    flightPlanCount = await getFlightPlanCount()
-  } catch (error) {
-    console.error("Error fetching flight plan count:", error)
-    // Use default value of 0
-  }
+  const flightPlanCount = await getFlightPlanCount()
 
   return (
     <footer className="py-6 border-t">
