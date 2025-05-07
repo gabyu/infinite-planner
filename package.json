@@ -62,7 +62,8 @@
     "xmldom": "latest",
     "fs": "latest",
     "path": "latest",
-    "os": "latest"
+    "os": "latest",
+    "@supabase/supabase-js": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

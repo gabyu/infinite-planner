@@ -1,4 +1,4 @@
-import { getFlightPlanCount } from "@/lib/db-service"
+import { getFlightPlanCount } from "@/lib/counter-service"
 import { CounterDisplay } from "./counter-display"
 
 export async function SiteFooter() {

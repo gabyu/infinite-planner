@@ -17,7 +17,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
-import { incrementFlightPlanCounter } from "@/lib/db-service"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview"), {
@@ -253,9 +252,6 @@ export function FlightPlanEditor() {
             "Cache-Control": "no-cache",
           },
         })
-
-        // Also try the server action as a fallback
-        await incrementFlightPlanCounter()
       } catch (counterError) {
         console.error("Error incrementing counter:", counterError)
       }
