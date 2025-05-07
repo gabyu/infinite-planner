@@ -243,7 +243,7 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      // Increment the counter using the API endpoint to ensure it works in production
+      // Increment the counter using the API endpoint
       try {
         await fetch("/api/counter", {
           method: "POST",
