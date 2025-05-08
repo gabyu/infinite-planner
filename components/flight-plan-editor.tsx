@@ -410,47 +410,50 @@ export function FlightPlanEditor() {
   return (
     <div className="container mx-auto py-8 px-4">
       <Card className="bg-background shadow-sm border-border">
-        <CardHeader className="pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                disabled={isLoading}
-              >
-                <Upload size={14} />
-                <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
-                <span className="sm:hidden">Import</span>
-              </Button>
-              <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
+        {/* Make the header sticky */}
+        <div className="sticky top-0 z-10">
+          <CardHeader className="pb-4 border-b bg-background shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                  disabled={isLoading}
+                >
+                  <Upload size={14} />
+                  <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
+                  <span className="sm:hidden">Import</span>
+                </Button>
+                <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
 
-              <Button
-                onClick={() => setShowMapPreview(true)}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                disabled={waypoints.length === 0 || isLoading}
-              >
-                <Map size={14} />
-                <span className="hidden sm:inline">Preview</span>
-              </Button>
+                <Button
+                  onClick={() => setShowMapPreview(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                  disabled={waypoints.length === 0 || isLoading}
+                >
+                  <Map size={14} />
+                  <span className="hidden sm:inline">Preview</span>
+                </Button>
 
-              <Button
-                onClick={handleExportFPL}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                disabled={waypoints.length === 0 || isLoading}
-              >
-                <Download size={14} />
-                <span className="hidden sm:inline">Export FPL</span>
-                <span className="sm:hidden">Export</span>
-              </Button>
+                <Button
+                  onClick={handleExportFPL}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                  disabled={waypoints.length === 0 || isLoading}
+                >
+                  <Download size={14} />
+                  <span className="hidden sm:inline">Export FPL</span>
+                  <span className="sm:hidden">Export</span>
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        </div>
         <CardContent className="pt-6">
           {error && (
             <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
