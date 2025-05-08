@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle, CheckCircle2, FileText, Layers } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -54,6 +54,8 @@ export function FlightPlanEditor() {
   const [waypointPrefix, setWaypointPrefix] = useState("")
   const [importedFileName, setImportedFileName] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const txtFileInputRef = useRef<HTMLInputElement>(null)
+  const waypointsBatchRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const [isMobile, setIsMobile] = useState(false)
 
@@ -227,6 +229,65 @@ export function FlightPlanEditor() {
     }
   }
 
+  // Handle TXT file import for waypoint names
+  const handleTxtImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || waypoints.length === 0) return
+
+    setError(null)
+    setWarning(null)
+    setSuccessMessage(null)
+
+    try {
+      const text = await file.text()
+
+      // Split the text file by lines and filter out empty lines
+      const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "")
+
+      // Create a copy of the waypoints
+      const updatedWaypoints = [...waypoints]
+
+      // Update waypoint names with the lines from the text file
+      for (let i = 0; i < updatedWaypoints.length; i++) {
+        if (i < lines.length) {
+          // If we have a line for this waypoint, use it as the name
+          updatedWaypoints[i] = {
+            ...updatedWaypoints[i],
+            name: lines[i].trim(),
+          }
+        } else {
+          // If we don't have a line for this waypoint, clear the name
+          updatedWaypoints[i] = {
+            ...updatedWaypoints[i],
+            name: "",
+          }
+        }
+      }
+
+      // Update the waypoints
+      setWaypoints(updatedWaypoints)
+
+      // Show a warning if there are more lines than waypoints
+      if (lines.length > waypoints.length) {
+        setWarning(
+          `The text file contains ${lines.length} lines, but there are only ${waypoints.length} waypoints. Some lines were not used.`,
+        )
+      }
+
+      setSuccessMessage(
+        `Successfully imported ${Math.min(lines.length, waypoints.length)} waypoint names from text file.`,
+      )
+    } catch (error) {
+      console.error("Error importing TXT file:", error)
+      setError(`Error importing TXT file: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    // Reset file input
+    if (txtFileInputRef.current) {
+      txtFileInputRef.current.value = ""
+    }
+  }
+
   // Generate and download FPL file
   const handleExportFPL = async () => {
     if (waypoints.length === 0) {
@@ -337,6 +398,13 @@ export function FlightPlanEditor() {
 
     setWaypoints(renamedWaypoints)
     setSuccessMessage(`Prefix "${waypointPrefix}" applied to all waypoints!`)
+  }
+
+  // Scroll to Waypoints Batch section
+  const scrollToWaypointsBatch = () => {
+    if (waypointsBatchRef.current) {
+      waypointsBatchRef.current.scrollIntoView({ behavior: "smooth" })
+    }
   }
 
   return (
@@ -460,6 +528,18 @@ export function FlightPlanEditor() {
                   <span className="sm:hidden">Add</span>
                 </Button>
               )}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={scrollToWaypointsBatch}
+                className="flex items-center gap-1 h-10"
+                disabled={waypoints.length === 0 || isLoading}
+              >
+                <Layers size={14} />
+                <span className="hidden sm:inline">Waypoints Batch</span>
+                <span className="sm:hidden">Batch</span>
+              </Button>
             </div>
           </div>
 
@@ -558,24 +638,75 @@ export function FlightPlanEditor() {
                 <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <div className="flex-grow max-w-xs">
-                  <Label htmlFor="waypointPrefix" className="text-sm font-medium mb-1 block">
-                    Waypoint Prefix
-                  </Label>
-                  <Input
-                    id="waypointPrefix"
-                    value={waypointPrefix}
-                    onChange={(e) => setWaypointPrefix(e.target.value)}
-                    placeholder="Enter prefix (e.g., WP)"
-                    onFocus={handleInputFocus}
-                    className="h-10 font-[var(--font-ibm-plex-mono)]"
-                    style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                  />
+              {/* Waypoints Batch Section */}
+              <div ref={waypointsBatchRef} className="mt-8 border-t pt-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Layers className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-medium">Waypoints Batch</h3>
                 </div>
-                <Button onClick={applyWaypointPrefix} className="mt-6" disabled={isLoading}>
-                  Apply Prefix
-                </Button>
+
+                <div className="space-y-6">
+                  {/* Import TXT to Waypoints */}
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Import TXT to Waypoints</h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Import a text file to populate waypoint names. Each line in the file will be used as a waypoint
+                      name.
+                    </p>
+                    <Button
+                      onClick={() => txtFileInputRef.current?.click()}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1 h-9"
+                      disabled={waypoints.length === 0}
+                    >
+                      <Upload size={14} />
+                      <span>Import TXT File</span>
+                    </Button>
+                    <input
+                      ref={txtFileInputRef}
+                      type="file"
+                      accept=".txt"
+                      onChange={handleTxtImport}
+                      className="hidden"
+                    />
+                  </div>
+
+                  {/* Waypoint Prefix */}
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Waypoint Prefix</h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Add a prefix to all waypoint names (e.g., "WP" will result in "WP001", "WP002", etc.).
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex-grow max-w-xs">
+                        <Input
+                          id="waypointPrefix"
+                          value={waypointPrefix}
+                          onChange={(e) => setWaypointPrefix(e.target.value)}
+                          placeholder="Enter prefix (e.g., WP)"
+                          onFocus={handleInputFocus}
+                          className="h-9 font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                      </div>
+                      <Button
+                        onClick={applyWaypointPrefix}
+                        size="sm"
+                        className="h-9"
+                        disabled={isLoading || waypoints.length === 0}
+                      >
+                        Apply Prefix
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </>
           )}
