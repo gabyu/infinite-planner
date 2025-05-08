@@ -90,6 +90,12 @@ export function FlightPlanEditor() {
     }
   }, [waypoints])
 
+  // Handle focus event to select all text in the input field
+  const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Select all text when the input is focused
+    e.target.select()
+  }
+
   // Handle tab key navigation for waypoint names
   const handleTabKeyNavigation = (
     e: React.KeyboardEvent<HTMLInputElement>,
@@ -108,6 +114,7 @@ export function FlightPlanEditor() {
         const nextInput = document.getElementById(`name-${nextWaypointId}`)
         if (nextInput) {
           nextInput.focus()
+          // The focus event will trigger the selection of all text
         }
       }
     }
@@ -243,7 +250,7 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      // Increment the counter using the API endpoint to ensure it works in production
+      // Increment the counter using the API endpoint
       try {
         await fetch("/api/counter", {
           method: "POST",
@@ -496,6 +503,7 @@ export function FlightPlanEditor() {
                           value={waypoint.name}
                           onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
                           onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
+                          onFocus={handleInputFocus}
                           className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
@@ -506,6 +514,7 @@ export function FlightPlanEditor() {
                           step="0.0001"
                           value={waypoint.lat}
                           onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
+                          onFocus={handleInputFocus}
                           className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
@@ -516,6 +525,7 @@ export function FlightPlanEditor() {
                           step="0.0001"
                           value={waypoint.lng}
                           onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
+                          onFocus={handleInputFocus}
                           className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
@@ -527,6 +537,7 @@ export function FlightPlanEditor() {
                           onChange={(e) =>
                             updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
                           }
+                          onFocus={handleInputFocus}
                           className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
@@ -557,6 +568,7 @@ export function FlightPlanEditor() {
                     value={waypointPrefix}
                     onChange={(e) => setWaypointPrefix(e.target.value)}
                     placeholder="Enter prefix (e.g., WP)"
+                    onFocus={handleInputFocus}
                     className="h-10 font-[var(--font-ibm-plex-mono)]"
                     style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                   />
