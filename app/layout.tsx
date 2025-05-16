@@ -1,5 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
+
+// Load Vercel Speed Insights for performance monitoring
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 import { Inter, IBM_Plex_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -69,6 +73,8 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
+        {/* Load Vercel Speed Insights for performance monitoring */}
+        <SpeedInsights />
       </body>
     </html>
   )
