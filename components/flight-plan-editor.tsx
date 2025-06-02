@@ -187,7 +187,7 @@ export function FlightPlanEditor() {
       const text = await file.text()
       console.log("KML file loaded, parsing...")
 
-      const result = parseKML(text)
+      const result = parseKML(text, file.name)
       console.log(`Parsing complete: ${result.waypoints.length} waypoints`)
 
       if (result.waypoints.length === 0) {

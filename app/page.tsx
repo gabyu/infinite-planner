@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Plane, Map, Download, MapPin } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
+import { FlightStatistics } from "@/components/flight-statistics"
 
 export default function HomePage() {
   return (
@@ -187,6 +188,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Flight Statistics Section */}
+      <FlightStatistics />
 
       {/* Discord CTA Section */}
       <section className="py-12 bg-blue-600 text-white">

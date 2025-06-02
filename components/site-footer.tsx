@@ -6,7 +6,10 @@ export async function SiteFooter() {
   let flightPlanCount = 0
 
   try {
-    flightPlanCount = await getFlightPlanCount()
+    // Only fetch server-side if not in a static export
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      flightPlanCount = await getFlightPlanCount()
+    }
   } catch (error) {
     console.error("Error fetching flight plan count:", error)
     // Use default value of 0

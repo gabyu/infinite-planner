@@ -1,4 +1,5 @@
 import { DOMParser } from "xmldom"
+import { parseFlightFilename, saveFlightData } from "./flight-stats-service"
 
 interface Waypoint {
   id: string
@@ -17,7 +18,7 @@ interface SimplificationResult {
   source?: string // Added to track the source of the KML file
 }
 
-export function parseKML(kmlString: string): SimplificationResult {
+export function parseKML(kmlString: string, filename?: string): SimplificationResult {
   try {
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(kmlString, "text/xml")
@@ -225,6 +226,21 @@ export function parseKML(kmlString: string): SimplificationResult {
     }
 
     console.log(`Total waypoints found in KML: ${originalWaypoints.length}`)
+
+    // Save flight statistics if filename is provided and waypoints were found
+    if (filename && originalWaypoints.length > 0) {
+      try {
+        const flightData = parseFlightFilename(filename)
+        flightData.source = source
+
+        // Save flight data asynchronously (don't wait for it)
+        saveFlightData(flightData).catch((error) => {
+          console.error("Failed to save flight statistics:", error)
+        })
+      } catch (error) {
+        console.error("Error parsing flight filename:", error)
+      }
+    }
 
     // If we still have no waypoints, return empty result
     if (originalWaypoints.length === 0) {
@@ -547,25 +563,6 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
     }
   }
 }
-
-// Helper function to smooth an array (moving average)
-// function smoothArray(arr: number[], windowSize: number): number[] {
-//   const result: number[] = []
-
-//   for (let i = 0; i < arr.length; i++) {
-//     let sum = 0
-//     let count = 0
-
-//     for (let j = Math.max(0, i - windowSize); j <= Math.min(arr.length - 1, i + windowSize); j++) {
-//       sum += arr[j]
-//       count++
-//     }
-
-//     result.push(sum / count)
-//   }
-
-//   return result
-// }
 
 // Helper function to identify critical points in a segment (turns, altitude changes)
 function identifyCriticalPoints(waypoints: Waypoint[], maxPoints: number): Waypoint[] {
