@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 
 // Load Vercel Speed Insights for performance monitoring
-import { SpeedInsights } from '@vercel/speed-insights/next';
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 import { Inter, IBM_Plex_Mono } from "next/font/google"
 import "./globals.css"
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     description: "Turn real-world flights into Infinite Flight custom flight plans!",
     images: ["/og-image.png"],
   },
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
