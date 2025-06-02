@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getFlightPlanCount, incrementFlightPlanCounter } from "@/lib/counter-service"
 
-// API route to get the current count
+// API route to get the current count (no caching)
 export async function GET() {
   try {
     const count = await getFlightPlanCount()
@@ -10,7 +10,11 @@ export async function GET() {
       { count },
       {
         headers: {
-          "Cache-Control": "no-store, max-age=0",
+          // Prevent all caching
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+          "Surrogate-Control": "no-store",
           "Content-Type": "application/json",
         },
       },
@@ -21,7 +25,7 @@ export async function GET() {
   }
 }
 
-// API route to increment the count
+// API route to increment the count (no caching)
 export async function POST() {
   try {
     const newCount = await incrementFlightPlanCounter()
@@ -30,7 +34,11 @@ export async function POST() {
       { count: newCount },
       {
         headers: {
-          "Cache-Control": "no-store, max-age=0",
+          // Prevent all caching
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+          "Surrogate-Control": "no-store",
           "Content-Type": "application/json",
         },
       },
