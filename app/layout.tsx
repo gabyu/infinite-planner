@@ -3,10 +3,13 @@ import type { Metadata } from "next"
 
 // Load Vercel Speed Insights for performance monitoring
 import { SpeedInsights } from "@vercel/speed-insights/next"
+// Load Vercel Analytics for web analytics
+import { Analytics } from "@vercel/analytics/react"
 
 import { Inter, IBM_Plex_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Suspense } from "react"
 
 // Load IBM Plex Mono with more weights for better flexibility
 const ibmPlexMono = IBM_Plex_Mono({
@@ -71,10 +74,12 @@ export default function RootLayout({
       </head>
       <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <Suspense>{children}</Suspense>
         </ThemeProvider>
         {/* Load Vercel Speed Insights for performance monitoring */}
         <SpeedInsights />
+        {/* Load Vercel Analytics for web analytics */}
+        <Analytics />
       </body>
     </html>
   )
