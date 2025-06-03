@@ -1,10 +1,11 @@
 import { FlightPlanEditor } from "@/components/flight-plan-editor"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Home, Plane } from "lucide-react"
+import { Home } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 import "./planner.css" // Import the planner-specific CSS
+import Image from "next/image"
 
 export default function PlannerPage() {
   return (
@@ -14,8 +15,8 @@ export default function PlannerPage() {
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Link href="/" className="no-underline hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-                <Plane className="h-5 w-5 text-primary-foreground" />
+              <div className="w-8 h-8 rounded-md overflow-hidden">
+                <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={32} height={32} priority />
               </div>
             </Link>
             <h1 className="text-xl font-bold text-xs sm:text-xl">Infinite Planner</h1>

@@ -3,13 +3,10 @@ import type { Metadata } from "next"
 
 // Load Vercel Speed Insights for performance monitoring
 import { SpeedInsights } from "@vercel/speed-insights/next"
-// Load Vercel Analytics for web analytics
-import { Analytics } from "@vercel/analytics/react"
 
 import { Inter, IBM_Plex_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { Suspense } from "react"
 
 // Load IBM Plex Mono with more weights for better flexibility
 const ibmPlexMono = IBM_Plex_Mono({
@@ -43,7 +40,7 @@ export const metadata: Metadata = {
     siteName: "Infinite Planner",
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-image.webp",
         width: 1200,
         height: 630,
         alt: "Infinite Planner",
@@ -55,7 +52,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
     description: "Turn real-world flights into Infinite Flight custom flight plans!",
-    images: ["/og-image.png"],
+    images: ["/og-image.webp"],
   },
   generator: "v0.dev",
 }
@@ -74,12 +71,10 @@ export default function RootLayout({
       </head>
       <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Suspense>{children}</Suspense>
+          {children}
         </ThemeProvider>
         {/* Load Vercel Speed Insights for performance monitoring */}
         <SpeedInsights />
-        {/* Load Vercel Analytics for web analytics */}
-        <Analytics />
       </body>
     </html>
   )
