@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Infinite Planner",
     images: [
       {
-        url: "/public/infinite-planner-og.webp",
+        url: "./public/infinite-planner-og.webp",
         width: 1200,
         height: 630,
         alt: "Infinite Planner",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
     description:
       "Turn real-world flights into Infinite Flight custom flight plans!",
-    images: ["/public/infinite-planner-og.webp"],
+    images: ["./public/infinite-planner-og.webp"],
   },
   generator: "v0.dev",
 };
