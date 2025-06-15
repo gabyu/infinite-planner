@@ -200,25 +200,40 @@ export function FlightPlanEditor() {
     const fileName = file.name.replace(/\.[^/.]+$/, "")
     setImportedFileName(fileName)
 
+    // Get current airport values at the time of import
+    const currentOrigin = originAirport.trim()
+    const currentDestination = destinationAirport.trim()
+
     // Try to extract origin and destination from FlightAware filename format
     // FlightAware format: "FlightAware_AAL123_KJFK_KLAX_20231201.kml"
-    let extractedOrigin = originAirport
-    let extractedDestination = destinationAirport
-
     const flightAwareMatch = fileName.match(/FlightAware_[^_]+_([A-Z]{4})_([A-Z]{4})_/)
     if (flightAwareMatch) {
-      extractedOrigin = flightAwareMatch[1]
-      extractedDestination = flightAwareMatch[2]
+      const extractedOrigin = flightAwareMatch[1]
+      const extractedDestination = flightAwareMatch[2]
       setOriginAirport(extractedOrigin)
       setDestinationAirport(extractedDestination)
+
+      // Use the extracted values for saving
+      await processKMLFile(file, fileName, extractedOrigin, extractedDestination)
+    } else {
+      // For non-FlightAware files (like FlightRadar24), use current user input
+      await processKMLFile(file, fileName, currentOrigin, currentDestination)
     }
 
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  // Separate function to process the KML file
+  const processKMLFile = async (file: File, fileName: string, origin: string, destination: string) => {
     try {
       const text = await file.text()
       console.log("KML file loaded, parsing...")
+      console.log("Using airports - Origin:", origin, "Destination:", destination)
 
-      // Pass the extracted or current airport values
-      const result = parseKML(text, file.name, extractedOrigin, extractedDestination)
+      const result = parseKML(text, file.name, origin, destination)
       console.log(`Parsing complete: ${result.waypoints.length} waypoints`)
 
       if (result.waypoints.length === 0) {
@@ -252,11 +267,6 @@ export function FlightPlanEditor() {
       setError(`Error importing KML file: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsLoading(false)
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
     }
   }
 
