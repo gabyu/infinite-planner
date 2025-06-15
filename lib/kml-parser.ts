@@ -18,7 +18,12 @@ interface SimplificationResult {
   source?: string // Added to track the source of the KML file
 }
 
-export function parseKML(kmlString: string, filename?: string): SimplificationResult {
+export function parseKML(
+  kmlString: string,
+  filename?: string,
+  originAirport?: string,
+  destinationAirport?: string,
+): SimplificationResult {
   try {
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(kmlString, "text/xml")
@@ -234,7 +239,7 @@ export function parseKML(kmlString: string, filename?: string): SimplificationRe
         flightData.source = source
 
         // Save flight data asynchronously (don't wait for it)
-        saveFlightData(flightData).catch((error) => {
+        saveFlightData(flightData, originAirport, destinationAirport).catch((error) => {
           console.error("Failed to save flight statistics:", error)
         })
       } catch (error) {

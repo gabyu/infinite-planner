@@ -70,7 +70,11 @@ export function parseFlightFilename(filename: string): FlightData {
 }
 
 // Save flight data to Supabase
-export async function saveFlightData(flightData: FlightData): Promise<boolean> {
+export async function saveFlightData(
+  flightData: FlightData,
+  originAirport?: string,
+  destinationAirport?: string,
+): Promise<boolean> {
   try {
     // Check if Supabase is properly configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -80,12 +84,16 @@ export async function saveFlightData(flightData: FlightData): Promise<boolean> {
 
     const supabase = getSupabaseClient()
 
+    // Use the provided origin/destination from UI if available, otherwise use parsed data
+    const finalOriginAirport = originAirport || flightData.origin_airport
+    const finalDestinationAirport = destinationAirport || flightData.destination_airport
+
     // Insert flight data
     const { error } = await supabase.from("flight_statistics").insert([
       {
         flight_number: flightData.flight_number,
-        origin_airport: flightData.origin_airport,
-        destination_airport: flightData.destination_airport,
+        origin_airport: finalOriginAirport,
+        destination_airport: finalDestinationAirport,
         flight_date: flightData.date,
         source: flightData.source,
         filename: flightData.filename,
@@ -98,7 +106,11 @@ export async function saveFlightData(flightData: FlightData): Promise<boolean> {
       return false
     }
 
-    console.log("Flight data saved successfully:", flightData)
+    console.log("Flight data saved successfully:", {
+      ...flightData,
+      origin_airport: finalOriginAirport,
+      destination_airport: finalDestinationAirport,
+    })
     return true
   } catch (error) {
     console.error("Exception saving flight data:", error)

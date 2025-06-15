@@ -58,6 +58,9 @@ export function FlightPlanEditor() {
   const waypointsBatchRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const [isMobile, setIsMobile] = useState(false)
+  const [originAirport, setOriginAirport] = useState("")
+  const [destinationAirport, setDestinationAirport] = useState("")
+  const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
 
   // Check if device is mobile
   useEffect(() => {
@@ -91,6 +94,20 @@ export function FlightPlanEditor() {
       setWarning(null)
     }
   }, [waypoints])
+
+  // Apply "Made with Infinite Planner" when checkbox changes
+  useEffect(() => {
+    if (waypoints.length >= 4 && useMadeWithInfinitePlanner) {
+      applyMadeWithInfinitePlanner()
+    } else if (waypoints.length >= 4 && !useMadeWithInfinitePlanner) {
+      // Restore original numbering when unchecked
+      const renamedWaypoints = waypoints.map((wp, index) => ({
+        ...wp,
+        name: String(index + 1).padStart(3, "0"),
+      }))
+      setWaypoints(renamedWaypoints)
+    }
+  }, [useMadeWithInfinitePlanner])
 
   // Handle focus event to select all text in the input field
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -183,11 +200,19 @@ export function FlightPlanEditor() {
     const fileName = file.name.replace(/\.[^/.]+$/, "")
     setImportedFileName(fileName)
 
+    // Try to extract origin and destination from FlightAware filename format
+    // FlightAware format: "FlightAware_AAL123_KJFK_KLAX_20231201.kml"
+    const flightAwareMatch = fileName.match(/FlightAware_[^_]+_([A-Z]{4})_([A-Z]{4})_/)
+    if (flightAwareMatch) {
+      setOriginAirport(flightAwareMatch[1])
+      setDestinationAirport(flightAwareMatch[2])
+    }
+
     try {
       const text = await file.text()
       console.log("KML file loaded, parsing...")
 
-      const result = parseKML(text, file.name)
+      const result = parseKML(text, file.name, originAirport, destinationAirport)
       console.log(`Parsing complete: ${result.waypoints.length} waypoints`)
 
       if (result.waypoints.length === 0) {
@@ -400,6 +425,27 @@ export function FlightPlanEditor() {
     setSuccessMessage(`Prefix "${waypointPrefix}" applied to all waypoints!`)
   }
 
+  // Apply "Made with Infinite Planner" to last 4 waypoints
+  const applyMadeWithInfinitePlanner = () => {
+    if (waypoints.length < 4) {
+      setError("Need at least 4 waypoints to apply 'Made with Infinite Planner'")
+      return
+    }
+
+    const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
+    const updatedWaypoints = waypoints.map((wp, index) => {
+      const isLastFour = index >= waypoints.length - 4
+      if (isLastFour && useMadeWithInfinitePlanner) {
+        const nameIndex = index - (waypoints.length - 4)
+        return { ...wp, name: madeWithNames[nameIndex] }
+      }
+      return wp
+    })
+
+    setWaypoints(updatedWaypoints)
+    setSuccessMessage("Applied 'Made with Infinite Planner' to last 4 waypoints!")
+  }
+
   // Scroll to Waypoints Batch section
   const scrollToWaypointsBatch = () => {
     if (waypointsBatchRef.current) {
@@ -413,43 +459,77 @@ export function FlightPlanEditor() {
         {/* Make the header sticky */}
         <div className="sticky top-0 z-10">
           <CardHeader className="pb-4 border-b bg-background shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                  disabled={isLoading}
-                >
-                  <Upload size={14} />
-                  <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
-                  <span className="sm:hidden">Import</span>
-                </Button>
-                <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
+            <div className="flex flex-col gap-4">
+              {/* Airport Fields */}
+              {/* Action Buttons and Airport Fields */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                    disabled={isLoading}
+                  >
+                    <Upload size={14} />
+                    <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
+                    <span className="sm:hidden">Import</span>
+                  </Button>
+                  <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
 
-                <Button
-                  onClick={() => setShowMapPreview(true)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                  disabled={waypoints.length === 0 || isLoading}
-                >
-                  <Map size={14} />
-                  <span className="hidden sm:inline">Preview</span>
-                </Button>
+                  <Button
+                    onClick={() => setShowMapPreview(true)}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                    disabled={waypoints.length === 0 || isLoading}
+                  >
+                    <Map size={14} />
+                    <span className="hidden sm:inline">Preview</span>
+                  </Button>
 
-                <Button
-                  onClick={handleExportFPL}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                  disabled={waypoints.length === 0 || isLoading}
-                >
-                  <Download size={14} />
-                  <span className="hidden sm:inline">Export FPL</span>
-                  <span className="sm:hidden">Export</span>
-                </Button>
+                  <Button
+                    onClick={handleExportFPL}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                    disabled={waypoints.length === 0 || isLoading}
+                  >
+                    <Download size={14} />
+                    <span className="hidden sm:inline">Export FPL</span>
+                    <span className="sm:hidden">Export</span>
+                  </Button>
+                </div>
+
+                {/* Airport Fields on the right */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
+                      Origin
+                    </Label>
+                    <Input
+                      id="origin"
+                      value={originAirport}
+                      onChange={(e) => setOriginAirport(e.target.value.toUpperCase())}
+                      placeholder="EHAM"
+                      className="h-8 w-20 text-center font-mono"
+                      maxLength={4}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
+                      Dest
+                    </Label>
+                    <Input
+                      id="destination"
+                      value={destinationAirport}
+                      onChange={(e) => setDestinationAirport(e.target.value.toUpperCase())}
+                      placeholder="KSFO"
+                      className="h-8 w-20 text-center font-mono"
+                      maxLength={4}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -484,6 +564,9 @@ export function FlightPlanEditor() {
               <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
               <AlertTitle className="text-blue-700 dark:text-blue-400">Waypoint Simplification Applied</AlertTitle>
               <AlertDescription className="text-blue-600 dark:text-blue-300">
+                <p>
+                  Imported filename: <strong>{importedFileName || "Unknown"}.kml</strong>
+                </p>
                 <p>Original waypoints: {simplificationInfo.originalCount}</p>
                 <p>After simplification: {simplificationInfo.simplifiedCount}</p>
                 {simplificationInfo.source && (
@@ -707,6 +790,28 @@ export function FlightPlanEditor() {
                       >
                         Apply Prefix
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Made with Infinite Planner */}
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Made with Infinite Planner</h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Replace the last 4 waypoint names with "MADE", "WITH", "INFINITE", "PLANNER" to share the love!
+                    </p>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="madeWithInfinitePlanner"
+                        checked={useMadeWithInfinitePlanner}
+                        onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
+                        disabled={waypoints.length < 4}
+                      />
+                      <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
+                        Use "Made with Infinite Planner" for last 4 waypoints
+                      </Label>
                     </div>
                   </div>
                 </div>
