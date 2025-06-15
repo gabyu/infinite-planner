@@ -202,17 +202,23 @@ export function FlightPlanEditor() {
 
     // Try to extract origin and destination from FlightAware filename format
     // FlightAware format: "FlightAware_AAL123_KJFK_KLAX_20231201.kml"
+    let extractedOrigin = originAirport
+    let extractedDestination = destinationAirport
+
     const flightAwareMatch = fileName.match(/FlightAware_[^_]+_([A-Z]{4})_([A-Z]{4})_/)
     if (flightAwareMatch) {
-      setOriginAirport(flightAwareMatch[1])
-      setDestinationAirport(flightAwareMatch[2])
+      extractedOrigin = flightAwareMatch[1]
+      extractedDestination = flightAwareMatch[2]
+      setOriginAirport(extractedOrigin)
+      setDestinationAirport(extractedDestination)
     }
 
     try {
       const text = await file.text()
       console.log("KML file loaded, parsing...")
 
-      const result = parseKML(text, file.name, originAirport, destinationAirport)
+      // Pass the extracted or current airport values
+      const result = parseKML(text, file.name, extractedOrigin, extractedDestination)
       console.log(`Parsing complete: ${result.waypoints.length} waypoints`)
 
       if (result.waypoints.length === 0) {

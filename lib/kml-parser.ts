@@ -238,6 +238,10 @@ export function parseKML(
         const flightData = parseFlightFilename(filename)
         flightData.source = source
 
+        console.log("Parsed flight data:", flightData)
+        console.log("Origin airport parameter:", originAirport)
+        console.log("Destination airport parameter:", destinationAirport)
+
         // Save flight data asynchronously (don't wait for it)
         saveFlightData(flightData, originAirport, destinationAirport).catch((error) => {
           console.error("Failed to save flight statistics:", error)

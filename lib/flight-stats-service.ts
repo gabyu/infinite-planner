@@ -84,33 +84,51 @@ export async function saveFlightData(
 
     const supabase = getSupabaseClient()
 
-    // Use the provided origin/destination from UI if available, otherwise use parsed data
-    const finalOriginAirport = originAirport || flightData.origin_airport
-    const finalDestinationAirport = destinationAirport || flightData.destination_airport
+    // Determine final origin and destination based on source
+    let finalOriginAirport: string | undefined
+    let finalDestinationAirport: string | undefined
+
+    if (flightData.source === "FlightRadar24") {
+      // For FlightRadar24, use user-entered airport codes from UI
+      finalOriginAirport = originAirport && originAirport.trim() !== "" ? originAirport : undefined
+      finalDestinationAirport = destinationAirport && destinationAirport.trim() !== "" ? destinationAirport : undefined
+    } else {
+      // For FlightAware and other sources, use parsed data from filename
+      finalOriginAirport = flightData.origin_airport
+      finalDestinationAirport = flightData.destination_airport
+    }
+
+    console.log("Saving flight data:", {
+      flight_number: flightData.flight_number,
+      origin_airport: finalOriginAirport,
+      destination_airport: finalDestinationAirport,
+      flight_date: flightData.date,
+      source: flightData.source,
+      filename: flightData.filename,
+    })
 
     // Insert flight data
-    const { error } = await supabase.from("flight_statistics").insert([
-      {
-        flight_number: flightData.flight_number,
-        origin_airport: finalOriginAirport,
-        destination_airport: finalDestinationAirport,
-        flight_date: flightData.date,
-        source: flightData.source,
-        filename: flightData.filename,
-        created_at: new Date().toISOString(),
-      },
-    ])
+    const { data, error } = await supabase
+      .from("flight_statistics")
+      .insert([
+        {
+          flight_number: flightData.flight_number,
+          origin_airport: finalOriginAirport,
+          destination_airport: finalDestinationAirport,
+          flight_date: flightData.date,
+          source: flightData.source,
+          filename: flightData.filename,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
 
     if (error) {
       console.error("Error saving flight data:", error)
       return false
     }
 
-    console.log("Flight data saved successfully:", {
-      ...flightData,
-      origin_airport: finalOriginAirport,
-      destination_airport: finalDestinationAirport,
-    })
+    console.log("Flight data saved successfully:", data)
     return true
   } catch (error) {
     console.error("Exception saving flight data:", error)
