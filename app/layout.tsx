@@ -1,12 +1,12 @@
-import type React from "react";
-import type { Metadata } from "next";
+import type React from "react"
+import type { Metadata } from "next"
 
-// Load Vercel Speed Insights for performance monitoring
-import { SpeedInsights } from "@vercel/speed-insights/next";
+// Load Vercel Speed Insights for performance monitoring - using stable version
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
-import { Inter, IBM_Plex_Mono } from "next/font/google";
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import { Inter, IBM_Plex_Mono } from "next/font/google"
+import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 
 // Load IBM Plex Mono with more weights for better flexibility
 const ibmPlexMono = IBM_Plex_Mono({
@@ -14,13 +14,13 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-ibm-plex-mono",
-});
+})
 
 const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
-});
+})
 
 export const metadata: Metadata = {
   title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
@@ -36,8 +36,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://infiniteplanner.gabyu.com/",
     title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
-    description:
-      "Turn real-world flights into Infinite Flight custom flight plans!",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
     siteName: "Infinite Planner",
     images: [
       {
@@ -52,28 +51,23 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
-    description:
-      "Turn real-world flights into Infinite Flight custom flight plans!",
+    description: "Turn real-world flights into Infinite Flight custom flight plans!",
     images: ["/images/infinite-planner-og.webp"],
   },
   generator: "v0.dev",
-};
+}
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         {/* Preconnect to Google Fonts to improve loading performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
@@ -83,5 +77,5 @@ export default function RootLayout({
         <SpeedInsights />
       </body>
     </html>
-  );
+  )
 }
