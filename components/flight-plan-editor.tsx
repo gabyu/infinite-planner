@@ -210,6 +210,8 @@ export function FlightPlanEditor() {
     if (flightAwareMatch) {
       const extractedOrigin = flightAwareMatch[1]
       const extractedDestination = flightAwareMatch[2]
+
+      // Update the UI fields immediately so user can see the extracted data
       setOriginAirport(extractedOrigin)
       setDestinationAirport(extractedDestination)
 
