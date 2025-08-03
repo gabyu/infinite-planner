@@ -18,11 +18,15 @@ export default function HomePage() {
                 <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={32} height={32} className="w-8 h-8" />
               </div>
             </Link>
-            <h1 className="text-xl font-bold text-xs sm:text-xl">Infinite Planner</h1>
+            <Link href="/" className="no-underline">
+              <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors cursor-pointer">
+                Infinite Planner
+              </h1>
+            </Link>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
             <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4">
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Join Discord</span>
               </Button>
@@ -40,6 +44,12 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-16 md:py-24 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
         <div className="container mx-auto px-4 text-center">
+          {/* Large rounded icon */}
+          <div className="flex justify-center mb-8">
+            <div className="w-24 h-24 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center">
+              <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={48} height={48} className="w-12 h-12" />
+            </div>
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">Infinite Planner</h1>
           <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
             Turn real-world flights into Infinite Flight custom flight plans!

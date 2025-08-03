@@ -19,17 +19,21 @@ export default function PlannerPage() {
                 <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={32} height={32} priority />
               </div>
             </Link>
-            <h1 className="text-xl font-bold text-xs sm:text-xl">Infinite Planner</h1>
+            <Link href="/" className="no-underline">
+              <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors cursor-pointer">
+                Infinite Planner
+              </h1>
+            </Link>
           </div>
           <nav className="flex items-center gap-2 sm:gap-4">
             <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4">
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Join Discord</span>
               </Button>
             </Link>
             <Link href="/">
-              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4">
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
                 <Home size={16} />
                 <span className="hidden sm:inline">Back to Home</span>
               </Button>

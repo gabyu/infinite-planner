@@ -22,10 +22,10 @@ export function FlightStatistics() {
       try {
         setIsLoading(true)
 
-        // Fetch all statistics in parallel
+        // Fetch all statistics in parallel - changed from 5 to 10
         const [airports, flights, totals] = await Promise.all([
-          getPopularAirports(5),
-          getPopularFlights(5),
+          getPopularAirports(10),
+          getPopularFlights(10),
           getTotalStats(),
         ])
 
@@ -100,7 +100,7 @@ export function FlightStatistics() {
             <CardContent>
               {isLoading ? (
                 <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
+                  {[...Array(10)].map((_, i) => (
                     <div key={i} className="flex justify-between items-center">
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8"></div>
@@ -136,7 +136,7 @@ export function FlightStatistics() {
             <CardContent>
               {isLoading ? (
                 <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
+                  {[...Array(10)].map((_, i) => (
                     <div key={i} className="flex justify-between items-center">
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
                       <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8"></div>
