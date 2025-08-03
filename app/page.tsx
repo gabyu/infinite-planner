@@ -73,7 +73,7 @@ export default function HomePage() {
             <div className="h-[2px] w-12 bg-gray-300"></div>
           </div>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            This site is used to convert KML flight plans from Flight Radar 24 or Flight Aware into flight plans on
+            This site is used to convert KML flight plans from FlightRadar24 or Flight Aware into flight plans on
             Infinite Flight.
           </p>
         </div>
@@ -103,7 +103,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-2xl font-bold mb-4">Flight Plan</h3>
               <p className="text-gray-600 dark:text-gray-300">
-                Import your flight plan from Flight Aware or Flight Radar 24.
+                Import your flight plan from Flight Aware or FlightRadar24.
               </p>
             </div>
 
