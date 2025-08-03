@@ -44,11 +44,9 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="py-16 md:py-24 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
         <div className="container mx-auto px-4 text-center">
-          {/* Large rounded icon */}
+          {/* Large logo without background container */}
           <div className="flex justify-center mb-8">
-            <div className="w-24 h-24 rounded-full bg-white dark:bg-gray-800 shadow-lg flex items-center justify-center">
-              <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={48} height={48} className="w-12 h-12" />
-            </div>
+            <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={96} height={96} className="w-24 h-24" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">Infinite Planner</h1>
           <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
@@ -75,7 +73,7 @@ export default function HomePage() {
             <div className="h-[2px] w-12 bg-gray-300"></div>
           </div>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            This site is used to convert KML flight plans from Flight radar or Flight Aware into flight plans on
+            This site is used to convert KML flight plans from Flight Radar 24 or Flight Aware into flight plans on
             Infinite Flight.
           </p>
         </div>
@@ -105,7 +103,7 @@ export default function HomePage() {
               </div>
               <h3 className="text-2xl font-bold mb-4">Flight Plan</h3>
               <p className="text-gray-600 dark:text-gray-300">
-                Import your flight plan from Flight Aware or Flight Radar.
+                Import your flight plan from Flight Aware or Flight Radar 24.
               </p>
             </div>
 
@@ -203,16 +201,20 @@ export default function HomePage() {
       <FlightStatistics />
 
       {/* Discord CTA Section */}
-      <section className="py-12 bg-blue-600 text-white">
+      <section className="py-12 bg-blue-700 dark:bg-blue-800 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold mb-4">Join Our Community</h2>
-          <p className="mb-6 max-w-2xl mx-auto">
+          <h2 className="text-2xl font-bold mb-4 text-white">Join Our Community</h2>
+          <p className="mb-6 max-w-2xl mx-auto text-blue-50 dark:text-blue-100">
             Connect with other Infinite Flight enthusiasts, get help with flight planning, and stay updated on new
             features.
           </p>
           <div className="flex justify-center">
             <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" size="lg" className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex items-center gap-2 bg-white text-blue-700 hover:bg-blue-50 dark:bg-gray-100 dark:text-blue-800 dark:hover:bg-gray-200"
+              >
                 <DiscordIcon className="w-6 h-6" />
                 Join Our Discord
               </Button>
