@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { useTheme } from "next-themes"
+import { Button } from "@/components/ui/button"
 
 interface Waypoint {
   id: string
@@ -23,6 +24,22 @@ export default function MapPreview({ waypoints }: MapPreviewProps) {
   const mapInstanceRef = useRef<L.Map | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+
+  // Zoom to departure airport (first waypoint) - increased zoom level
+  const zoomToDeparture = () => {
+    if (waypoints.length > 0 && mapInstanceRef.current) {
+      const firstWaypoint = waypoints[0]
+      mapInstanceRef.current.setView([firstWaypoint.lat, firstWaypoint.lng], 14)
+    }
+  }
+
+  // Zoom to arrival airport (last waypoint) - increased zoom level
+  const zoomToArrival = () => {
+    if (waypoints.length > 0 && mapInstanceRef.current) {
+      const lastWaypoint = waypoints[waypoints.length - 1]
+      mapInstanceRef.current.setView([lastWaypoint.lat, lastWaypoint.lng], 14)
+    }
+  }
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -189,5 +206,29 @@ export default function MapPreview({ waypoints }: MapPreviewProps) {
     }
   }, [waypoints, isDark])
 
-  return <div ref={mapRef} className="h-full w-full" />
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapRef} className="h-full w-full" />
+
+      {/* Zoom Controls */}
+      {waypoints.length > 1 && (
+        <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
+          <Button
+            onClick={zoomToDeparture}
+            size="sm"
+            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
+          >
+            🛫 Departure
+          </Button>
+          <Button
+            onClick={zoomToArrival}
+            size="sm"
+            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
+          >
+            🛬 Arrival
+          </Button>
+        </div>
+      )}
+    </div>
+  )
 }
