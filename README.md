@@ -1,10 +1,10 @@
 # Infinite Planner
-Infinite Planner is the name of a series of tools built to improve and ease the Flight Planning experience for Infinite Flight.
+Infinite Planner is the name of a series of tools built to improve and ease the Flight Planning experience for Infinite Flight, one of the most popular flight simulator for iOS, iPadOS and Android.
 
 # FPL Cleaner / Optimizer
 Perfect for virtual pilots looking for more accurate and efficient route planning.
 
-The script converts a FlightRadar24 KML file to an optimized KML file with the limitations of Infinite Flight. 
+The script converts a FlightRadar24 KML file to an optimized FPL file with the limitations of Infinite Flight. 
 
 Flight Planner enhances the flight planning experience in Infinite Flight by optimizing existing and past flight KML files. It intelligently cleans up flight paths by:
 - ✔️ Filtering unnecessary waypoints, keeping only essential turns.
