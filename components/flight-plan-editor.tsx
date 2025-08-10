@@ -785,7 +785,9 @@ export function FlightPlanEditor() {
                       key={waypoint.id}
                       className="bg-card hover:bg-muted/50 h-12" // Removed drag-related classes
                     >
-                      <TableCell className="w-12 py-0 pl-4 pr-2 flex items-center justify-center">
+                      <TableCell className="w-12 py-2 pl-4 pr-2">
+                        {" "}
+                        {/* Reverted to default padding, removed flex for vertical alignment */}
                         <Checkbox
                           id={`wp-${waypoint.id}`}
                           checked={waypoint.selected}
@@ -793,40 +795,48 @@ export function FlightPlanEditor() {
                           className="flex-shrink-0"
                         />
                       </TableCell>
-                      <TableCell className="py-0">
+                      <TableCell className="py-2">
+                        {" "}
+                        {/* Reverted to default padding */}
                         <Input
                           id={`name-${waypoint.id}`}
                           value={waypoint.name}
                           onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
                           onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
                           onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell py-0">
+                      <TableCell className="hidden md:table-cell py-2">
+                        {" "}
+                        {/* Reverted to default padding */}
                         <Input
                           type="number"
                           step="0.0001"
                           value={waypoint.lat}
                           onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
                           onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell py-0">
+                      <TableCell className="hidden md:table-cell py-2">
+                        {" "}
+                        {/* Reverted to default padding */}
                         <Input
                           type="number"
                           step="0.0001"
                           value={waypoint.lng}
                           onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
                           onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>
-                      <TableCell className="hidden md:table-cell py-0">
+                      <TableCell className="hidden md:table-cell py-2">
+                        {" "}
+                        {/* Reverted to default padding */}
                         <Input
                           type="number"
                           value={waypoint.altitude}
@@ -834,7 +844,7 @@ export function FlightPlanEditor() {
                             updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
                           }
                           onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                         />
                       </TableCell>

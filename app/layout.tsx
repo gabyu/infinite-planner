@@ -12,13 +12,13 @@ import { ThemeProvider } from "@/components/theme-provider"
 const ibmPlexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
-  display: "swap",
+  display: "optional", // Changed from "swap" to "optional"
   variable: "--font-ibm-plex-mono",
 })
 
 const inter = Inter({
   subsets: ["latin"],
-  display: "swap",
+  display: "optional", // Changed from "swap" to "optional"
   variable: "--font-inter",
 })
 
