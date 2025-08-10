@@ -2,18 +2,37 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Download, Upload, Trash2, Plus, Info, Map, AlertTriangle, CheckCircle2, FileText, Layers } from "lucide-react"
+import {
+  Download,
+  Upload,
+  Trash2,
+  Plus,
+  Info,
+  Map,
+  AlertTriangle,
+  CheckCircle2,
+  FileText,
+  Layers,
+  Pencil,
+} from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
@@ -58,8 +77,13 @@ export function FlightPlanEditor() {
   const { theme } = useTheme()
   const [isMobile, setIsMobile] = useState(false)
   const [originAirport, setOriginAirport] = useState("")
-  const [destinationAirport, setDestinationAirport] = useState("")
+  const [destinationAirport, setDestinationToAirport] = useState("")
   const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
+  const [isEditingMap, setIsEditingMap] = useState(false) // New state for map editing mode
+
+  // Refs for sticky header height calculation
+  const cardHeaderRef = useRef<HTMLDivElement>(null)
+  const [tableBarTopPosition, setTableBarTopPosition] = useState(0)
 
   // Check if device is mobile
   useEffect(() => {
@@ -72,6 +96,26 @@ export function FlightPlanEditor() {
 
     return () => {
       window.removeEventListener("resize", checkMobile)
+    }
+  }, [])
+
+  // Calculate sticky table bar top position
+  useEffect(() => {
+    const calculateTopPosition = () => {
+      if (cardHeaderRef.current) {
+        // Get the height of the card header (which is sticky at top-0)
+        const headerHeight = cardHeaderRef.current.offsetHeight
+        // Set the top position to 81px as requested
+        setTableBarTopPosition(81)
+      }
+    }
+
+    // Recalculate on mount and resize
+    calculateTopPosition()
+    window.addEventListener("resize", calculateTopPosition)
+
+    return () => {
+      window.removeEventListener("resize", calculateTopPosition)
     }
   }, [])
 
@@ -212,7 +256,7 @@ export function FlightPlanEditor() {
 
       // Update the UI fields immediately so user can see the extracted data
       setOriginAirport(extractedOrigin)
-      setDestinationAirport(extractedDestination)
+      setDestinationToAirport(extractedDestination)
 
       // Use the extracted values for saving
       await processKMLFile(file, fileName, extractedOrigin, extractedDestination)
@@ -231,11 +275,8 @@ export function FlightPlanEditor() {
   const processKMLFile = async (file: File, fileName: string, origin: string, destination: string) => {
     try {
       const text = await file.text()
-      console.log("KML file loaded, parsing...")
-      console.log("Using airports - Origin:", origin, "Destination:", destination)
 
       const result = parseKML(text, file.name, origin, destination)
-      console.log(`Parsing complete: ${result.waypoints.length} waypoints`)
 
       if (result.waypoints.length === 0) {
         setError("No valid waypoints found in the KML file. Please check the file format.")
@@ -373,17 +414,38 @@ export function FlightPlanEditor() {
     }
   }
 
-  // Add a new waypoint
-  const addWaypoint = () => {
-    const newWaypoint: Waypoint = {
-      id: Date.now().toString(),
-      name: String(waypoints.length + 1).padStart(3, "0"),
-      lat: 0,
-      lng: 0,
-      altitude: 0,
+  // Insert a new waypoint after each selected waypoint
+  const insertWaypoint = () => {
+    const selectedWaypoints = waypoints.filter((wp) => wp.selected)
+    if (selectedWaypoints.length === 0) {
+      setError("Please select at least one waypoint to insert after.")
+      return
     }
-    setWaypoints([...waypoints, newWaypoint])
-    setSuccessMessage("New waypoint added!")
+
+    const newWaypoints: Waypoint[] = []
+    let insertedCount = 0
+
+    waypoints.forEach((wp) => {
+      newWaypoints.push(wp)
+      if (wp.selected) {
+        const newWaypoint: Waypoint = {
+          id: Date.now().toString() + insertedCount, // Ensure unique ID
+          name: "New Waypoint", // Name new waypoints as "New Waypoint"
+          lat: wp.lat, // Inherit lat/lng from the selected waypoint
+          lng: wp.lng,
+          altitude: wp.altitude, // Inherit altitude
+          selected: false,
+        }
+        newWaypoints.push(newWaypoint)
+        insertedCount++
+      }
+    })
+
+    // Do NOT renumber existing waypoints
+    setWaypoints(newWaypoints)
+    setSuccessMessage(
+      `Inserted ${insertedCount} new waypoint${insertedCount !== 1 ? "s" : ""} after selected waypoints!`,
+    )
   }
 
   // Update waypoint field
@@ -411,14 +473,23 @@ export function FlightPlanEditor() {
 
     const newWaypoints = waypoints.filter((wp) => !wp.selected)
 
-    // Renumber waypoints after deletion
-    const renamedWaypoints = newWaypoints.map((wp, index) => ({
-      ...wp,
-      name: String(index + 1).padStart(3, "0"),
-    }))
-
-    setWaypoints(renamedWaypoints)
+    // Do NOT renumber existing waypoints
+    setWaypoints(newWaypoints)
     setSuccessMessage(`${selectedCount} waypoint${selectedCount !== 1 ? "s" : ""} removed successfully!`)
+  }
+
+  // Clear altitudes of selected waypoints
+  const clearSelectedAltitudes = () => {
+    const selectedCount = waypoints.filter((wp) => wp.selected).length
+
+    if (selectedCount === 0) {
+      setError("No waypoints selected to clear altitudes.")
+      return
+    }
+
+    const updatedWaypoints = waypoints.map((wp) => (wp.selected ? { ...wp, altitude: 0 } : wp))
+    setWaypoints(updatedWaypoints)
+    setSuccessMessage(`Cleared altitude for ${selectedCount} selected waypoint${selectedCount !== 1 ? "s" : ""}.`)
   }
 
   // Select/deselect all waypoints
@@ -463,14 +534,41 @@ export function FlightPlanEditor() {
     setSuccessMessage("Applied 'Made with Infinite Planner' to last 4 waypoints!")
   }
 
+  // Callback for when a waypoint is dragged on the map
+  const handleWaypointDragEnd = useCallback((id: string, newLat: number, newLng: number) => {
+    setWaypoints((prevWaypoints) => {
+      const updated = prevWaypoints.map((wp) =>
+        wp.id === id
+          ? {
+              ...wp,
+              lat: newLat,
+              lng: newLng,
+              altitude: 0, // Clear altitude when position is manually edited
+            }
+          : wp,
+      )
+      setSuccessMessage(`Waypoint ${updated.find((wp) => wp.id === id)?.name} updated on map. Altitude cleared.`)
+      return updated
+    })
+  }, [])
+
+  // Toggle map editing mode
+  const toggleMapEditing = () => {
+    setIsEditingMap((prev) => !prev)
+    if (!isEditingMap) {
+      setSuccessMessage("Map editing mode enabled. Drag waypoints to adjust their position.")
+    } else {
+      setSuccessMessage("Map editing mode disabled. Waypoints updated in table.")
+    }
+  }
+
   return (
     <div className="container mx-auto py-8 px-4">
       <Card className="bg-background shadow-sm border-border">
         {/* Make the header sticky */}
-        <div className="sticky top-0 z-10">
+        <div ref={cardHeaderRef} className="sticky top-0 z-10">
           <CardHeader className="pb-4 border-b bg-background shadow-sm">
             <div className="flex flex-col gap-4">
-              {/* Airport Fields */}
               {/* Action Buttons and Airport Fields */}
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex flex-wrap gap-2">
@@ -495,7 +593,7 @@ export function FlightPlanEditor() {
                     disabled={waypoints.length === 0 || isLoading}
                   >
                     <Map size={14} />
-                    <span className="hidden sm:inline">Preview</span>
+                    <span className="hidden sm:inline">Flight Map</span> {/* Renamed from Preview */}
                   </Button>
 
                   <Button
@@ -533,7 +631,7 @@ export function FlightPlanEditor() {
                     <Input
                       id="destination"
                       value={destinationAirport}
-                      onChange={(e) => setDestinationAirport(e.target.value.toUpperCase())}
+                      onChange={(e) => setDestinationToAirport(e.target.value.toUpperCase())}
                       placeholder="KSFO"
                       className="h-8 w-20 text-center font-mono"
                       maxLength={4}
@@ -589,7 +687,11 @@ export function FlightPlanEditor() {
             </Alert>
           )}
 
-          <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+          {/* Table Action Bar (Select All, Delete, Clear Altitudes, Insert Waypoint, Batch Rename) */}
+          <div
+            className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
+            style={{ top: `${tableBarTopPosition}px` }}
+          >
             <div className="flex items-center space-x-2">
               <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
               <Label htmlFor="selectAll" className="text-sm font-medium">
@@ -606,35 +708,152 @@ export function FlightPlanEditor() {
                 className="flex items-center gap-1 h-10"
               >
                 <Trash2 size={14} />
-                <span className="hidden sm:inline">Delete Selected</span>
+                <span className="hidden sm:inline">Delete</span>
                 <span className="sm:hidden">Delete</span>
               </Button>
 
-              {/* Only show Add Waypoint button on non-mobile devices */}
-              {!isMobile && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={addWaypoint}
-                  className="flex items-center gap-1 h-10"
-                  disabled={isLoading}
-                >
-                  <Plus size={14} />
-                  <span className="hidden sm:inline">Add Waypoint</span>
-                  <span className="sm:hidden">Add</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearSelectedAltitudes}
+                disabled={!waypoints.some((wp) => wp.selected) || isLoading}
+                className="flex items-center gap-1 h-10"
+              >
+                <Info size={14} />
+                <span className="hidden sm:inline">Clear Alt</span>
+                <span className="sm:hidden">Clear Alt</span>
+              </Button>
+
+              {/* Insert Waypoint button */}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={insertWaypoint}
+                className="flex items-center gap-1 h-10"
+                disabled={isLoading || waypoints.filter((wp) => wp.selected).length === 0} // Disabled if no selection
+              >
+                <Plus size={14} />
+                <span className="hidden sm:inline">Insert Waypoint</span>
+                <span className="sm:hidden">Insert</span>
+              </Button>
+
+              {/* Batch Rename Button */}
+              <Button
+                onClick={() =>
+                  document.getElementById("waypoints-batch-section")?.scrollIntoView({ behavior: "smooth" })
+                }
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 h-10 px-3 sm:px-4"
+                disabled={waypoints.length === 0 || isLoading}
+              >
+                <Layers size={14} />
+                <span className="hidden sm:inline">Batch Renaming...</span>
+                <span className="sm:hidden">Batch</span>
+              </Button>
             </div>
           </div>
 
-          {/* Waypoints Batch Section - Show directly below controls */}
+          {/* Waypoint Table */}
+          <div className="border rounded-md overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden md:table-cell">Latitude</TableHead>
+                  <TableHead className="hidden md:table-cell">Longitude</TableHead>
+                  <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                      Loading waypoints...
+                    </TableCell>
+                  </TableRow>
+                ) : waypoints.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                      No waypoints added. Import a KML file or add waypoints manually.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  waypoints.map((waypoint) => (
+                    <TableRow
+                      key={waypoint.id}
+                      className="bg-card hover:bg-muted/50 h-12" // Removed drag-related classes
+                    >
+                      <TableCell className="w-12 py-0 pl-4 pr-2 flex items-center justify-center">
+                        <Checkbox
+                          id={`wp-${waypoint.id}`}
+                          checked={waypoint.selected}
+                          onCheckedChange={() => toggleWaypointSelection(waypoint.id)}
+                          className="flex-shrink-0"
+                        />
+                      </TableCell>
+                      <TableCell className="py-0">
+                        <Input
+                          id={`name-${waypoint.id}`}
+                          value={waypoint.name}
+                          onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
+                          onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
+                          onFocus={handleInputFocus}
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell py-0">
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={waypoint.lat}
+                          onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
+                          onFocus={handleInputFocus}
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell py-0">
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={waypoint.lng}
+                          onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
+                          onFocus={handleInputFocus}
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell py-0">
+                        <Input
+                          type="number"
+                          value={waypoint.altitude}
+                          onChange={(e) =>
+                            updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
+                          }
+                          onFocus={handleInputFocus}
+                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Waypoints Batch Section - Moved here */}
           {waypoints.length > 0 && (
-            <div className="mb-6 border-t pt-6">
+            <div id="waypoints-batch-section" className="mb-6 border-t pt-6 mt-6">
+              {" "}
+              {/* Added mt-6 for spacing */}
               <div className="flex items-center gap-2 mb-4">
                 <Layers className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">Waypoints Batch</h3>
+                <h3 className="text-lg font-medium">Waypoints Batch Rename Options</h3>
               </div>
-
               <div className="space-y-6">
                 {/* Import TXT to Waypoints */}
                 <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
@@ -722,115 +941,56 @@ export function FlightPlanEditor() {
             </div>
           )}
 
-          <div className="border rounded-md overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Latitude</TableHead>
-                  <TableHead className="hidden md:table-cell">Longitude</TableHead>
-                  <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
-                      Loading waypoints...
-                    </TableCell>
-                  </TableRow>
-                ) : waypoints.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
-                      No waypoints added. Import a KML file or add waypoints manually.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  waypoints.map((waypoint) => (
-                    <TableRow key={waypoint.id} className="hover:bg-muted/50">
-                      <TableCell className="w-12">
-                        <Checkbox
-                          id={`wp-${waypoint.id}`}
-                          checked={waypoint.selected}
-                          onCheckedChange={() => toggleWaypointSelection(waypoint.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          id={`name-${waypoint.id}`}
-                          value={waypoint.name}
-                          onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
-                          onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          value={waypoint.lat}
-                          onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          value={waypoint.lng}
-                          onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Input
-                          type="number"
-                          value={waypoint.altitude}
-                          onChange={(e) =>
-                            updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
-                          }
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)]"
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
           {waypoints.length > 0 && (
-            <>
-              <div className="mt-4 text-sm text-muted-foreground">
-                <p>
-                  Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
-                </p>
-                <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
-              </div>
-            </>
+            <div className="mt-4 text-sm text-muted-foreground">
+              <p>
+                Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
+              </p>
+              <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Map Preview Dialog */}
-      <Dialog open={showMapPreview} onOpenChange={setShowMapPreview}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Flight Plan Preview</DialogTitle>
-            <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
+      <Dialog
+        open={showMapPreview}
+        onOpenChange={(open) => {
+          // Prevent closing if editing is active
+          if (!isEditingMap) {
+            setShowMapPreview(open)
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-6xl" // Increased max-width
+          onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
+          onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
+        >
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <DialogTitle>Flight Plan Preview</DialogTitle>
+              <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
+            </div>
+            {waypoints.length > 0 && (
+              <Button
+                onClick={toggleMapEditing}
+                variant={isEditingMap ? "default" : "outline"}
+                className="flex items-center gap-2 ml-auto mr-4" // Adjusted margin
+              >
+                <Pencil size={16} />
+                {isEditingMap ? "Done Editing" : "Edit Waypoints"}
+              </Button>
+            )}
           </DialogHeader>
           <div className="h-[500px] w-full relative">
-            <MapPreview waypoints={waypoints} />
+            <MapPreview waypoints={waypoints} isEditing={isEditingMap} onWaypointDragEnd={handleWaypointDragEnd} />
           </div>
+          <DialogFooter>
+            <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

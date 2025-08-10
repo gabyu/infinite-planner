@@ -17,13 +17,23 @@ interface Waypoint {
 
 interface MapPreviewProps {
   waypoints: Waypoint[]
+  isEditing: boolean // New prop to control draggable state
+  onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void // Callback for drag end
 }
 
-export default function MapPreview({ waypoints }: MapPreviewProps) {
+export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
+  const routeLineRef = useRef<L.Polyline | null>(null) // Ref for the polyline
+  const markersRef = useRef<Map<string, L.Marker>>(new Map()) // Ref for markers
+  const legendRef = useRef<L.Control | null>(null) // Ref for the legend
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+
+  // Custom icon SVG data for rounded pins
+  const getCustomIconSvg = (color: string, size: number) => {
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24' fill='${encodeURIComponent(color)}' stroke='white' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E`
+  }
 
   // Zoom to departure airport (first waypoint) - increased zoom level
   const zoomToDeparture = () => {
@@ -61,84 +71,106 @@ export default function MapPreview({ waypoints }: MapPreviewProps) {
           })
 
       tileLayer.addTo(mapInstanceRef.current)
+
+      // Add legend only once during initial map setup
+      const legend = L.control({ position: "bottomright" })
+      legend.onAdd = () => {
+        const div = L.DomUtil.create("div", "info legend")
+        div.style.backgroundColor = isDark ? "#1f2937" : "white"
+        div.style.color = isDark ? "#e5e7eb" : "#374151"
+        div.style.padding = "6px 8px"
+        div.style.border = isDark ? "1px solid #374151" : "1px solid #ccc"
+        div.style.borderRadius = "4px"
+        div.style.lineHeight = "18px"
+        div.style.fontFamily = "Arial, sans-serif"
+        div.style.fontSize = "12px"
+
+        div.innerHTML = `
+        <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center">
+          <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Waypoint</span>
+        </div>
+      `
+        return div
+      }
+      legend.addTo(mapInstanceRef.current)
+      legendRef.current = legend // Store legend instance
     }
 
     const map = mapInstanceRef.current
+    if (!map) return
 
-    // Clear existing layers
-    map.eachLayer((layer) => {
-      if (layer instanceof L.TileLayer) return // Keep the base tile layer
-      map.removeLayer(layer)
-    })
-
-    if (waypoints.length === 0) return
-
-    // Create a polyline for the route
-    const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
-
-    // Create a more visible route line
-    const routeLine = L.polyline(routePoints, {
-      color: "#3B82F6",
-      weight: 3,
-      opacity: 0.8,
-      smoothFactor: 1,
-    }).addTo(map)
-
-    // Add direction indicators by placing arrow markers at regular intervals
-    if (waypoints.length > 1) {
-      // Place arrows at regular intervals along the route
-      const arrowCount = Math.min(10, Math.floor(waypoints.length / 2))
-      const step = Math.max(1, Math.floor(waypoints.length / arrowCount))
-
-      for (let i = step; i < waypoints.length - 1; i += step) {
-        const current = waypoints[i]
-        const next = waypoints[i + 1]
-
-        // Calculate the midpoint between two waypoints
-        const midLat = (current.lat + next.lat) / 2
-        const midLng = (current.lng + next.lng) / 2
-
-        // Calculate the angle for the arrow
-        const angle = (Math.atan2(next.lat - current.lat, next.lng - current.lng) * 180) / Math.PI
-
-        // Create an arrow icon
-        const arrowIcon = L.divIcon({
-          html: `<div style="transform: rotate(${angle}deg); font-size: 20px; color: #3B82F6;">➔</div>`,
-          className: "arrow-icon",
-          iconSize: [20, 20],
-          iconAnchor: [10, 10],
-        })
-
-        // Add the arrow marker
-        L.marker([midLat, midLng], { icon: arrowIcon }).addTo(map)
-      }
+    // Update tile layer based on theme
+    const currentTileLayer = map.hasLayer(
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {}),
+    )
+    if (isDark && !currentTileLayer) {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: "abcd",
+        maxZoom: 19,
+      }).addTo(map)
+    } else if (!isDark && currentTileLayer) {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map)
     }
 
-    // Add markers for each waypoint
-    const markers: L.Marker[] = []
+    // Update polyline
+    const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
+    if (routeLineRef.current) {
+      routeLineRef.current.setLatLngs(routePoints)
+    } else {
+      routeLineRef.current = L.polyline(routePoints, {
+        color: "#3B82F6",
+        weight: 3,
+        opacity: 0.8,
+        smoothFactor: 1,
+      }).addTo(map)
+    }
+
+    // Update markers
+    const currentMarkerIds = new Set<string>()
     waypoints.forEach((waypoint, index) => {
+      currentMarkerIds.add(waypoint.id)
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
       const isMilestone = index % Math.max(1, Math.floor(waypoints.length / 10)) === 0
 
-      // Create custom icon based on waypoint position
-      let iconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png"
-      let iconSize: [number, number] = [12, 12] // Make regular waypoints smaller
+      let iconUrl: string
+      let iconSize: [number, number]
 
       if (isFirst) {
-        // Green for first waypoint (departure)
-        iconUrl =
-          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%2322c55e'/%3E%3Cpath d='M8 12h8'/%3E%3Cpath d='M12 8v8'/%3E%3C/svg%3E"
-        iconSize = [24, 24]
+        iconUrl = getCustomIconSvg("#22c55e", 32) // Green for departure, increased size
+        iconSize = [32, 32]
       } else if (isLast) {
-        // Red for last waypoint (arrival)
-        iconUrl =
-          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%23ef4444'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E"
-        iconSize = [24, 24]
+        iconUrl = getCustomIconSvg("#ef4444", 32) // Red for arrival, increased size
+        iconSize = [32, 32]
       } else if (isMilestone) {
-        // Blue for milestone waypoints
-        iconUrl =
-          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' fill='%233B82F6'/%3E%3C/svg%3E"
+        iconUrl = getCustomIconSvg("#3B82F6", 20) // Blue for milestone, increased size
+        iconSize = [20, 20]
+      } else {
+        iconUrl = getCustomIconSvg("#3B82F6", 16) // Smaller blue for regular waypoints, increased size
         iconSize = [16, 16]
       }
 
@@ -149,62 +181,88 @@ export default function MapPreview({ waypoints }: MapPreviewProps) {
         popupAnchor: [0, -iconSize[1] / 2],
       })
 
-      const marker = L.marker([waypoint.lat, waypoint.lng], { icon })
-        .addTo(map)
-        .bindPopup(
+      let marker = markersRef.current.get(waypoint.id)
+      if (marker) {
+        // Update existing marker
+        marker.setLatLng([waypoint.lat, waypoint.lng])
+        marker.setIcon(icon)
+        marker.setPopupContent(
           `<strong>${waypoint.name}</strong><br>
          Lat: ${waypoint.lat.toFixed(6)}<br>
          Lng: ${waypoint.lng.toFixed(6)}<br>
          Alt: ${waypoint.altitude} ft`,
         )
+        marker.dragging?.enable() // Ensure draggable is enabled/disabled based on isEditing
+        if (!isEditing) {
+          marker.dragging?.disable()
+        }
+      } else {
+        // Create new marker
+        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing })
+          .addTo(map)
+          .bindPopup(
+            `<strong>${waypoint.name}</strong><br>
+           Lat: ${waypoint.lat.toFixed(6)}<br>
+           Lng: ${waypoint.lng.toFixed(6)}<br>
+           Alt: ${waypoint.altitude} ft`,
+          )
 
-      markers.push(marker)
+        // Add drag event listeners only once
+        marker.on("drag", (e) => {
+          const draggedLatLng = e.latlng
+          const newRoutePoints = waypoints.map((wp, i) => {
+            if (wp.id === waypoint.id) {
+              return [draggedLatLng.lat, draggedLatLng.lng]
+            }
+            return [wp.lat, wp.lng]
+          })
+          routeLineRef.current?.setLatLngs(newRoutePoints as L.LatLngExpression[])
+        })
+
+        marker.on("dragend", (e) => {
+          const newLatLng = e.target.getLatLng()
+          onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
+        })
+        markersRef.current.set(waypoint.id, marker)
+      }
     })
 
-    // Add a legend to explain the markers
-    const legend = L.control({ position: "bottomright" })
-    legend.onAdd = () => {
-      const div = L.DomUtil.create("div", "info legend")
-      div.style.backgroundColor = isDark ? "#1f2937" : "white"
-      div.style.color = isDark ? "#e5e7eb" : "#374151"
-      div.style.padding = "6px 8px"
-      div.style.border = isDark ? "1px solid #374151" : "1px solid #ccc"
-      div.style.borderRadius = "4px"
-      div.style.lineHeight = "18px"
-      div.style.fontFamily = "Arial, sans-serif"
-      div.style.fontSize = "12px"
+    // Remove markers that are no longer in the waypoints array
+    markersRef.current.forEach((marker, id) => {
+      if (!currentMarkerIds.has(id)) {
+        map.removeLayer(marker)
+        markersRef.current.delete(id)
+      }
+    })
 
-      div.innerHTML = `
+    // Update legend content if waypoints change (e.g., names)
+    if (legendRef.current && waypoints.length > 0) {
+      const legendDiv = legendRef.current.getContainer()
+      if (legendDiv) {
+        legendDiv.innerHTML = `
         <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
         <div style="display: flex; align-items: center; margin-bottom: 3px">
           <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Departure (${waypoints[0].name})</span>
+          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 3px">
           <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Arrival (${waypoints[waypoints.length - 1].name})</span>
+          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
         </div>
         <div style="display: flex; align-items: center">
           <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
           <span>Waypoint</span>
         </div>
       `
-
-      return div
+      }
     }
-    legend.addTo(map)
 
-    // Fit the map to show all waypoints with padding
-    if (waypoints.length > 0) {
+    // Fit the map to show all waypoints with padding only on initial load or when not editing
+    if (waypoints.length > 0 && !isEditing) {
       const bounds = L.latLngBounds(routePoints)
       map.fitBounds(bounds, { padding: [50, 50] })
     }
-
-    // Cleanup function
-    return () => {
-      // We don't destroy the map, just clear the layers
-    }
-  }, [waypoints, isDark])
+  }, [waypoints, isDark, isEditing, onWaypointDragEnd]) // Added isEditing and onWaypointDragEnd to dependencies
 
   return (
     <div className="relative h-full w-full">

@@ -18,6 +18,9 @@ interface SimplificationResult {
   source?: string // Added to track the source of the KML file
 }
 
+// Conversion factor from meters to feet (1 meter = 3.28084 feet)
+const METERS_TO_FEET = 3.28084
+
 export function parseKML(
   kmlString: string,
   filename?: string,
@@ -51,7 +54,7 @@ export function parseKML(
 
     if (hasFlightAwareSignature || (docName && docName.includes("FlightAware"))) {
       source = "FlightAware"
-      console.log("Detected FlightAware KML format")
+      // console.log("Detected FlightAware KML format")
 
       // Process FlightAware format (gx:Track with gx:coord elements)
       for (let i = 0; i < gxTracks.length; i++) {
@@ -61,7 +64,7 @@ export function parseKML(
 
           // Get all gx:coord elements
           const gxCoords = track.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "coord")
-          console.log(`Found ${gxCoords.length} gx:coord elements in track ${i + 1}`)
+          // console.log(`Found ${gxCoords.length} gx:coord elements in track ${i + 1}`)
 
           if (gxCoords && gxCoords.length > 0) {
             for (let j = 0; j < gxCoords.length; j++) {
@@ -74,7 +77,9 @@ export function parseKML(
                   const lng = Number.parseFloat(parts[0])
                   const lat = Number.parseFloat(parts[1])
                   // Get altitude if available, otherwise default to 0
-                  const altitude = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
+                  // KML altitude is in meters, convert to feet
+                  const altitudeMeters = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
+                  const altitudeFeet = Math.round(altitudeMeters * METERS_TO_FEET)
 
                   if (!isNaN(lat) && !isNaN(lng)) {
                     originalWaypoints.push({
@@ -82,7 +87,7 @@ export function parseKML(
                       name: String(originalWaypoints.length + 1).padStart(3, "0"),
                       lat,
                       lng,
-                      altitude,
+                      altitude: altitudeFeet,
                       selected: false,
                     })
                   }
@@ -97,20 +102,20 @@ export function parseKML(
 
       // If we found waypoints, we're done with FlightAware processing
       if (originalWaypoints.length > 0) {
-        console.log(`Found ${originalWaypoints.length} waypoints in FlightAware KML`)
+        // console.log(`Found ${originalWaypoints.length} waypoints in FlightAware KML`)
       } else {
         // Fallback to standard KML processing if no waypoints were found
-        console.log("No waypoints found in FlightAware format, trying standard KML processing")
+        // console.log("No waypoints found in FlightAware format, trying standard KML processing")
       }
     } else {
       source = "FlightRadar24"
-      console.log("Processing as FlightRadar24 KML format")
+      // console.log("Processing as FlightRadar24 KML format")
     }
 
     // If we haven't found waypoints yet, process as FlightRadar24 or standard KML
     if (originalWaypoints.length === 0) {
       // Process LineString elements (common in FlightRadar24)
-      console.log(`Found ${lineStrings.length} LineString elements`)
+      // console.log(`Found ${lineStrings.length} LineString elements`)
 
       for (let i = 0; i < lineStrings.length; i++) {
         try {
@@ -127,7 +132,7 @@ export function parseKML(
 
           // FlightRadar24 typically has one long string of coordinates separated by spaces
           const coordLines = coordinatesText.split(/\s+/)
-          console.log(`LineString ${i + 1}: Found ${coordLines.length} coordinate points`)
+          // console.log(`LineString ${i + 1}: Found ${coordLines.length} coordinate points`)
 
           if (coordLines.length > 0) {
             const waypoints = processCoordinates(coordLines, i, originalWaypoints.length)
@@ -140,11 +145,11 @@ export function parseKML(
 
       // If we still have no waypoints, try other elements
       if (originalWaypoints.length === 0) {
-        console.log("No coordinates found in LineString elements, checking Placemarks...")
+        // console.log("No coordinates found in LineString elements, checking Placemarks...")
 
         // Try to find coordinates in Placemarks (alternative format)
         const placemarks = xmlDoc.getElementsByTagName("Placemark")
-        console.log(`Found ${placemarks.length} Placemark elements`)
+        // console.log(`Found ${placemarks.length} Placemark elements`)
 
         for (let i = 0; i < placemarks.length; i++) {
           try {
@@ -157,7 +162,7 @@ export function parseKML(
               const coordinatesText = coordinatesElements[0].textContent.trim()
               if (coordinatesText) {
                 const coordLines = coordinatesText.split(/\s+/)
-                console.log(`Placemark ${i + 1}: Found ${coordLines.length} coordinate points`)
+                // console.log(`Placemark ${i + 1}: Found ${coordLines.length} coordinate points`)
 
                 if (coordLines.length > 0) {
                   const waypoints = processCoordinates(coordLines, i, originalWaypoints.length)
@@ -177,7 +182,7 @@ export function parseKML(
                 // First check for <coord> elements
                 const coordElements = track.getElementsByTagName("coord")
                 if (coordElements && coordElements.length > 0) {
-                  console.log(`Track ${j + 1} in Placemark ${i + 1}: Found ${coordElements.length} coord elements`)
+                  // console.log(`Track ${j + 1} in Placemark ${i + 1}: Found ${coordElements.length} coord elements`)
 
                   const trackCoords: string[] = []
                   for (let k = 0; k < coordElements.length; k++) {
@@ -204,10 +209,10 @@ export function parseKML(
 
       // If we still have no waypoints, try one more approach - look for any coordinates element
       if (originalWaypoints.length === 0) {
-        console.log("Still no coordinates found, searching for any coordinates element...")
+        // console.log("Still no coordinates found, searching for any coordinates element...")
 
         const allCoordinatesElements = xmlDoc.getElementsByTagName("coordinates")
-        console.log(`Found ${allCoordinatesElements.length} coordinates elements in total`)
+        // console.log(`Found ${allCoordinatesElements.length} coordinates elements in total`)
 
         for (let i = 0; i < allCoordinatesElements.length; i++) {
           try {
@@ -217,7 +222,7 @@ export function parseKML(
             if (!coordinatesText) continue
 
             const coordLines = coordinatesText.split(/\s+/)
-            console.log(`Coordinates element ${i + 1}: Found ${coordLines.length} coordinate points`)
+            // console.log(`Coordinates element ${i + 1}: Found ${coordLines.length} coordinate points`)
 
             if (coordLines.length > 0) {
               const waypoints = processCoordinates(coordLines, i + 10000, originalWaypoints.length)
@@ -230,7 +235,7 @@ export function parseKML(
       }
     }
 
-    console.log(`Total waypoints found in KML: ${originalWaypoints.length}`)
+    // console.log(`Total waypoints found in KML: ${originalWaypoints.length}`)
 
     // Save flight statistics if filename is provided and waypoints were found
     if (filename && originalWaypoints.length > 0) {
@@ -238,9 +243,9 @@ export function parseKML(
         const flightData = parseFlightFilename(filename)
         flightData.source = source
 
-        console.log("Parsed flight data:", flightData)
-        console.log("Origin airport parameter:", originAirport)
-        console.log("Destination airport parameter:", destinationAirport)
+        // console.log("Parsed flight data:", flightData)
+        // console.log("Origin airport parameter:", originAirport)
+        // console.log("Destination airport parameter:", destinationAirport)
 
         // Save flight data asynchronously (don't wait for it)
         saveFlightData(flightData, originAirport, destinationAirport).catch((error) => {
@@ -265,7 +270,7 @@ export function parseKML(
 
     // Validate and clean the route
     const validatedWaypoints = validateAndCleanRoute(originalWaypoints)
-    console.log(`After validation: ${validatedWaypoints.length} waypoints`)
+    // console.log(`After validation: ${validatedWaypoints.length} waypoints`)
 
     // Simplify the waypoints
     const result = simplifyWaypoints(validatedWaypoints)
@@ -301,7 +306,9 @@ function processCoordinates(coordLines: string[], placemarkIndex: number, startI
       const lng = Number.parseFloat(parts[0])
       const lat = Number.parseFloat(parts[1])
       // Get altitude if available, otherwise default to 0
-      const altitude = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
+      // KML altitude is in meters, convert to feet
+      const altitudeMeters = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
+      const altitudeFeet = Math.round(altitudeMeters * METERS_TO_FEET)
 
       if (!isNaN(lat) && !isNaN(lng)) {
         waypoints.push({
@@ -309,7 +316,7 @@ function processCoordinates(coordLines: string[], placemarkIndex: number, startI
           name: String(startIndex + waypoints.length + 1).padStart(3, "0"),
           lat,
           lng,
-          altitude,
+          altitude: altitudeFeet,
           selected: false,
         })
       }
@@ -421,18 +428,18 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
     const arrivalCount = Math.max(Math.floor(maxWaypoints * 0.2), 10)
     const enRouteCount = maxWaypoints - departureCount - arrivalCount
 
-    console.log(
-      `Simplification targets: Departure=${departureCount}, En-route=${enRouteCount}, Arrival=${arrivalCount}`,
-    )
+    // console.log(
+    //   `Simplification targets: Departure=${departureCount}, En-route=${enRouteCount}, Arrival=${arrivalCount}`,
+    // )
 
     // Determine the segments of the flight
     const departureSegment = waypoints.slice(0, Math.floor(waypoints.length * 0.2))
     const arrivalSegment = waypoints.slice(Math.floor(waypoints.length * 0.8))
     const enRouteSegment = waypoints.slice(Math.floor(waypoints.length * 0.2), Math.floor(waypoints.length * 0.8))
 
-    console.log(
-      `Original segment sizes: Departure=${departureSegment.length}, En-route=${enRouteSegment.length}, Arrival=${arrivalSegment.length}`,
-    )
+    // console.log(
+    //   `Original segment sizes: Departure=${departureSegment.length}, En-route=${enRouteSegment.length}, Arrival=${arrivalSegment.length}`,
+    // )
 
     // Now simplify each segment to the target count
     let simplifiedDeparture: Waypoint[]
@@ -478,9 +485,9 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
       })
     }
 
-    console.log(
-      `Simplified segment sizes: Departure=${simplifiedDeparture.length}, En-route=${simplifiedEnRoute.length}, Arrival=${simplifiedArrival.length}`,
-    )
+    // console.log(
+    //   `Simplified segment sizes: Departure=${simplifiedDeparture.length}, En-route=${simplifiedEnRoute.length}, Arrival=${simplifiedArrival.length}`,
+    // )
 
     // Combine all segments
     const simplifiedWaypoints = [...simplifiedDeparture, ...simplifiedEnRoute, ...simplifiedArrival]
@@ -598,11 +605,12 @@ function identifyCriticalPoints(waypoints: Waypoint[], maxPoints: number): Waypo
       turnAngle = 2 * Math.PI - turnAngle
     }
 
-    // Calculate altitude change
+    // Calculate altitude change (using feet, as converted earlier)
     const altChange = Math.abs(next.altitude - prev.altitude)
 
     // Combined score (normalize turn angle to [0,1] range)
-    const score = turnAngle / Math.PI + altChange / 1000
+    // Altitude change is scaled to be comparable to angular change
+    const score = turnAngle / Math.PI + altChange / 10000 // Divide by a larger number for altitude to prevent it from dominating
 
     importanceScores.push({ waypoint: curr, score })
   }

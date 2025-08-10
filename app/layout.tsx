@@ -68,19 +68,6 @@ export default function RootLayout({
         {/* Preconnect to Google Fonts to improve loading performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Google Tag Manager script loader */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-BBLYJRGP2N"></script>
-        {/* Inline gtag config script using dangerouslySetInnerHTML */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', 'G-BBLYJRGP2N');
-            `,
-          }}
-        />
       </head>
       <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

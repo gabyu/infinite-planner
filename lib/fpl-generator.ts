@@ -7,6 +7,9 @@ interface Waypoint {
   selected?: boolean
 }
 
+// Conversion factor from feet to meters (1 foot = 0.3048 meters)
+const FEET_TO_METERS = 0.3048
+
 export function generateFPL(waypoints: Waypoint[]): string {
   if (waypoints.length === 0) {
     return ""
@@ -26,9 +29,11 @@ export function generateFPL(waypoints: Waypoint[]): string {
     xml += `      <lat>${waypoint.lat.toFixed(6)}</lat>\n`
     xml += `      <lon>${waypoint.lng.toFixed(6)}</lon>\n`
 
-    // Add elevation/altitude in feet
+    // Add elevation/altitude in meters (Garmin FPL schema expects meters)
     if (waypoint.altitude) {
-      xml += `      <elevation>${Math.round(waypoint.altitude)}</elevation>\n`
+      // Convert altitude from feet (internal representation) to meters for export
+      const altitudeMeters = Math.round(waypoint.altitude * FEET_TO_METERS)
+      xml += `      <elevation>${altitudeMeters}</elevation>\n`
     }
 
     xml += "    </waypoint>\n"
