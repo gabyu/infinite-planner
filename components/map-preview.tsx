@@ -160,7 +160,11 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
       let iconUrl: string
       let iconSize: [number, number]
 
-      if (isFirst) {
+      if (waypoint.selected) {
+        // Check if selected
+        iconUrl = getCustomIconSvg("#f97316", 28) // Orange for selected, slightly larger
+        iconSize = [28, 28]
+      } else if (isFirst) {
         iconUrl = getCustomIconSvg("#22c55e", 32) // Green for departure, increased size
         iconSize = [32, 32]
       } else if (isLast) {
@@ -208,15 +212,16 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
           )
 
         // Add drag event listeners only once
+        const currentWaypointIndex = index // Capture index in closure
         marker.on("drag", (e) => {
           const draggedLatLng = e.latlng
-          const newRoutePoints = waypoints.map((wp, i) => {
-            if (wp.id === waypoint.id) {
-              return [draggedLatLng.lat, draggedLatLng.lng]
-            }
-            return [wp.lat, wp.lng]
-          })
-          routeLineRef.current?.setLatLngs(newRoutePoints as L.LatLngExpression[])
+          const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
+          if (currentPolylineLatLngs) {
+            // Create a new array to update the polyline without mutating the original
+            const updatedPolylineLatLngs = [...currentPolylineLatLngs]
+            updatedPolylineLatLngs[currentWaypointIndex] = draggedLatLng
+            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
+          }
         })
 
         marker.on("dragend", (e) => {
