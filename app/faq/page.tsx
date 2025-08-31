@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -155,31 +155,42 @@ const faqData = [
 ]
 
 export default function FAQPage() {
-  const [selectedFAQ, setSelectedFAQ] = useState<string>(faqData[0].id)
+  const [activeSection, setActiveSection] = useState<string>(faqData[0].id)
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set())
+  const sectionRefs = useRef<{ [key: string]: HTMLElement | null }>({})
 
-  // Handle anchor links on page load
+  // Scroll spy effect to track which section is currently visible
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash.replace("#", "")
-      if (hash && faqData.find((faq) => faq.id === hash)) {
-        setSelectedFAQ(hash)
-        // Scroll to the question after a short delay to ensure rendering
-        setTimeout(() => {
-          const element = document.getElementById(hash)
-          if (element) {
-            element.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
-        }, 100)
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 200 // Offset for header
+
+      // Find which section is currently in view
+      for (let i = faqData.length - 1; i >= 0; i--) {
+        const section = sectionRefs.current[faqData[i].id]
+        if (section && section.offsetTop <= scrollPosition) {
+          setActiveSection(faqData[i].id)
+          break
+        }
       }
     }
+
+    window.addEventListener("scroll", handleScroll)
+    handleScroll() // Call once to set initial state
+
+    return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  const handleQuestionSelect = (questionId: string) => {
-    setSelectedFAQ(questionId)
-    // Update URL hash
-    if (typeof window !== "undefined") {
-      window.location.hash = questionId
+  const scrollToSection = (sectionId: string) => {
+    const section = sectionRefs.current[sectionId]
+    if (section) {
+      const headerOffset = 100
+      const elementPosition = section.offsetTop
+      const offsetPosition = elementPosition - headerOffset
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      })
     }
   }
 
@@ -192,8 +203,6 @@ export default function FAQPage() {
     }
     setOpenAccordions(newOpenAccordions)
   }
-
-  const selectedFAQData = faqData.find((faq) => faq.id === selectedFAQ) || faqData[0]
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -254,7 +263,7 @@ export default function FAQPage() {
 
         {/* Desktop Layout - Side by side */}
         <div className="hidden md:flex container mx-auto px-4 py-8 gap-8">
-          {/* Left Panel - Questions Menu */}
+          {/* Left Panel - Navigation Menu */}
           <div className="w-1/3">
             <div className="sticky top-8">
               <h2 className="text-xl font-bold mb-4">Questions</h2>
@@ -262,9 +271,9 @@ export default function FAQPage() {
                 {faqData.map((faq) => (
                   <button
                     key={faq.id}
-                    onClick={() => handleQuestionSelect(faq.id)}
+                    onClick={() => scrollToSection(faq.id)}
                     className={`w-full text-left p-3 transition-colors border-l-4 ${
-                      selectedFAQ === faq.id
+                      activeSection === faq.id
                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-500"
                         : "hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-transparent"
                     }`}
@@ -276,14 +285,24 @@ export default function FAQPage() {
             </div>
           </div>
 
-          {/* Right Panel - Answer */}
+          {/* Right Panel - All Questions and Answers */}
           <div className="w-2/3">
-            <div id={selectedFAQData.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{selectedFAQData.question}</h2>
-              <div
-                className="prose prose-gray dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: selectedFAQData.answer }}
-              />
+            <div className="space-y-8">
+              {faqData.map((faq) => (
+                <div
+                  key={faq.id}
+                  ref={(el) => {
+                    sectionRefs.current[faq.id] = el
+                  }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8"
+                >
+                  <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{faq.question}</h2>
+                  <div
+                    className="prose prose-gray dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: faq.answer }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -292,28 +311,26 @@ export default function FAQPage() {
         <div className="md:hidden container mx-auto px-4 py-8">
           <div className="space-y-4">
             {faqData.map((faq) => (
-              <div key={faq.id} id={faq.id}>
-                <Collapsible open={openAccordions.has(faq.id)} onOpenChange={() => toggleAccordion(faq.id)}>
-                  <CollapsibleTrigger className="w-full">
-                    <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
-                      {openAccordions.has(faq.id) ? (
-                        <ChevronDown className="h-5 w-5 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="h-5 w-5 text-gray-500" />
-                      )}
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg border-t">
-                      <div
-                        className="prose prose-gray dark:prose-invert prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: faq.answer }}
-                      />
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
+              <Collapsible key={faq.id} open={openAccordions.has(faq.id)} onOpenChange={() => toggleAccordion(faq.id)}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
+                    {openAccordions.has(faq.id) ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                    )}
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg border-t">
+                    <div
+                      className="prose prose-gray dark:prose-invert prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: faq.answer }}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         </div>
