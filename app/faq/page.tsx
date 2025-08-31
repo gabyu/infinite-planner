@@ -1,17 +1,13 @@
-"use client"
-
-import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight, MapPin } from "lucide-react"
+import { MapPin } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 
-// FAQ data structure - completely static
+// Simple FAQ data - no complex structures
 const faqData = [
   {
-    id: "supported-file-formats",
     question: "What file formats are supported?",
     answer: (
       <div>
@@ -33,7 +29,6 @@ const faqData = [
     ),
   },
   {
-    id: "waypoint-limitations",
     question: "Why are my waypoints limited to 250?",
     answer: (
       <div>
@@ -53,7 +48,6 @@ const faqData = [
     ),
   },
   {
-    id: "flight-plan-accuracy",
     question: "How accurate are the converted flight plans?",
     answer: (
       <div>
@@ -85,7 +79,6 @@ const faqData = [
     ),
   },
   {
-    id: "troubleshooting-import-issues",
     question: "My KML file won't import. What should I do?",
     answer: (
       <div>
@@ -115,7 +108,6 @@ const faqData = [
     ),
   },
   {
-    id: "infinite-flight-compatibility",
     question: "How do I use the exported flight plan in Infinite Flight?",
     answer: (
       <div>
@@ -148,7 +140,6 @@ const faqData = [
     ),
   },
   {
-    id: "cannot-download-flightradar24",
     question:
       "I can't download KML file from FlightRadar24. Must I purchase a subscription plan to use Infinite Planner?",
     answer: (
@@ -201,7 +192,6 @@ const faqData = [
     ),
   },
   {
-    id: "cannot-import-flight-plan",
     question: "I cannot import the flight plan in Infinite Flight",
     answer: (
       <div>
@@ -231,7 +221,6 @@ const faqData = [
     ),
   },
   {
-    id: "atc-acceptance",
     question: "Will ATC accept our custom flight plan?",
     answer: (
       <div>
@@ -274,65 +263,6 @@ const faqData = [
 ]
 
 export default function FAQPage() {
-  const [activeSection, setActiveSection] = useState<string>(faqData[0].id)
-  const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set())
-  const sectionRefs = useRef<{ [key: string]: HTMLElement | null }>({})
-
-  // Simple scroll spy - no complex logic
-  useEffect(() => {
-    const handleScroll = () => {
-      try {
-        const scrollPosition = window.scrollY + 200
-
-        for (let i = faqData.length - 1; i >= 0; i--) {
-          const section = sectionRefs.current[faqData[i].id]
-          if (section && section.offsetTop <= scrollPosition) {
-            setActiveSection(faqData[i].id)
-            break
-          }
-        }
-      } catch (error) {
-        // Silently handle any scroll errors
-        console.log("Scroll error:", error)
-      }
-    }
-
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    handleScroll()
-
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
-
-  // Simple scroll to section - no complex routing
-  const scrollToSection = (sectionId: string) => {
-    try {
-      const section = sectionRefs.current[sectionId]
-      if (section) {
-        const headerOffset = 100
-        const elementPosition = section.offsetTop
-        const offsetPosition = elementPosition - headerOffset
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth",
-        })
-      }
-    } catch (error) {
-      console.log("Scroll to section error:", error)
-    }
-  }
-
-  // Simple accordion toggle for mobile
-  const toggleAccordion = (id: string) => {
-    const newOpenAccordions = new Set(openAccordions)
-    if (newOpenAccordions.has(id)) {
-      newOpenAccordions.delete(id)
-    } else {
-      newOpenAccordions.add(id)
-    }
-    setOpenAccordions(newOpenAccordions)
-  }
-
   return (
     <div className="flex flex-col min-h-screen">
       {/* Navigation */}
@@ -390,70 +320,13 @@ export default function FAQPage() {
           </div>
         </section>
 
-        {/* Desktop Layout */}
-        <div className="hidden md:flex container mx-auto px-4 py-8 gap-8">
-          {/* Left Panel - Navigation Menu */}
-          <div className="w-1/3">
-            <div className="sticky top-8">
-              <h2 className="text-xl font-bold mb-4">Questions</h2>
-              <nav className="space-y-1">
-                {faqData.map((faq) => (
-                  <button
-                    key={faq.id}
-                    onClick={() => scrollToSection(faq.id)}
-                    className={`w-full text-left p-3 transition-colors border-l-4 rounded-r-md ${
-                      activeSection === faq.id
-                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-500"
-                        : "hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-transparent"
-                    }`}
-                  >
-                    <span className="font-medium text-sm">{faq.question}</span>
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
-
-          {/* Right Panel - All Questions and Answers */}
-          <div className="w-2/3">
-            <div className="space-y-8">
-              {faqData.map((faq) => (
-                <div
-                  key={faq.id}
-                  ref={(el) => {
-                    sectionRefs.current[faq.id] = el
-                  }}
-                  className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8"
-                >
-                  <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{faq.question}</h2>
-                  <div className="prose prose-gray dark:prose-invert max-w-none">{faq.answer}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Layout - Simple Accordions */}
-        <div className="md:hidden container mx-auto px-4 py-8">
-          <div className="space-y-4">
-            {faqData.map((faq) => (
-              <div key={faq.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border">
-                <button
-                  onClick={() => toggleAccordion(faq.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
-                  {openAccordions.has(faq.id) ? (
-                    <ChevronDown className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                  )}
-                </button>
-                {openAccordions.has(faq.id) && (
-                  <div className="p-4 border-t bg-gray-50 dark:bg-gray-900">
-                    <div className="prose prose-gray dark:prose-invert prose-sm max-w-none">{faq.answer}</div>
-                  </div>
-                )}
+        {/* Simple FAQ Layout - Just a list of questions and answers */}
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto space-y-8">
+            {faqData.map((faq, index) => (
+              <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8">
+                <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{faq.question}</h2>
+                <div className="prose prose-gray dark:prose-invert max-w-none">{faq.answer}</div>
               </div>
             ))}
           </div>
