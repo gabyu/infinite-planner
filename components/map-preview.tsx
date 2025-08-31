@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { useTheme } from "next-themes"
@@ -17,16 +17,22 @@ interface Waypoint {
 
 interface MapPreviewProps {
   waypoints: Waypoint[]
-  isEditing: boolean // New prop to control draggable state
-  onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void // Callback for drag end
+  isEditing: boolean
+  onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
+  onWaypointInsert?: (afterIndex: number, lat: number, lng: number) => void
 }
 
-export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: MapPreviewProps) {
+export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, onWaypointInsert }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
-  const routeLineRef = useRef<L.Polyline | null>(null) // Ref for the polyline
-  const markersRef = useRef<Map<string, L.Marker>>(new Map()) // Ref for markers
-  const legendRef = useRef<L.Control | null>(null) // Ref for the legend
+  const routeLineRef = useRef<L.Polyline | null>(null)
+  const hoverLineRef = useRef<L.Polyline | null>(null)
+  const markersRef = useRef<Map<string, L.Marker>>(new Map())
+  const legendRef = useRef<L.Control | null>(null)
+  const insertMarkerRef = useRef<L.Marker | null>(null)
+  const [hoverSegmentIndex, setHoverSegmentIndex] = useState<number | null>(null)
+  const [hoverPoint, setHoverPoint] = useState<L.LatLng | null>(null)
+  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -35,7 +41,12 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
     return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24' fill='${encodeURIComponent(color)}' stroke='white' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E`
   }
 
-  // Zoom to departure airport (first waypoint) - increased zoom level
+  // Custom icon for the insert waypoint indicator - perfect circle
+  const getInsertIconSvg = (size: number) => {
+    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24' fill='%2310b981' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='8' x2='12' y2='16'/%3E%3Cline x1='8' y1='12' x2='16' y2='12'/%3E%3C/svg%3E`
+  }
+
+  // Zoom to departure airport (first waypoint)
   const zoomToDeparture = () => {
     if (waypoints.length > 0 && mapInstanceRef.current) {
       const firstWaypoint = waypoints[0]
@@ -43,11 +54,160 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
     }
   }
 
-  // Zoom to arrival airport (last waypoint) - increased zoom level
+  // Zoom to arrival airport (last waypoint)
   const zoomToArrival = () => {
     if (waypoints.length > 0 && mapInstanceRef.current) {
       const lastWaypoint = waypoints[waypoints.length - 1]
       mapInstanceRef.current.setView([lastWaypoint.lat, lastWaypoint.lng], 14)
+    }
+  }
+
+  // Function to find the closest point on a line segment to a given point
+  const getClosestPointOnSegment = (point: L.LatLng, segmentStart: L.LatLng, segmentEnd: L.LatLng) => {
+    const map = mapInstanceRef.current
+    if (!map) return null
+
+    // Convert to pixel coordinates for more accurate calculations
+    const pointPixel = map.latLngToContainerPoint(point)
+    const startPixel = map.latLngToContainerPoint(segmentStart)
+    const endPixel = map.latLngToContainerPoint(segmentEnd)
+
+    // Calculate the closest point on the line segment
+    const dx = endPixel.x - startPixel.x
+    const dy = endPixel.y - startPixel.y
+    const length = Math.sqrt(dx * dx + dy * dy)
+
+    if (length === 0) return segmentStart
+
+    const t = Math.max(
+      0,
+      Math.min(1, ((pointPixel.x - startPixel.x) * dx + (pointPixel.y - startPixel.y) * dy) / (length * length)),
+    )
+
+    const closestPixel = {
+      x: startPixel.x + t * dx,
+      y: startPixel.y + t * dy,
+    }
+
+    return map.containerPointToLatLng(L.point(closestPixel.x, closestPixel.y))
+  }
+
+  // Check if mouse is near an existing waypoint (priority zone)
+  const isNearExistingWaypoint = (mouseLatLng: L.LatLng, threshold = 30) => {
+    const map = mapInstanceRef.current
+    if (!map) return false
+
+    const mousePixel = map.latLngToContainerPoint(mouseLatLng)
+
+    for (const waypoint of waypoints) {
+      const waypointPixel = map.latLngToContainerPoint(L.latLng(waypoint.lat, waypoint.lng))
+      const distance = Math.sqrt(
+        Math.pow(mousePixel.x - waypointPixel.x, 2) + Math.pow(mousePixel.y - waypointPixel.y, 2),
+      )
+
+      if (distance <= threshold) {
+        return true
+      }
+    }
+    return false
+  }
+
+  // Check distance in pixels between mouse and closest point on route
+  const getPixelDistanceToRoute = (mouseLatLng: L.LatLng) => {
+    const map = mapInstanceRef.current
+    if (!map || waypoints.length < 2) return Number.POSITIVE_INFINITY
+
+    const mousePixel = map.latLngToContainerPoint(mouseLatLng)
+    let minPixelDistance = Number.POSITIVE_INFINITY
+
+    // Check distance to each segment
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const segmentStart = L.latLng(waypoints[i].lat, waypoints[i].lng)
+      const segmentEnd = L.latLng(waypoints[i + 1].lat, waypoints[i + 1].lng)
+
+      const pointOnSegment = getClosestPointOnSegment(mouseLatLng, segmentStart, segmentEnd)
+      if (pointOnSegment) {
+        const segmentPixel = map.latLngToContainerPoint(pointOnSegment)
+        const pixelDistance = Math.sqrt(
+          Math.pow(mousePixel.x - segmentPixel.x, 2) + Math.pow(mousePixel.y - segmentPixel.y, 2),
+        )
+        minPixelDistance = Math.min(minPixelDistance, pixelDistance)
+      }
+    }
+
+    return minPixelDistance
+  }
+
+  // Handle map mousemove to find the closest segment
+  const handleMapMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isEditing || !mapInstanceRef.current || waypoints.length < 2) {
+      setHoverSegmentIndex(null)
+      setHoverPoint(null)
+      return
+    }
+
+    // Clear existing timeout
+    if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current)
+    }
+
+    // Debounce the mousemove to reduce flickering
+    mouseMoveTimeoutRef.current = setTimeout(() => {
+      const mouseLatLng = e.latlng
+
+      // Check if we're near an existing waypoint (priority zone)
+      if (isNearExistingWaypoint(mouseLatLng)) {
+        setHoverSegmentIndex(null)
+        setHoverPoint(null)
+        return
+      }
+
+      // Check pixel distance to route
+      const pixelDistance = getPixelDistanceToRoute(mouseLatLng)
+
+      // Show (+) icon only when within 20 pixels of the route line
+      if (pixelDistance <= 20) {
+        let closestSegmentIndex = -1
+        let closestPoint: L.LatLng | null = null
+        let minDistance = Number.POSITIVE_INFINITY
+
+        // Find the closest segment
+        for (let i = 0; i < waypoints.length - 1; i++) {
+          const segmentStart = L.latLng(waypoints[i].lat, waypoints[i].lng)
+          const segmentEnd = L.latLng(waypoints[i + 1].lat, waypoints[i + 1].lng)
+
+          const pointOnSegment = getClosestPointOnSegment(mouseLatLng, segmentStart, segmentEnd)
+          if (pointOnSegment) {
+            const distance = mouseLatLng.distanceTo(pointOnSegment)
+            if (distance < minDistance) {
+              minDistance = distance
+              closestSegmentIndex = i
+              closestPoint = pointOnSegment
+            }
+          }
+        }
+
+        if (closestPoint && closestSegmentIndex >= 0) {
+          setHoverSegmentIndex(closestSegmentIndex)
+          setHoverPoint(closestPoint)
+        } else {
+          setHoverSegmentIndex(null)
+          setHoverPoint(null)
+        }
+      } else {
+        setHoverSegmentIndex(null)
+        setHoverPoint(null)
+      }
+    }, 10) // Reduced debounce for more responsive feel
+  }
+
+  // Handle insert marker click
+  const handleInsertMarkerClick = () => {
+    if (hoverSegmentIndex !== null && hoverPoint && onWaypointInsert) {
+      onWaypointInsert(hoverSegmentIndex, hoverPoint.lat, hoverPoint.lng)
+      // Clear hover state after insertion
+      setHoverSegmentIndex(null)
+      setHoverPoint(null)
     }
   }
 
@@ -103,7 +263,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
         return div
       }
       legend.addTo(mapInstanceRef.current)
-      legendRef.current = legend // Store legend instance
+      legendRef.current = legend
     }
 
     const map = mapInstanceRef.current
@@ -140,13 +300,56 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
     const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
     if (routeLineRef.current) {
       routeLineRef.current.setLatLngs(routePoints)
+      // Make polyline non-interactive when not editing
+      routeLineRef.current.setStyle({ interactive: false, weight: 5 })
     } else {
       routeLineRef.current = L.polyline(routePoints, {
         color: "#3B82F6",
-        weight: 3,
+        weight: 5, // Keep the thicker line for better visibility
         opacity: 0.8,
         smoothFactor: 1,
+        interactive: false, // Always non-interactive to prevent conflicts
       }).addTo(map)
+    }
+
+    // Setup hover detection ONLY for edit mode
+    if (isEditing && waypoints.length > 1) {
+      // Remove old hover line if it exists
+      if (hoverLineRef.current) {
+        map.removeLayer(hoverLineRef.current)
+      }
+
+      // Create a moderately wider invisible line for hover detection
+      // Reduced from 120px to 40px for more reasonable cursor change area
+      hoverLineRef.current = L.polyline(routePoints, {
+        color: "transparent",
+        weight: 40, // Reduced from 120 to 40 for more reasonable hover area
+        opacity: 0,
+        interactive: true,
+      }).addTo(map)
+
+      // Add mousemove event to the map ONLY in edit mode
+      map.on("mousemove", handleMapMouseMove)
+
+      // Also add mouseleave to clear hover state when leaving the map
+      map.on("mouseout", () => {
+        setHoverSegmentIndex(null)
+        setHoverPoint(null)
+      })
+    } else {
+      // Remove hover line when not in editing mode
+      if (hoverLineRef.current) {
+        map.removeLayer(hoverLineRef.current)
+        hoverLineRef.current = null
+      }
+
+      // Remove mousemove event
+      map.off("mousemove", handleMapMouseMove)
+      map.off("mouseout")
+
+      // Clear hover state when not editing
+      setHoverSegmentIndex(null)
+      setHoverPoint(null)
     }
 
     // Update markers
@@ -161,20 +364,19 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
       let iconSize: [number, number]
 
       if (waypoint.selected) {
-        // Check if selected
-        iconUrl = getCustomIconSvg("#f97316", 28) // Orange for selected, slightly larger
+        iconUrl = getCustomIconSvg("#f97316", 28) // Orange for selected
         iconSize = [28, 28]
       } else if (isFirst) {
-        iconUrl = getCustomIconSvg("#22c55e", 32) // Green for departure, increased size
+        iconUrl = getCustomIconSvg("#22c55e", 32) // Green for departure
         iconSize = [32, 32]
       } else if (isLast) {
-        iconUrl = getCustomIconSvg("#ef4444", 32) // Red for arrival, increased size
+        iconUrl = getCustomIconSvg("#ef4444", 32) // Red for arrival
         iconSize = [32, 32]
       } else if (isMilestone) {
-        iconUrl = getCustomIconSvg("#3B82F6", 20) // Blue for milestone, increased size
+        iconUrl = getCustomIconSvg("#3B82F6", 20) // Blue for milestone
         iconSize = [20, 20]
       } else {
-        iconUrl = getCustomIconSvg("#3B82F6", 16) // Smaller blue for regular waypoints, increased size
+        iconUrl = getCustomIconSvg("#3B82F6", 16) // Smaller blue for regular waypoints
         iconSize = [16, 16]
       }
 
@@ -187,40 +389,52 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
 
       let marker = markersRef.current.get(waypoint.id)
       if (marker) {
-        // Update existing marker
         marker.setLatLng([waypoint.lat, waypoint.lng])
         marker.setIcon(icon)
-        marker.setPopupContent(
-          `<strong>${waypoint.name}</strong><br>
-         Lat: ${waypoint.lat.toFixed(6)}<br>
-         Lng: ${waypoint.lng.toFixed(6)}<br>
-         Alt: ${waypoint.altitude} ft`,
-        )
-        marker.dragging?.enable() // Ensure draggable is enabled/disabled based on isEditing
+
+        // Handle popup based on editing mode
         if (!isEditing) {
+          marker.bindPopup(
+            `<strong>${waypoint.name}</strong><br>
+             Lat: ${waypoint.lat.toFixed(6)}<br>
+             Lng: ${waypoint.lng.toFixed(6)}<br>
+             Alt: ${waypoint.altitude} ft`,
+          )
+        } else {
+          marker.unbindPopup()
+        }
+
+        if (isEditing) {
+          marker.dragging?.enable()
+        } else {
           marker.dragging?.disable()
         }
       } else {
-        // Create new marker
-        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing })
-          .addTo(map)
-          .bindPopup(
-            `<strong>${waypoint.name}</strong><br>
-           Lat: ${waypoint.lat.toFixed(6)}<br>
-           Lng: ${waypoint.lng.toFixed(6)}<br>
-           Alt: ${waypoint.altitude} ft`,
-          )
+        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing }).addTo(map)
 
-        // Add drag event listeners only once
-        const currentWaypointIndex = index // Capture index in closure
+        // Only bind popup when NOT in editing mode
+        if (!isEditing) {
+          marker.bindPopup(
+            `<strong>${waypoint.name}</strong><br>
+             Lat: ${waypoint.lat.toFixed(6)}<br>
+             Lng: ${waypoint.lng.toFixed(6)}<br>
+             Alt: ${waypoint.altitude} ft`,
+          )
+        }
+
+        const currentWaypointIndex = index
         marker.on("drag", (e) => {
           const draggedLatLng = e.latlng
           const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
           if (currentPolylineLatLngs) {
-            // Create a new array to update the polyline without mutating the original
             const updatedPolylineLatLngs = [...currentPolylineLatLngs]
             updatedPolylineLatLngs[currentWaypointIndex] = draggedLatLng
             routeLineRef.current?.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
+
+            // Also update hover line
+            if (hoverLineRef.current) {
+              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
+            }
           }
         })
 
@@ -240,7 +454,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
       }
     })
 
-    // Update legend content if waypoints change (e.g., names)
+    // Update legend content if waypoints change
     if (legendRef.current && waypoints.length > 0) {
       const legendDiv = legendRef.current.getContainer()
       if (legendDiv) {
@@ -267,7 +481,65 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd }: 
       const bounds = L.latLngBounds(routePoints)
       map.fitBounds(bounds, { padding: [50, 50] })
     }
-  }, [waypoints, isDark, isEditing, onWaypointDragEnd]) // Added isEditing and onWaypointDragEnd to dependencies
+
+    // Cleanup function
+    return () => {
+      if (map) {
+        map.off("mousemove", handleMapMouseMove)
+        map.off("mouseout")
+      }
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current)
+      }
+    }
+  }, [waypoints, isDark, isEditing, onWaypointDragEnd])
+
+  // Effect to handle the insert marker - ONLY in edit mode
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+
+    // Remove existing insert marker
+    if (insertMarkerRef.current) {
+      map.removeLayer(insertMarkerRef.current)
+      insertMarkerRef.current = null
+    }
+
+    // Add new insert marker ONLY if we're in edit mode and have a hover point
+    if (isEditing && hoverPoint && hoverSegmentIndex !== null) {
+      const insertIcon = L.icon({
+        iconUrl: getInsertIconSvg(24),
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      })
+
+      insertMarkerRef.current = L.marker(hoverPoint, {
+        icon: insertIcon,
+        interactive: true,
+        zIndexOffset: 1000, // Ensure it appears above other markers
+      }).addTo(map)
+
+      // Add click handler to insert waypoint
+      insertMarkerRef.current.on("click", handleInsertMarkerClick)
+    }
+
+    // Cleanup function
+    return () => {
+      if (insertMarkerRef.current && map) {
+        map.removeLayer(insertMarkerRef.current)
+        insertMarkerRef.current = null
+      }
+    }
+  }, [hoverPoint, hoverSegmentIndex, isEditing])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (mouseMoveTimeoutRef.current) {
+        clearTimeout(mouseMoveTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="relative h-full w-full">

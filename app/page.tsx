@@ -1,7 +1,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Plane, Map, Download, MapPin } from 'lucide-react'
+import { Plane, Map, Download, MapPin } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 import { FlightStatistics } from "@/components/flight-statistics"
@@ -12,15 +12,33 @@ export default function HomePage() {
       {/* Navigation */}
       <header className="border-b">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 no-underline group"> {/* Combined Link and added group */}
+          <Link href="/" className="flex items-center gap-2 no-underline group">
             <div className="w-8 h-8 rounded-md flex items-center justify-center">
-              <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={32} height={32} className="w-8 h-8 group-hover:opacity-80 transition-opacity" />
+              <Image
+                src="/ip_logo.svg"
+                alt="Infinite Planner Logo"
+                width={32}
+                height={32}
+                className="w-8 h-8 group-hover:opacity-80 transition-opacity"
+              />
             </div>
-            <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 group-hover:text-blue-500 dark:group-hover:text-blue-300 transition-colors cursor-pointer">
+            <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer">
               Infinite Planner
             </h1>
           </Link>
-          <nav className="flex items-center gap-2 sm:gap-4">
+          <nav className="flex items-center gap-4 sm:gap-6">
+            <Link
+              href="/how-it-works"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center"
+            >
+              How it Works
+            </Link>
+            <Link
+              href="/faq"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center"
+            >
+              FAQ
+            </Link>
             <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
@@ -141,7 +159,7 @@ export default function HomePage() {
         {/* Team Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Gabyu */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"> {/* Changed bg-white to bg-gray-50 */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-20 h-20 rounded-full mx-auto mt-4 border-4 border-white dark:border-gray-800 overflow-hidden">
                 <Image
@@ -158,7 +176,7 @@ export default function HomePage() {
           </div>
 
           {/* Zetfree */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"> {/* Changed bg-white to bg-gray-50 */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-20 h-20 rounded-full mx-auto mt-4 border-4 border-white dark:border-gray-800 overflow-hidden">
                 <Image
@@ -175,7 +193,7 @@ export default function HomePage() {
           </div>
 
           {/* Zaidee */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden"> {/* Changed bg-white to bg-gray-50 */}
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-20 h-20 rounded-full mx-auto mt-4 border-4 border-white dark:border-gray-800 overflow-hidden">
                 <Image

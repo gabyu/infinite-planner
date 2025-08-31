@@ -552,11 +552,35 @@ export function FlightPlanEditor() {
     })
   }, [])
 
+  // Callback for when a waypoint is inserted on the map
+  const handleWaypointInsert = useCallback((afterIndex: number, lat: number, lng: number) => {
+    setWaypoints((prevWaypoints) => {
+      const newWaypoint: Waypoint = {
+        id: `${Date.now()}-map-insert`,
+        name: "", // Empty name as requested
+        lat,
+        lng,
+        altitude: 0, // Empty altitude as requested
+        selected: false,
+      }
+
+      const newWaypoints = [...prevWaypoints]
+      newWaypoints.splice(afterIndex + 1, 0, newWaypoint)
+
+      setSuccessMessage(
+        `New waypoint inserted between ${prevWaypoints[afterIndex]?.name || "waypoint"} and ${prevWaypoints[afterIndex + 1]?.name || "waypoint"}`,
+      )
+      return newWaypoints
+    })
+  }, [])
+
   // Toggle map editing mode
   const toggleMapEditing = () => {
     setIsEditingMap((prev) => !prev)
     if (!isEditingMap) {
-      setSuccessMessage("Map editing mode enabled. Drag waypoints to adjust their position.")
+      setSuccessMessage(
+        "Map editing mode enabled. Drag waypoints to adjust their position or hover over the route to add new waypoints.",
+      )
     } else {
       setSuccessMessage("Map editing mode disabled. Waypoints updated in table.")
     }
@@ -994,7 +1018,12 @@ export function FlightPlanEditor() {
             )}
           </DialogHeader>
           <div className="h-[500px] w-full relative">
-            <MapPreview waypoints={waypoints} isEditing={isEditingMap} onWaypointDragEnd={handleWaypointDragEnd} />
+            <MapPreview
+              waypoints={waypoints}
+              isEditing={isEditingMap}
+              onWaypointDragEnd={handleWaypointDragEnd}
+              onWaypointInsert={handleWaypointInsert}
+            />
           </div>
           <DialogFooter>
             <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>

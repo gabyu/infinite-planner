@@ -1,0 +1,325 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronRight } from "lucide-react"
+import { SiteFooter } from "@/components/site-footer"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+
+// FAQ data structure
+const faqData = [
+  {
+    id: "supported-file-formats",
+    question: "What file formats are supported?",
+    answer: `
+      <p>Infinite Planner currently supports KML files from two major flight tracking services:</p>
+      <ul>
+        <li><strong>FlightRadar24 KML files</strong> - These typically contain flight path data with coordinates</li>
+        <li><strong>FlightAware KML files</strong> - These include more detailed flight information including airports and timestamps</li>
+      </ul>
+      <p>We automatically detect the source of your KML file and parse it accordingly. The exported file format is FPL (Flight Plan), which is compatible with Infinite Flight.</p>
+    `,
+  },
+  {
+    id: "waypoint-limitations",
+    question: "Why are my waypoints limited to 250?",
+    answer: `
+      <p>Infinite Flight has a technical limitation of 250 waypoints per flight plan. This is a constraint of the simulator itself, not our tool.</p>
+      <p>When your imported KML file contains more than 250 waypoints, our intelligent simplification algorithm:</p>
+      <ul>
+        <li>Preserves critical waypoints like turns and altitude changes</li>
+        <li>Maintains 20% of waypoints for departure operations</li>
+        <li>Keeps 60% for en-route navigation</li>
+        <li>Reserves 20% for arrival procedures</li>
+      </ul>
+      <p>This ensures your flight plan remains accurate while staying within Infinite Flight's limits.</p>
+    `,
+  },
+  {
+    id: "flight-plan-accuracy",
+    question: "How accurate are the converted flight plans?",
+    answer: `
+      <p>Our flight plans are highly accurate and based on real-world flight data from FlightRadar24 and FlightAware. However, there are some considerations:</p>
+      <ul>
+        <li><strong>Coordinate Accuracy:</strong> We preserve the original GPS coordinates from the source data</li>
+        <li><strong>Altitude Data:</strong> Converted from meters to feet for Infinite Flight compatibility</li>
+        <li><strong>Route Optimization:</strong> Our algorithm removes redundant waypoints while preserving the flight path shape</li>
+        <li><strong>Airport Integration:</strong> We can automatically detect origin and destination airports from FlightAware files</li>
+      </ul>
+      <p>The resulting flight plan will closely match the real-world flight while being optimized for the Infinite Flight simulator.</p>
+    `,
+  },
+  {
+    id: "troubleshooting-import-issues",
+    question: "My KML file won't import. What should I do?",
+    answer: `
+      <p>If you're having trouble importing your KML file, try these troubleshooting steps:</p>
+      <ol>
+        <li><strong>Check file format:</strong> Ensure your file has a .kml extension</li>
+        <li><strong>Verify file source:</strong> We support FlightRadar24 and FlightAware KML files</li>
+        <li><strong>File size:</strong> Very large files (>10MB) may take longer to process</li>
+        <li><strong>File corruption:</strong> Try re-downloading the KML file from the original source</li>
+        <li><strong>Browser issues:</strong> Try refreshing the page or using a different browser</li>
+      </ol>
+      <p>If you continue to experience issues, please join our Discord community for support. Include the filename and source of your KML file when asking for help.</p>
+    `,
+  },
+  {
+    id: "infinite-flight-compatibility",
+    question: "How do I use the exported flight plan in Infinite Flight?",
+    answer: `
+      <p>Once you've exported your flight plan as an FPL file, follow these steps to use it in Infinite Flight:</p>
+      <ol>
+        <li><strong>Save the FPL file:</strong> Download the .fpl file to your device</li>
+        <li><strong>Import to Infinite Flight:</strong> 
+          <ul>
+            <li>Open Infinite Flight</li>
+            <li>Go to the Flight Plan section</li>
+            <li>Tap "Import" or the folder icon</li>
+            <li>Select your downloaded .fpl file</li>
+          </ul>
+        </li>
+        <li><strong>Review the plan:</strong> Check waypoints, altitudes, and route</li>
+        <li><strong>Start your flight:</strong> Select your aircraft and begin flying!</li>
+      </ol>
+      <p>The flight plan will appear in Infinite Flight with all waypoints properly named and positioned. You can edit individual waypoints within Infinite Flight if needed.</p>
+    `,
+  },
+  {
+    id: "cannot-download-flightradar24",
+    question:
+      "I can't download KML file from FlightRadar24. Must I purchase a subscription plan to use Infinite Planner?",
+    answer: `
+      <p><strong>No, you don't need to purchase any subscription to use Infinite Planner!</strong> While FlightRadar24 requires a paid subscription to download KML files, you can use <strong>FlightAware as a free alternative</strong>.</p>
+      
+      <h4><strong>Using FlightAware (Free Option):</strong></h4>
+      <ol>
+        <li>Go to <a href="https://www.flightaware.com" target="_blank" rel="noopener noreferrer">FlightAware.com</a></li>
+        <li>Use the flight finder with origin and destination airports</li>
+        <li>Choose a flight that has already ended (completed flights only)</li>
+        <li>Download the KML file for free</li>
+      </ol>
+      
+      <h4><strong>Example - Amsterdam to San Francisco flights:</strong></h4>
+      <p>Visit: <a href="https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO" target="_blank" rel="noopener noreferrer">https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO</a></p>
+      
+      <p><strong>Important:</strong> Make sure to select flights that have already completed their journey, as only finished flights have complete KML data available for download.</p>
+      
+      <p>FlightAware provides excellent flight data and works perfectly with Infinite Planner, often with even more detailed information than FlightRadar24!</p>
+    `,
+  },
+  {
+    id: "cannot-import-flight-plan",
+    question: "I cannot import the flight plan in Infinite Flight",
+    answer: `
+      <p>The issue is usually the file extension. The file must end with <strong>.fpl</strong> (without .xml or .kml).</p>
+      
+      <h4><strong>On iOS / iPadOS:</strong></h4>
+      <ol>
+        <li>Open the Files app</li>
+        <li>In settings, turn "Show All Filename Extensions" ON</li>
+        <li>Rename the file and remove ".xml" so it ends only with .fpl</li>
+      </ol>
+      
+      <h4><strong>On Android:</strong></h4>
+      <ol>
+        <li>Save the file in a folder where Infinite Flight has permission to read</li>
+        <li>Using a file manager, make sure the filename ends with .fpl</li>
+      </ol>
+      
+      <p>Once the extension is correct, Infinite Flight will recognize and import the plan.</p>
+    `,
+  },
+  {
+    id: "atc-acceptance",
+    question: "Will ATC accept our custom flight plan?",
+    answer: `
+      <p>Yes, landing with ATC is absolutely fine — but it's important to know how Infinite Planner works.</p>
+      <p>Infinite Planner doesn't decide which runway or approach you'll use. The flight plan you import and edit is what matters, and it's <strong>always your responsibility to follow ATC instructions and ATIS information</strong> in Infinite Flight, especially in Expert and Training servers.</p>
+      <ul>
+        <li>If you import a plan from a <strong>recent real-world flight</strong>, there's a very good chance it will remain valid when you fly it.</li>
+        <li>At airports with GTS or GT configurations, your plan will usually be valid for landing, especially if the runway setup hasn't changed.</li>
+        <li>If <strong>approach frequency is active</strong>, ATC may require you to follow the published ATIS and the preferred STAR approach. In this case, you'll need to amend your flight plan:
+          <ul>
+            <li><strong>Remove waypoints</strong> that don't match the STAR path</li>
+            <li><strong>Add the STAR waypoints</strong> up to the final approach</li>
+            <li>For the last waypoints before landing, you can still keep those from your original plan, as long as the runway assignment matches</li>
+          </ul>
+        </li>
+      </ul>
+    `,
+  },
+]
+
+export default function FAQPage() {
+  const [selectedFAQ, setSelectedFAQ] = useState<string>(faqData[0].id)
+  const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set())
+  const router = useRouter()
+
+  // Handle URL routing for FAQ questions
+  useEffect(() => {
+    const path = window.location.pathname
+    const questionId = path.replace("/faq/", "")
+
+    // If there's a question ID in the URL, select it
+    if (questionId && questionId !== "faq" && faqData.find((faq) => faq.id === questionId)) {
+      setSelectedFAQ(questionId)
+    }
+  }, [])
+
+  const handleQuestionSelect = (questionId: string) => {
+    setSelectedFAQ(questionId)
+    // Update URL without page reload
+    router.push(`/faq/${questionId}`)
+  }
+
+  const toggleAccordion = (id: string) => {
+    const newOpenAccordions = new Set(openAccordions)
+    if (newOpenAccordions.has(id)) {
+      newOpenAccordions.delete(id)
+    } else {
+      newOpenAccordions.add(id)
+    }
+    setOpenAccordions(newOpenAccordions)
+  }
+
+  const selectedFAQData = faqData.find((faq) => faq.id === selectedFAQ) || faqData[0]
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* Navigation */}
+      <header className="border-b">
+        <div className="container mx-auto py-4 px-4 flex justify-between items-center">
+          <Link href="/" className="flex items-center gap-2 no-underline group">
+            <div className="w-8 h-8 rounded-md flex items-center justify-center">
+              <Image
+                src="/ip_logo.svg"
+                alt="Infinite Planner Logo"
+                width={32}
+                height={32}
+                className="w-8 h-8 group-hover:opacity-80 transition-opacity"
+              />
+            </div>
+            <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer">
+              Infinite Planner
+            </h1>
+          </Link>
+          <nav className="flex items-center gap-4 sm:gap-6">
+            <Link
+              href="/how-it-works"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center"
+            >
+              How it Works
+            </Link>
+            <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-md text-sm font-medium h-10 flex items-center">
+              FAQ
+            </span>
+            <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
+                <span className="hidden sm:inline">Join Discord</span>
+              </Button>
+            </Link>
+            <Link href="/planner">
+              <Button className="h-10 flex items-center gap-2 px-2 sm:px-4">
+                <span className="hidden sm:inline">Open Planner Tool</span>
+              </Button>
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      {/* Page Content */}
+      <main className="flex-grow">
+        {/* Hero Section */}
+        <section className="py-12 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
+          <div className="container mx-auto px-4 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">Frequently Asked Questions</h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+              Find answers to common questions about using Infinite Planner
+            </p>
+          </div>
+        </section>
+
+        {/* Desktop Layout - Side by side */}
+        <div className="hidden md:flex container mx-auto px-4 py-8 gap-8">
+          {/* Left Panel - Questions Menu */}
+          <div className="w-1/3">
+            <div className="sticky top-8">
+              <h2 className="text-xl font-bold mb-4">Questions</h2>
+              <nav className="space-y-1">
+                {faqData.map((faq) => (
+                  <button
+                    key={faq.id}
+                    onClick={() => handleQuestionSelect(faq.id)}
+                    className={`w-full text-left p-3 transition-colors border-l-4 ${
+                      selectedFAQ === faq.id
+                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-500"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-800/50 text-gray-700 dark:text-gray-300 border-transparent"
+                    }`}
+                  >
+                    <span className="font-medium">{faq.question}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+
+          {/* Right Panel - Answer */}
+          <div className="w-2/3">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{selectedFAQData.question}</h2>
+              <div
+                className="prose prose-gray dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: selectedFAQData.answer }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Layout - Accordions */}
+        <div className="md:hidden container mx-auto px-4 py-8">
+          <div className="space-y-4">
+            {faqData.map((faq) => (
+              <Collapsible key={faq.id} open={openAccordions.has(faq.id)} onOpenChange={() => toggleAccordion(faq.id)}>
+                <CollapsibleTrigger className="w-full">
+                  <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
+                    {openAccordions.has(faq.id) ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                    )}
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg border-t">
+                    <div
+                      className="prose prose-gray dark:prose-invert prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: faq.answer }}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+        </div>
+
+        {/* Hidden content for SEO - All FAQ content for search engines */}
+        <div className="sr-only">
+          {faqData.map((faq) => (
+            <div key={`seo-${faq.id}`}>
+              <h2>{faq.question}</h2>
+              <div dangerouslySetInnerHTML={{ __html: faq.answer }} />
+            </div>
+          ))}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <SiteFooter />
+    </div>
+  )
+}
