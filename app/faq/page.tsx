@@ -158,24 +158,28 @@ export default function FAQPage() {
   const [selectedFAQ, setSelectedFAQ] = useState<string>(faqData[0].id)
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set())
 
-  // Handle URL routing for FAQ questions - simplified without router
+  // Handle anchor links on page load
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const path = window.location.pathname
-      const questionId = path.replace("/faq/", "").replace("/faq", "")
-
-      // If there's a question ID in the URL, select it
-      if (questionId && questionId !== "" && faqData.find((faq) => faq.id === questionId)) {
-        setSelectedFAQ(questionId)
+      const hash = window.location.hash.replace("#", "")
+      if (hash && faqData.find((faq) => faq.id === hash)) {
+        setSelectedFAQ(hash)
+        // Scroll to the question after a short delay to ensure rendering
+        setTimeout(() => {
+          const element = document.getElementById(hash)
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        }, 100)
       }
     }
   }, [])
 
   const handleQuestionSelect = (questionId: string) => {
     setSelectedFAQ(questionId)
-    // Update URL without using router to avoid errors
+    // Update URL hash
     if (typeof window !== "undefined") {
-      window.history.pushState({}, "", `/faq/${questionId}`)
+      window.location.hash = questionId
     }
   }
 
@@ -274,7 +278,7 @@ export default function FAQPage() {
 
           {/* Right Panel - Answer */}
           <div className="w-2/3">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8">
+            <div id={selectedFAQData.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-8">
               <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">{selectedFAQData.question}</h2>
               <div
                 className="prose prose-gray dark:prose-invert max-w-none"
@@ -288,26 +292,28 @@ export default function FAQPage() {
         <div className="md:hidden container mx-auto px-4 py-8">
           <div className="space-y-4">
             {faqData.map((faq) => (
-              <Collapsible key={faq.id} open={openAccordions.has(faq.id)} onOpenChange={() => toggleAccordion(faq.id)}>
-                <CollapsibleTrigger className="w-full">
-                  <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
-                    {openAccordions.has(faq.id) ? (
-                      <ChevronDown className="h-5 w-5 text-gray-500" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 text-gray-500" />
-                    )}
-                  </div>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg border-t">
-                    <div
-                      className="prose prose-gray dark:prose-invert prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: faq.answer }}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+              <div key={faq.id} id={faq.id}>
+                <Collapsible open={openAccordions.has(faq.id)} onOpenChange={() => toggleAccordion(faq.id)}>
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <h3 className="font-medium text-left text-gray-900 dark:text-gray-100">{faq.question}</h3>
+                      {openAccordions.has(faq.id) ? (
+                        <ChevronDown className="h-5 w-5 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-500" />
+                      )}
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg border-t">
+                      <div
+                        className="prose prose-gray dark:prose-invert prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: faq.answer }}
+                      />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             ))}
           </div>
         </div>
