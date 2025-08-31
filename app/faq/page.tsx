@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight, MapPin } from "lucide-react"
+import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
@@ -157,23 +157,26 @@ const faqData = [
 export default function FAQPage() {
   const [selectedFAQ, setSelectedFAQ] = useState<string>(faqData[0].id)
   const [openAccordions, setOpenAccordions] = useState<Set<string>>(new Set())
-  const router = useRouter()
 
-  // Handle URL routing for FAQ questions
+  // Handle URL routing for FAQ questions - simplified without router
   useEffect(() => {
-    const path = window.location.pathname
-    const questionId = path.replace("/faq/", "")
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname
+      const questionId = path.replace("/faq/", "").replace("/faq", "")
 
-    // If there's a question ID in the URL, select it
-    if (questionId && questionId !== "faq" && faqData.find((faq) => faq.id === questionId)) {
-      setSelectedFAQ(questionId)
+      // If there's a question ID in the URL, select it
+      if (questionId && questionId !== "" && faqData.find((faq) => faq.id === questionId)) {
+        setSelectedFAQ(questionId)
+      }
     }
   }, [])
 
   const handleQuestionSelect = (questionId: string) => {
     setSelectedFAQ(questionId)
-    // Update URL without page reload
-    router.push(`/faq/${questionId}`)
+    // Update URL without using router to avoid errors
+    if (typeof window !== "undefined") {
+      window.history.pushState({}, "", `/faq/${questionId}`)
+    }
   }
 
   const toggleAccordion = (id: string) => {
@@ -219,11 +222,13 @@ export default function FAQPage() {
             </span>
             <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
+                <DiscordIcon className="w-5 h-5" />
                 <span className="hidden sm:inline">Join Discord</span>
               </Button>
             </Link>
             <Link href="/planner">
               <Button className="h-10 flex items-center gap-2 px-2 sm:px-4">
+                <MapPin size={16} />
                 <span className="hidden sm:inline">Open Planner Tool</span>
               </Button>
             </Link>
