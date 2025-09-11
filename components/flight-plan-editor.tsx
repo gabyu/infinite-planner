@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileText,
-  Layers,
+  Settings,
   Pencil,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
@@ -81,6 +81,12 @@ export function FlightPlanEditor() {
   const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false) // New state for map editing mode
 
+  // New states for airport code prompt dialog
+  const [showAirportPrompt, setShowAirportPrompt] = useState(false)
+  const [promptOriginAirport, setPromptOriginAirport] = useState("")
+  const [promptDestinationAirport, setPromptDestinationAirport] = useState("")
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+
   // Refs for sticky header height calculation
   const cardHeaderRef = useRef<HTMLDivElement>(null)
   const [tableBarTopPosition, setTableBarTopPosition] = useState(0)
@@ -140,9 +146,11 @@ export function FlightPlanEditor() {
 
   // Apply "Made with Infinite Planner" when checkbox changes
   useEffect(() => {
-    if (waypoints.length >= 4 && useMadeWithInfinitePlanner) {
+    if (waypoints.length >= 5 && useMadeWithInfinitePlanner) {
+      // Changed from 4 to 5
       applyMadeWithInfinitePlanner()
-    } else if (waypoints.length >= 4 && !useMadeWithInfinitePlanner) {
+    } else if (waypoints.length >= 5 && !useMadeWithInfinitePlanner) {
+      // Changed from 4 to 5
       // Restore original numbering when unchecked
       const renamedWaypoints = waypoints.map((wp, index) => ({
         ...wp,
@@ -229,46 +237,60 @@ export function FlightPlanEditor() {
     return deg * (Math.PI / 180)
   }
 
-  // Handle KML file import
+  // Handle KML file import - now shows airport prompt first
   const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setIsLoading(true)
-    setError(null)
-    setWarning(null)
-    setSuccessMessage(null)
-
-    // Store the original file name without extension for later use
-    const fileName = file.name.replace(/\.[^/.]+$/, "")
-    setImportedFileName(fileName)
-
-    // Get current airport values at the time of import
-    const currentOrigin = originAirport.trim()
-    const currentDestination = destinationAirport.trim()
-
-    // Try to extract origin and destination from FlightAware filename format
-    // FlightAware format: "FlightAware_AAL123_KJFK_KLAX_20231201.kml"
-    const flightAwareMatch = fileName.match(/FlightAware_[^_]+_([A-Z]{4})_([A-Z]{4})_/)
-    if (flightAwareMatch) {
-      const extractedOrigin = flightAwareMatch[1]
-      const extractedDestination = flightAwareMatch[2]
-
-      // Update the UI fields immediately so user can see the extracted data
-      setOriginAirport(extractedOrigin)
-      setDestinationToAirport(extractedDestination)
-
-      // Use the extracted values for saving
-      await processKMLFile(file, fileName, extractedOrigin, extractedDestination)
-    } else {
-      // For non-FlightAware files (like FlightRadar24), use current user input
-      await processKMLFile(file, fileName, currentOrigin, currentDestination)
-    }
+    // Store the file and show airport prompt dialog
+    setPendingFile(file)
+    setPromptOriginAirport("")
+    setPromptDestinationAirport("")
+    setShowAirportPrompt(true)
 
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
+  }
+
+  // Handle airport prompt confirmation
+  const handleAirportPromptConfirm = async () => {
+    if (!pendingFile) return
+
+    const file = pendingFile
+    const fileName = file.name.replace(/\.[^/.]+$/, "")
+
+    // Update the UI fields with the entered airport codes
+    setOriginAirport(promptOriginAirport.trim().toUpperCase())
+    setDestinationToAirport(promptDestinationAirport.trim().toUpperCase())
+
+    // Close the dialog
+    setShowAirportPrompt(false)
+    setPendingFile(null)
+
+    // Start the import process
+    setIsLoading(true)
+    setError(null)
+    setWarning(null)
+    setSuccessMessage(null)
+    setImportedFileName(fileName)
+
+    // Process the KML file with the entered airport codes
+    await processKMLFile(
+      file,
+      fileName,
+      promptOriginAirport.trim().toUpperCase(),
+      promptDestinationAirport.trim().toUpperCase(),
+    )
+  }
+
+  // Handle airport prompt cancellation
+  const handleAirportPromptCancel = () => {
+    setShowAirportPrompt(false)
+    setPendingFile(null)
+    setPromptOriginAirport("")
+    setPromptDestinationAirport("")
   }
 
   // Separate function to process the KML file
@@ -286,6 +308,21 @@ export function FlightPlanEditor() {
           ...wp,
           name: String(index + 1).padStart(3, "0"),
         }))
+
+        // Rename first and last waypoints with airport codes if provided
+        if (origin && renamedWaypoints.length > 0) {
+          renamedWaypoints[0] = {
+            ...renamedWaypoints[0],
+            name: origin,
+          }
+        }
+
+        if (destination && renamedWaypoints.length > 1) {
+          renamedWaypoints[renamedWaypoints.length - 1] = {
+            ...renamedWaypoints[renamedWaypoints.length - 1],
+            name: destination,
+          }
+        }
 
         setWaypoints(renamedWaypoints)
         setSimplificationInfo({
@@ -513,25 +550,27 @@ export function FlightPlanEditor() {
     setSuccessMessage(`Prefix "${waypointPrefix}" applied to all waypoints!`)
   }
 
-  // Apply "Made with Infinite Planner" to last 4 waypoints
+  // Apply "Made with Infinite Planner" to waypoints excluding the very last one
   const applyMadeWithInfinitePlanner = () => {
-    if (waypoints.length < 4) {
-      setError("Need at least 4 waypoints to apply 'Made with Infinite Planner'")
+    if (waypoints.length < 5) {
+      // Changed from 4 to 5 since we need at least 5 waypoints (4 for "MADE WITH INFINITE PLANNER" + 1 for destination)
+      setError("Need at least 5 waypoints to apply 'Made with Infinite Planner' (preserving destination airport)")
       return
     }
 
     const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
     const updatedWaypoints = waypoints.map((wp, index) => {
-      const isLastFour = index >= waypoints.length - 4
-      if (isLastFour && useMadeWithInfinitePlanner) {
-        const nameIndex = index - (waypoints.length - 4)
+      // Apply to positions: length-5, length-4, length-3, length-2 (skipping length-1 which is the last waypoint)
+      const isTargetPosition = index >= waypoints.length - 5 && index < waypoints.length - 1
+      if (isTargetPosition && useMadeWithInfinitePlanner) {
+        const nameIndex = index - (waypoints.length - 5)
         return { ...wp, name: madeWithNames[nameIndex] }
       }
       return wp
     })
 
     setWaypoints(updatedWaypoints)
-    setSuccessMessage("Applied 'Made with Infinite Planner' to last 4 waypoints!")
+    setSuccessMessage("Applied 'Made with Infinite Planner' to waypoints (preserving destination airport)!")
   }
 
   // Callback for when a waypoint is dragged on the map
@@ -711,7 +750,7 @@ export function FlightPlanEditor() {
             </Alert>
           )}
 
-          {/* Table Action Bar (Select All, Delete, Clear Altitudes, Insert Waypoint, Batch Rename) */}
+          {/* Table Action Bar (Select All, Delete, Clear Altitudes, Insert Waypoint, FPL Options) */}
           <div
             className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
             style={{ top: `${tableBarTopPosition}px` }}
@@ -761,19 +800,17 @@ export function FlightPlanEditor() {
                 <span className="sm:hidden">Insert</span>
               </Button>
 
-              {/* Batch Rename Button */}
+              {/* FPL Options Button - Changed from Batch Renaming */}
               <Button
-                onClick={() =>
-                  document.getElementById("waypoints-batch-section")?.scrollIntoView({ behavior: "smooth" })
-                }
+                onClick={() => document.getElementById("fpl-options-section")?.scrollIntoView({ behavior: "smooth" })}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-1 h-10 px-3 sm:px-4"
                 disabled={waypoints.length === 0 || isLoading}
               >
-                <Layers size={14} />
-                <span className="hidden sm:inline">Batch Renaming...</span>
-                <span className="sm:hidden">Batch</span>
+                <Settings size={14} />
+                <span className="hidden sm:inline">FPL Options...</span>
+                <span className="sm:hidden">Options</span>
               </Button>
             </div>
           </div>
@@ -879,14 +916,14 @@ export function FlightPlanEditor() {
             </Table>
           </div>
 
-          {/* Waypoints Batch Section - Moved here */}
+          {/* FPL Options Section - Renamed from Waypoints Batch Section */}
           {waypoints.length > 0 && (
-            <div id="waypoints-batch-section" className="mb-6 border-t pt-6 mt-6">
+            <div id="fpl-options-section" className="mb-6 border-t pt-6 mt-6">
               {" "}
               {/* Added mt-6 for spacing */}
               <div className="flex items-center gap-2 mb-4">
-                <Layers className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">Waypoints Batch Rename Options</h3>
+                <Settings className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-medium">FPL Options</h3>
               </div>
               <div className="space-y-6">
                 {/* Import TXT to Waypoints */}
@@ -957,17 +994,18 @@ export function FlightPlanEditor() {
                     <h4 className="font-medium">Made with Infinite Planner</h4>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Replace the last 4 waypoint names with "MADE", "WITH", "INFINITE", "PLANNER" to share the love!
+                    Replace waypoints with "MADE", "WITH", "INFINITE", "PLANNER" (preserving the destination airport as
+                    the last waypoint)
                   </p>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="madeWithInfinitePlanner"
                       checked={useMadeWithInfinitePlanner}
                       onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
-                      disabled={waypoints.length < 4}
+                      disabled={waypoints.length < 5} // Changed from 4 to 5
                     />
                     <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
-                      Use "Made with Infinite Planner" for last 4 waypoints
+                      Use "Made with Infinite Planner" (preserving destination airport)
                     </Label>
                   </div>
                 </div>
@@ -986,6 +1024,51 @@ export function FlightPlanEditor() {
         </CardContent>
       </Card>
 
+      {/* Airport Code Prompt Dialog */}
+      <Dialog open={showAirportPrompt} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Airport Codes</DialogTitle>
+            <DialogDescription>
+              Please enter the origin and destination airport ICAO codes for this flight plan. These will be used for
+              statistics and to name the first and last waypoints.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="promptOrigin">Origin Airport (ICAO)</Label>
+              <Input
+                id="promptOrigin"
+                value={promptOriginAirport}
+                onChange={(e) => setPromptOriginAirport(e.target.value.toUpperCase())}
+                placeholder="e.g., EHAM"
+                className="font-mono text-center"
+                maxLength={4}
+                onFocus={handleInputFocus}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="promptDestination">Destination Airport (ICAO)</Label>
+              <Input
+                id="promptDestination"
+                value={promptDestinationAirport}
+                onChange={(e) => setPromptDestinationAirport(e.target.value.toUpperCase())}
+                placeholder="e.g., KSFO"
+                className="font-mono text-center"
+                maxLength={4}
+                onFocus={handleInputFocus}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleAirportPromptCancel}>
+              Cancel
+            </Button>
+            <Button onClick={handleAirportPromptConfirm}>Continue Import</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Map Preview Dialog */}
       <Dialog
         open={showMapPreview}
@@ -997,11 +1080,11 @@ export function FlightPlanEditor() {
         }}
       >
         <DialogContent
-          className="max-w-6xl" // Increased max-width
+          className="max-w-[95vw] w-full h-[90vh] p-0" // Remove flex flex-col
           onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
           onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
         >
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
             <div>
               <DialogTitle>Flight Plan Preview</DialogTitle>
               <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
@@ -1010,26 +1093,41 @@ export function FlightPlanEditor() {
               <Button
                 onClick={toggleMapEditing}
                 variant={isEditingMap ? "default" : "outline"}
-                className="flex items-center gap-2 ml-auto mr-4" // Adjusted margin
+                className="flex items-center gap-2 ml-4" // Add ml-4 for spacing from close button
               >
                 <Pencil size={16} />
                 {isEditingMap ? "Done Editing" : "Edit Waypoints"}
               </Button>
             )}
           </DialogHeader>
-          <div className="h-[500px] w-full relative">
-            <MapPreview
-              waypoints={waypoints}
-              isEditing={isEditingMap}
-              onWaypointDragEnd={handleWaypointDragEnd}
-              onWaypointInsert={handleWaypointInsert}
-            />
+
+          {/* Map container - takes remaining space */}
+          <div className="flex-1 w-full relative px-6">
+            <div className="h-[calc(90vh-120px)] w-full">
+              {" "}
+              {/* Back to calculated height */}
+              <MapPreview
+                waypoints={waypoints}
+                isEditing={isEditingMap}
+                onWaypointDragEnd={handleWaypointDragEnd}
+                onWaypointInsert={handleWaypointInsert}
+              />
+            </div>
           </div>
-          <DialogFooter>
-            <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
-              Close
-            </Button>
-          </DialogFooter>
+
+          {/* Footer with Close button - always at bottom */}
+          <div className="flex-shrink-0 px-6 pb-6">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowMapPreview(false)}
+                disabled={isEditingMap}
+                variant="outline"
+                className="min-w-[80px]"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
