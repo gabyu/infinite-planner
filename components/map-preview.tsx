@@ -1,8 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import L from "leaflet"
-import "leaflet/dist/leaflet.css"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 
@@ -24,17 +22,49 @@ interface MapPreviewProps {
 
 export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, onWaypointInsert }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<L.Map | null>(null)
-  const routeLineRef = useRef<L.Polyline | null>(null)
-  const hoverLineRef = useRef<L.Polyline | null>(null)
-  const markersRef = useRef<Map<string, L.Marker>>(new Map())
-  const legendRef = useRef<L.Control | null>(null)
-  const insertMarkerRef = useRef<L.Marker | null>(null)
+  const mapInstanceRef = useRef<any>(null)
+  const routeLineRef = useRef<any>(null)
+  const hoverLineRef = useRef<any>(null)
+  const markersRef = useRef<Map<string, any>>(new Map())
+  const legendRef = useRef<any>(null)
+  const insertMarkerRef = useRef<any>(null)
   const [hoverSegmentIndex, setHoverSegmentIndex] = useState<number | null>(null)
-  const [hoverPoint, setHoverPoint] = useState<L.LatLng | null>(null)
+  const [hoverPoint, setHoverPoint] = useState<any>(null)
   const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+  const [L, setL] = useState<any>(null)
+  const [isMapReady, setIsMapReady] = useState(false)
+
+  // Load Leaflet dynamically
+  useEffect(() => {
+    const loadLeaflet = async () => {
+      try {
+        // Dynamic import of Leaflet
+        const leaflet = await import("leaflet")
+
+        // Import CSS
+        await import("leaflet/dist/leaflet.css")
+
+        // Fix for default markers in Leaflet with webpack
+        delete (leaflet.Icon.Default.prototype as any)._getIconUrl
+        leaflet.Icon.Default.mergeOptions({
+          iconRetinaUrl: "/marker-icon.png",
+          iconUrl: "/marker-icon.png",
+          shadowUrl: "/marker-shadow.png",
+        })
+
+        setL(leaflet.default || leaflet)
+        setIsMapReady(true)
+      } catch (error) {
+        console.error("Failed to load Leaflet:", error)
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      loadLeaflet()
+    }
+  }, [])
 
   // Custom icon SVG data for rounded pins
   const getCustomIconSvg = (color: string, size: number) => {
@@ -63,9 +93,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Function to find the closest point on a line segment to a given point
-  const getClosestPointOnSegment = (point: L.LatLng, segmentStart: L.LatLng, segmentEnd: L.LatLng) => {
+  const getClosestPointOnSegment = (point: any, segmentStart: any, segmentEnd: any) => {
     const map = mapInstanceRef.current
-    if (!map) return null
+    if (!map || !L) return null
 
     // Convert to pixel coordinates for more accurate calculations
     const pointPixel = map.latLngToContainerPoint(point)
@@ -93,9 +123,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Check if mouse is near an existing waypoint (priority zone)
-  const isNearExistingWaypoint = (mouseLatLng: L.LatLng, threshold = 30) => {
+  const isNearExistingWaypoint = (mouseLatLng: any, threshold = 30) => {
     const map = mapInstanceRef.current
-    if (!map) return false
+    if (!map || !L) return false
 
     const mousePixel = map.latLngToContainerPoint(mouseLatLng)
 
@@ -113,9 +143,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Check distance in pixels between mouse and closest point on route
-  const getPixelDistanceToRoute = (mouseLatLng: L.LatLng) => {
+  const getPixelDistanceToRoute = (mouseLatLng: any) => {
     const map = mapInstanceRef.current
-    if (!map || waypoints.length < 2) return Number.POSITIVE_INFINITY
+    if (!map || !L || waypoints.length < 2) return Number.POSITIVE_INFINITY
 
     const mousePixel = map.latLngToContainerPoint(mouseLatLng)
     let minPixelDistance = Number.POSITIVE_INFINITY
@@ -139,8 +169,8 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Handle map mousemove to find the closest segment
-  const handleMapMouseMove = (e: L.LeafletMouseEvent) => {
-    if (!isEditing || !mapInstanceRef.current || waypoints.length < 2) {
+  const handleMapMouseMove = (e: any) => {
+    if (!isEditing || !mapInstanceRef.current || !L || waypoints.length < 2) {
       setHoverSegmentIndex(null)
       setHoverPoint(null)
       return
@@ -168,7 +198,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       // Show (+) icon only when within 20 pixels of the route line
       if (pixelDistance <= 20) {
         let closestSegmentIndex = -1
-        let closestPoint: L.LatLng | null = null
+        let closestPoint: any = null
         let minDistance = Number.POSITIVE_INFINITY
 
         // Find the closest segment
@@ -198,7 +228,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         setHoverSegmentIndex(null)
         setHoverPoint(null)
       }
-    }, 10) // Reduced debounce for more responsive feel
+    }, 10)
   }
 
   // Handle insert marker click
@@ -212,7 +242,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   useEffect(() => {
-    if (!mapRef.current) return
+    if (!mapRef.current || !L || !isMapReady) return
 
     // Initialize map if it doesn't exist
     if (!mapInstanceRef.current) {
@@ -274,7 +304,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {}),
     )
     if (isDark && !currentTileLayer) {
-      map.eachLayer((layer) => {
+      map.eachLayer((layer: any) => {
         if (layer instanceof L.TileLayer) {
           map.removeLayer(layer)
         }
@@ -286,7 +316,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         maxZoom: 19,
       }).addTo(map)
     } else if (!isDark && currentTileLayer) {
-      map.eachLayer((layer) => {
+      map.eachLayer((layer: any) => {
         if (layer instanceof L.TileLayer) {
           map.removeLayer(layer)
         }
@@ -300,15 +330,14 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
     if (routeLineRef.current) {
       routeLineRef.current.setLatLngs(routePoints)
-      // Make polyline non-interactive when not editing
       routeLineRef.current.setStyle({ interactive: false, weight: 5 })
     } else {
       routeLineRef.current = L.polyline(routePoints, {
         color: "#3B82F6",
-        weight: 5, // Keep the thicker line for better visibility
+        weight: 5,
         opacity: 0.8,
         smoothFactor: 1,
-        interactive: false, // Always non-interactive to prevent conflicts
+        interactive: false,
       }).addTo(map)
     }
 
@@ -319,11 +348,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         map.removeLayer(hoverLineRef.current)
       }
 
-      // Create a moderately wider invisible line for hover detection
-      // Reduced from 120px to 40px for more reasonable cursor change area
       hoverLineRef.current = L.polyline(routePoints, {
         color: "transparent",
-        weight: 40, // Reduced from 120 to 40 for more reasonable hover area
+        weight: 40,
         opacity: 0,
         interactive: true,
       }).addTo(map)
@@ -364,19 +391,19 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       let iconSize: [number, number]
 
       if (waypoint.selected) {
-        iconUrl = getCustomIconSvg("#f97316", 28) // Orange for selected
+        iconUrl = getCustomIconSvg("#f97316", 28)
         iconSize = [28, 28]
       } else if (isFirst) {
-        iconUrl = getCustomIconSvg("#22c55e", 32) // Green for departure
+        iconUrl = getCustomIconSvg("#22c55e", 32)
         iconSize = [32, 32]
       } else if (isLast) {
-        iconUrl = getCustomIconSvg("#ef4444", 32) // Red for arrival
+        iconUrl = getCustomIconSvg("#ef4444", 32)
         iconSize = [32, 32]
       } else if (isMilestone) {
-        iconUrl = getCustomIconSvg("#3B82F6", 20) // Blue for milestone
+        iconUrl = getCustomIconSvg("#3B82F6", 20)
         iconSize = [20, 20]
       } else {
-        iconUrl = getCustomIconSvg("#3B82F6", 16) // Smaller blue for regular waypoints
+        iconUrl = getCustomIconSvg("#3B82F6", 16)
         iconSize = [16, 16]
       }
 
@@ -423,22 +450,22 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         }
 
         const currentWaypointIndex = index
-        marker.on("drag", (e) => {
+        marker.on("drag", (e: any) => {
           const draggedLatLng = e.latlng
           const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
           if (currentPolylineLatLngs) {
             const updatedPolylineLatLngs = [...currentPolylineLatLngs]
             updatedPolylineLatLngs[currentWaypointIndex] = draggedLatLng
-            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
+            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs)
 
             // Also update hover line
             if (hoverLineRef.current) {
-              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
+              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs)
             }
           }
         })
 
-        marker.on("dragend", (e) => {
+        marker.on("dragend", (e: any) => {
           const newLatLng = e.target.getLatLng()
           onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
         })
@@ -492,12 +519,12 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         clearTimeout(mouseMoveTimeoutRef.current)
       }
     }
-  }, [waypoints, isDark, isEditing, onWaypointDragEnd])
+  }, [waypoints, isDark, isEditing, onWaypointDragEnd, L, isMapReady])
 
   // Effect to handle the insert marker - ONLY in edit mode
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map) return
+    if (!map || !L) return
 
     // Remove existing insert marker
     if (insertMarkerRef.current) {
@@ -516,7 +543,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       insertMarkerRef.current = L.marker(hoverPoint, {
         icon: insertIcon,
         interactive: true,
-        zIndexOffset: 1000, // Ensure it appears above other markers
+        zIndexOffset: 1000,
       }).addTo(map)
 
       // Add click handler to insert waypoint
@@ -530,7 +557,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         insertMarkerRef.current = null
       }
     }
-  }, [hoverPoint, hoverSegmentIndex, isEditing])
+  }, [hoverPoint, hoverSegmentIndex, isEditing, L])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -540,6 +567,14 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       }
     }
   }, [])
+
+  if (!isMapReady || !L) {
+    return (
+      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        Loading map...
+      </div>
+    )
+  }
 
   return (
     <div className="relative h-full w-full">

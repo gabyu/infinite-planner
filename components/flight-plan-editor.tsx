@@ -38,7 +38,7 @@ import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
-const MapPreview = dynamic(() => import("@/components/map-preview"), {
+const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
   ssr: false,
   loading: () => (
     <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">Loading map...</div>
@@ -80,6 +80,10 @@ export function FlightPlanEditor() {
   const [destinationAirport, setDestinationToAirport] = useState("")
   const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false) // New state for map editing mode
+  const [icaoValidation, setIcaoValidation] = useState({
+    origin: false,
+    destination: false,
+  })
 
   // Refs for sticky header height calculation
   const cardHeaderRef = useRef<HTMLDivElement>(null)
@@ -586,6 +590,24 @@ export function FlightPlanEditor() {
     }
   }
 
+  const validateICAO = (code: string): boolean => {
+    // Must be exactly 4 characters and all letters
+    return /^[A-Z]{4}$/.test(code.toUpperCase())
+  }
+
+  const handleICAOChange = (field: "origin" | "destination", value: string) => {
+    const upperValue = value.toUpperCase()
+    const isValid = validateICAO(upperValue)
+
+    if (field === "origin") {
+      setOriginAirport(upperValue)
+      setIcaoValidation((prev) => ({ ...prev, origin: isValid }))
+    } else {
+      setDestinationToAirport(upperValue)
+      setIcaoValidation((prev) => ({ ...prev, destination: isValid }))
+    }
+  }
+
   return (
     <div className="container mx-auto py-8 px-4">
       <Card className="bg-background shadow-sm border-border">
@@ -593,22 +615,71 @@ export function FlightPlanEditor() {
         <div ref={cardHeaderRef} className="sticky top-0 z-10">
           <CardHeader className="pb-4 border-b bg-background shadow-sm">
             <div className="flex flex-col gap-4">
-              {/* Action Buttons and Airport Fields */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap gap-2">
+              {/* ICAO Fields and Import KML - Dedicated Top Row */}
+              <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
+                    Origin ICAO
+                  </Label>
+                  <Input
+                    id="origin"
+                    value={originAirport}
+                    onChange={(e) => handleICAOChange("origin", e.target.value)}
+                    placeholder="EHAM"
+                    className={`h-8 w-20 text-center font-mono ${
+                      originAirport && !icaoValidation.origin
+                        ? "border-red-500 focus:border-red-500"
+                        : icaoValidation.origin
+                          ? "border-green-500 focus:border-green-500"
+                          : ""
+                    }`}
+                    maxLength={4}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
+                    Destination ICAO
+                  </Label>
+                  <Input
+                    id="destination"
+                    value={destinationAirport}
+                    onChange={(e) => handleICAOChange("destination", e.target.value)}
+                    placeholder="KSFO"
+                    className={`h-8 w-20 text-center font-mono ${
+                      destinationAirport && !icaoValidation.destination
+                        ? "border-red-500 focus:border-red-500"
+                        : icaoValidation.destination
+                          ? "border-green-500 focus:border-green-500"
+                          : ""
+                    }`}
+                    maxLength={4}
+                  />
+                </div>
+
+                <div className="relative">
                   <Button
                     onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
+                    variant="default"
                     size="sm"
-                    className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                    disabled={isLoading}
+                    className="flex items-center gap-2 h-10 px-4"
+                    disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
+                    title={
+                      !icaoValidation.origin || !icaoValidation.destination
+                        ? "Enter departure and arrival ICAO codes to enable import"
+                        : undefined
+                    }
                   >
                     <Upload size={14} />
-                    <span className="hidden sm:inline">{isLoading ? "Importing..." : "Import KML"}</span>
-                    <span className="sm:hidden">Import</span>
+                    <span>{isLoading ? "Importing..." : "Import KML"}</span>
                   </Button>
                   <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
+                </div>
+              </div>
 
+              {/* Other Action Buttons Row */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => setShowMapPreview(true)}
                     variant="outline"
@@ -617,7 +688,7 @@ export function FlightPlanEditor() {
                     disabled={waypoints.length === 0 || isLoading}
                   >
                     <Map size={14} />
-                    <span className="hidden sm:inline">Flight Map</span> {/* Renamed from Preview */}
+                    <span className="hidden sm:inline">Flight Map</span>
                   </Button>
 
                   <Button
@@ -631,36 +702,6 @@ export function FlightPlanEditor() {
                     <span className="hidden sm:inline">Export FPL</span>
                     <span className="sm:hidden">Export</span>
                   </Button>
-                </div>
-
-                {/* Airport Fields on the right */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
-                      Origin
-                    </Label>
-                    <Input
-                      id="origin"
-                      value={originAirport}
-                      onChange={(e) => setOriginAirport(e.target.value.toUpperCase())}
-                      placeholder="EHAM"
-                      className="h-8 w-20 text-center font-mono"
-                      maxLength={4}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
-                      Dest
-                    </Label>
-                    <Input
-                      id="destination"
-                      value={destinationAirport}
-                      onChange={(e) => setDestinationToAirport(e.target.value.toUpperCase())}
-                      placeholder="KSFO"
-                      className="h-8 w-20 text-center font-mono"
-                      maxLength={4}
-                    />
-                  </div>
                 </div>
               </div>
             </div>
