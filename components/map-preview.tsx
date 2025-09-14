@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 
@@ -22,69 +24,17 @@ interface MapPreviewProps {
 
 export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, onWaypointInsert }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
-  const routeLineRef = useRef<any>(null)
-  const hoverLineRef = useRef<any>(null)
-  const markersRef = useRef<Map<string, any>>(new Map())
-  const legendRef = useRef<any>(null)
-  const insertMarkerRef = useRef<any>(null)
+  const mapInstanceRef = useRef<L.Map | null>(null)
+  const routeLineRef = useRef<L.Polyline | null>(null)
+  const hoverLineRef = useRef<L.Polyline | null>(null)
+  const markersRef = useRef<Map<string, L.Marker>>(new Map())
+  const legendRef = useRef<L.Control | null>(null)
+  const insertMarkerRef = useRef<L.Marker | null>(null)
   const [hoverSegmentIndex, setHoverSegmentIndex] = useState<number | null>(null)
-  const [hoverPoint, setHoverPoint] = useState<any>(null)
+  const [hoverPoint, setHoverPoint] = useState<L.LatLng | null>(null)
   const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
-  const [isLeafletLoaded, setIsLeafletLoaded] = useState(false)
-  const [L, setL] = useState<any>(null)
-
-  // Load Leaflet from CDN with better caching and faster tiles
-  useEffect(() => {
-    if (typeof window === "undefined") return
-
-    // Check if Leaflet is already loaded
-    if ((window as any).L) {
-      setL((window as any).L)
-      setIsLeafletLoaded(true)
-      return
-    }
-
-    // Load Leaflet CSS with better caching
-    const cssLink = document.createElement("link")
-    cssLink.rel = "stylesheet"
-    cssLink.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    cssLink.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    cssLink.crossOrigin = ""
-    // Add cache control
-    cssLink.onload = () => {
-      console.log("Leaflet CSS loaded")
-    }
-    document.head.appendChild(cssLink)
-
-    // Load Leaflet JS with better error handling
-    const script = document.createElement("script")
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    script.crossOrigin = ""
-    script.async = true // Add async loading
-    script.onload = () => {
-      console.log("Leaflet JS loaded")
-      setL((window as any).L)
-      setIsLeafletLoaded(true)
-    }
-    script.onerror = () => {
-      console.error("Failed to load Leaflet")
-    }
-    document.head.appendChild(script)
-
-    return () => {
-      // Cleanup on unmount
-      if (document.head.contains(cssLink)) {
-        document.head.removeChild(cssLink)
-      }
-      if (document.head.contains(script)) {
-        document.head.removeChild(script)
-      }
-    }
-  }, [])
 
   // Custom icon SVG data for rounded pins
   const getCustomIconSvg = (color: string, size: number) => {
@@ -113,9 +63,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Function to find the closest point on a line segment to a given point
-  const getClosestPointOnSegment = (point: any, segmentStart: any, segmentEnd: any) => {
+  const getClosestPointOnSegment = (point: L.LatLng, segmentStart: L.LatLng, segmentEnd: L.LatLng) => {
     const map = mapInstanceRef.current
-    if (!map || !L) return null
+    if (!map) return null
 
     // Convert to pixel coordinates for more accurate calculations
     const pointPixel = map.latLngToContainerPoint(point)
@@ -143,9 +93,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Check if mouse is near an existing waypoint (priority zone)
-  const isNearExistingWaypoint = (mouseLatLng: any, threshold = 30) => {
+  const isNearExistingWaypoint = (mouseLatLng: L.LatLng, threshold = 30) => {
     const map = mapInstanceRef.current
-    if (!map || !L) return false
+    if (!map) return false
 
     const mousePixel = map.latLngToContainerPoint(mouseLatLng)
 
@@ -163,9 +113,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Check distance in pixels between mouse and closest point on route
-  const getPixelDistanceToRoute = (mouseLatLng: any) => {
+  const getPixelDistanceToRoute = (mouseLatLng: L.LatLng) => {
     const map = mapInstanceRef.current
-    if (!map || !L || waypoints.length < 2) return Number.POSITIVE_INFINITY
+    if (!map || waypoints.length < 2) return Number.POSITIVE_INFINITY
 
     const mousePixel = map.latLngToContainerPoint(mouseLatLng)
     let minPixelDistance = Number.POSITIVE_INFINITY
@@ -189,8 +139,8 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   // Handle map mousemove to find the closest segment
-  const handleMapMouseMove = (e: any) => {
-    if (!isEditing || !mapInstanceRef.current || !L || waypoints.length < 2) {
+  const handleMapMouseMove = (e: L.LeafletMouseEvent) => {
+    if (!isEditing || !mapInstanceRef.current || waypoints.length < 2) {
       setHoverSegmentIndex(null)
       setHoverPoint(null)
       return
@@ -218,7 +168,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       // Show (+) icon only when within 20 pixels of the route line
       if (pixelDistance <= 20) {
         let closestSegmentIndex = -1
-        let closestPoint: any = null
+        let closestPoint: L.LatLng | null = null
         let minDistance = Number.POSITIVE_INFINITY
 
         // Find the closest segment
@@ -262,76 +212,54 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   useEffect(() => {
-    if (!mapRef.current || !isLeafletLoaded || !L) return
+    if (!mapRef.current) return
 
     // Initialize map if it doesn't exist
     if (!mapInstanceRef.current) {
-      mapInstanceRef.current = L.map(mapRef.current, {
-        preferCanvas: true, // Use Canvas for better performance
-        zoomControl: false, // We'll add custom controls
-      }).setView([0, 0], 2)
+      mapInstanceRef.current = L.map(mapRef.current).setView([0, 0], 2)
 
-      // Use faster tile servers with better caching
+      // Use a dark theme map if in dark mode
       const tileLayer = isDark
         ? L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
             attribution:
               '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
             subdomains: "abcd",
-            maxZoom: 18, // Reduced from 19 for faster loading
-            minZoom: 2,
-            updateWhenIdle: false,
-            updateWhenZooming: false,
-            keepBuffer: 2, // Keep more tiles in memory
+            maxZoom: 19,
           })
         : L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 18, // Reduced from default for faster loading
-            minZoom: 2,
-            updateWhenIdle: false,
-            updateWhenZooming: false,
-            keepBuffer: 2, // Keep more tiles in memory
           })
 
       tileLayer.addTo(mapInstanceRef.current)
 
-      // Add custom zoom controls in better position
-      L.control
-        .zoom({
-          position: "topright",
-        })
-        .addTo(mapInstanceRef.current)
-
-      // Add legend with better positioning
-      const legend = L.control({ position: "bottomleft" }) // Changed from bottomright
+      // Add legend only once during initial map setup
+      const legend = L.control({ position: "bottomright" })
       legend.onAdd = () => {
         const div = L.DomUtil.create("div", "info legend")
-        div.style.backgroundColor = isDark ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 0.95)"
+        div.style.backgroundColor = isDark ? "#1f2937" : "white"
         div.style.color = isDark ? "#e5e7eb" : "#374151"
-        div.style.padding = "8px 10px"
+        div.style.padding = "6px 8px"
         div.style.border = isDark ? "1px solid #374151" : "1px solid #ccc"
-        div.style.borderRadius = "6px"
-        div.style.lineHeight = "20px"
-        div.style.fontFamily = "system-ui, -apple-system, sans-serif"
-        div.style.fontSize = "13px"
-        div.style.boxShadow = "0 2px 10px rgba(0,0,0,0.1)"
-        div.style.backdropFilter = "blur(4px)"
-        div.style.maxWidth = "200px"
+        div.style.borderRadius = "4px"
+        div.style.lineHeight = "18px"
+        div.style.fontFamily = "Arial, sans-serif"
+        div.style.fontSize = "12px"
 
         div.innerHTML = `
-          <div style="margin-bottom: 6px; font-weight: 600;">Flight Plan</div>
-          <div style="display: flex; align-items: center; margin-bottom: 4px">
-            <div style="background-color: #22c55e; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2)"></div>
-            <span style="font-size: 12px">Departure (${waypoints[0]?.name || "N/A"})</span>
-          </div>
-          <div style="display: flex; align-items: center; margin-bottom: 4px">
-            <div style="background-color: #ef4444; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2)"></div>
-            <span style="font-size: 12px">Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
-          </div>
-          <div style="display: flex; align-items: center">
-            <div style="background-color: #3B82F6; width: 14px; height: 14px; border-radius: 50%; margin-right: 6px; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2)"></div>
-            <span style="font-size: 12px">Waypoint</span>
-          </div>
-        `
+        <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center">
+          <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Waypoint</span>
+        </div>
+      `
         return div
       }
       legend.addTo(mapInstanceRef.current)
@@ -341,34 +269,32 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     const map = mapInstanceRef.current
     if (!map) return
 
-    // Update tile layer based on theme with better performance settings
-    map.eachLayer((layer: any) => {
-      if (layer instanceof L.TileLayer) {
-        map.removeLayer(layer)
-      }
-    })
-
-    const newTileLayer = isDark
-      ? L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: "abcd",
-          maxZoom: 18,
-          minZoom: 2,
-          updateWhenIdle: false,
-          updateWhenZooming: false,
-          keepBuffer: 2,
-        })
-      : L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxZoom: 18,
-          minZoom: 2,
-          updateWhenIdle: false,
-          updateWhenZooming: false,
-          keepBuffer: 2,
-        })
-
-    newTileLayer.addTo(map)
+    // Update tile layer based on theme
+    const currentTileLayer = map.hasLayer(
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {}),
+    )
+    if (isDark && !currentTileLayer) {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: "abcd",
+        maxZoom: 19,
+      }).addTo(map)
+    } else if (!isDark && currentTileLayer) {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map)
+    }
 
     // Update polyline
     const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
@@ -497,22 +423,22 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         }
 
         const currentWaypointIndex = index
-        marker.on("drag", (e: any) => {
+        marker.on("drag", (e) => {
           const draggedLatLng = e.latlng
           const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
           if (currentPolylineLatLngs) {
             const updatedPolylineLatLngs = [...currentPolylineLatLngs]
             updatedPolylineLatLngs[currentWaypointIndex] = draggedLatLng
-            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs as any[])
+            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
 
             // Also update hover line
             if (hoverLineRef.current) {
-              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs as any[])
+              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs as L.LatLngExpression[])
             }
           }
         })
 
-        marker.on("dragend", (e: any) => {
+        marker.on("dragend", (e) => {
           const newLatLng = e.target.getLatLng()
           onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
         })
@@ -527,6 +453,28 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         markersRef.current.delete(id)
       }
     })
+
+    // Update legend content if waypoints change
+    if (legendRef.current && waypoints.length > 0) {
+      const legendDiv = legendRef.current.getContainer()
+      if (legendDiv) {
+        legendDiv.innerHTML = `
+        <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 3px">
+          <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
+        </div>
+        <div style="display: flex; align-items: center">
+          <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
+          <span>Waypoint</span>
+        </div>
+      `
+      }
+    }
 
     // Fit the map to show all waypoints with padding only on initial load or when not editing
     if (waypoints.length > 0 && !isEditing) {
@@ -544,12 +492,12 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         clearTimeout(mouseMoveTimeoutRef.current)
       }
     }
-  }, [waypoints, isDark, isEditing, onWaypointDragEnd, isLeafletLoaded, L])
+  }, [waypoints, isDark, isEditing, onWaypointDragEnd])
 
   // Effect to handle the insert marker - ONLY in edit mode
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map || !L) return
+    if (!map) return
 
     // Remove existing insert marker
     if (insertMarkerRef.current) {
@@ -582,7 +530,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         insertMarkerRef.current = null
       }
     }
-  }, [hoverPoint, hoverSegmentIndex, isEditing, L])
+  }, [hoverPoint, hoverSegmentIndex, isEditing])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -593,35 +541,24 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     }
   }, [])
 
-  if (!isLeafletLoaded) {
-    return (
-      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Loading map...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="relative h-full w-full">
       <div ref={mapRef} className="h-full w-full" />
 
-      {/* Zoom Controls with better positioning */}
+      {/* Zoom Controls */}
       {waypoints.length > 1 && (
-        <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
+        <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
           <Button
             onClick={zoomToDeparture}
             size="sm"
-            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200 text-xs px-3 py-2"
+            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
           >
             🛫 Departure
           </Button>
           <Button
             onClick={zoomToArrival}
             size="sm"
-            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200 text-xs px-3 py-2"
+            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
           >
             🛬 Arrival
           </Button>
