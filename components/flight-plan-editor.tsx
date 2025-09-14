@@ -53,6 +53,7 @@ interface Waypoint {
   lng: number
   altitude: number
   selected?: boolean
+  locked?: boolean // Add locked property
 }
 
 interface SimplificationInfo {
@@ -144,17 +145,17 @@ export function FlightPlanEditor() {
 
   // Apply "Made with Infinite Planner" when checkbox changes
   useEffect(() => {
-    if (waypoints.length >= 4 && useMadeWithInfinitePlanner) {
-      applyMadeWithInfinitePlanner()
-    } else if (waypoints.length >= 4 && !useMadeWithInfinitePlanner) {
-      // Restore original numbering when unchecked
-      const renamedWaypoints = waypoints.map((wp, index) => ({
-        ...wp,
-        name: String(index + 1).padStart(3, "0"),
-      }))
-      setWaypoints(renamedWaypoints)
+    if (waypoints.length >= 6) {
+      // Need at least 6 waypoints for marketing feature
+      const updatedWaypoints = applyWaypointNamingRules(
+        waypoints,
+        originAirport,
+        destinationAirport,
+        useMadeWithInfinitePlanner,
+      )
+      setWaypoints(updatedWaypoints)
     }
-  }, [useMadeWithInfinitePlanner])
+  }, [useMadeWithInfinitePlanner, originAirport, destinationAirport])
 
   // Handle focus event to select all text in the input field
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -285,12 +286,13 @@ export function FlightPlanEditor() {
       if (result.waypoints.length === 0) {
         setError("No valid waypoints found in the KML file. Please check the file format.")
       } else {
-        // Apply sequential numbering (001, 002, 003...)
-        const renamedWaypoints = result.waypoints.map((wp, index) => ({
-          ...wp,
-          name: String(index + 1).padStart(3, "0"),
-        }))
-
+        // Apply waypoint naming rules
+        const renamedWaypoints = applyWaypointNamingRules(
+          result.waypoints,
+          origin,
+          destination,
+          useMadeWithInfinitePlanner,
+        )
         setWaypoints(renamedWaypoints)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -336,17 +338,17 @@ export function FlightPlanEditor() {
 
       // Update waypoint names with the lines from the text file
       for (let i = 0; i < updatedWaypoints.length; i++) {
-        if (i < lines.length) {
-          // If we have a line for this waypoint, use it as the name
+        if (i < lines.length && !updatedWaypoints[i].locked) {
+          // If we have a line for this waypoint and it's not locked, use it as the name
           updatedWaypoints[i] = {
             ...updatedWaypoints[i],
             name: lines[i].trim(),
           }
-        } else {
-          // If we don't have a line for this waypoint, clear the name
+        } else if (i >= lines.length) {
+          // If we don't have a line for this waypoint, clear the name if it's not locked
           updatedWaypoints[i] = {
             ...updatedWaypoints[i],
-            name: "",
+            name: updatedWaypoints[i].locked ? updatedWaypoints[i].name : "",
           }
         }
       }
@@ -456,7 +458,7 @@ export function FlightPlanEditor() {
   const updateWaypoint = (id: string, field: keyof Waypoint, value: string | number) => {
     setWaypoints(
       waypoints.map((wp) =>
-        wp.id === id ? { ...wp, [field]: typeof value === "string" ? value : Number(value) } : wp,
+        wp.id === id && !wp.locked ? { ...wp, [field]: typeof value === "string" ? value : Number(value) } : wp,
       ),
     )
   }
@@ -508,34 +510,30 @@ export function FlightPlanEditor() {
       return
     }
 
-    const renamedWaypoints = waypoints.map((wp, index) => ({
-      ...wp,
-      name: `${waypointPrefix}${String(index + 1).padStart(3, "0")}`,
-    }))
+    const renamedWaypoints = waypoints.map((wp, index) => {
+      // Skip locked waypoints
+      if (wp.locked) return wp
+
+      return {
+        ...wp,
+        name: `${waypointPrefix}${String(index).padStart(3, "0")}`,
+      }
+    })
 
     setWaypoints(renamedWaypoints)
-    setSuccessMessage(`Prefix "${waypointPrefix}" applied to all waypoints!`)
+    setSuccessMessage(`Prefix "${waypointPrefix}" applied to unlocked waypoints!`)
   }
 
   // Apply "Made with Infinite Planner" to last 4 waypoints
   const applyMadeWithInfinitePlanner = () => {
-    if (waypoints.length < 4) {
-      setError("Need at least 4 waypoints to apply 'Made with Infinite Planner'")
+    if (waypoints.length < 6) {
+      setError("Need at least 6 waypoints to apply 'Made with Infinite Planner'")
       return
     }
 
-    const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
-    const updatedWaypoints = waypoints.map((wp, index) => {
-      const isLastFour = index >= waypoints.length - 4
-      if (isLastFour && useMadeWithInfinitePlanner) {
-        const nameIndex = index - (waypoints.length - 4)
-        return { ...wp, name: madeWithNames[nameIndex] }
-      }
-      return wp
-    })
-
+    const updatedWaypoints = applyWaypointNamingRules(waypoints, originAirport, destinationAirport, true)
     setWaypoints(updatedWaypoints)
-    setSuccessMessage("Applied 'Made with Infinite Planner' to last 4 waypoints!")
+    setSuccessMessage("Applied 'Made with Infinite Planner' to waypoints before arrival!")
   }
 
   // Callback for when a waypoint is dragged on the map
@@ -580,14 +578,27 @@ export function FlightPlanEditor() {
 
   // Toggle map editing mode
   const toggleMapEditing = () => {
-    setIsEditingMap((prev) => !prev)
-    if (!isEditingMap) {
-      setSuccessMessage(
-        "Map editing mode enabled. Drag waypoints to adjust their position or hover over the route to add new waypoints.",
-      )
-    } else {
-      setSuccessMessage("Map editing mode disabled. Waypoints updated in table.")
-    }
+    setIsEditingMap((prev) => {
+      const newEditingState = !prev
+
+      if (newEditingState) {
+        setSuccessMessage(
+          "Map editing mode enabled. Drag waypoints to adjust their position or hover over the route to add new waypoints.",
+        )
+      } else {
+        // Apply naming rules when done editing
+        const updatedWaypoints = applyWaypointNamingRules(
+          waypoints,
+          originAirport,
+          destinationAirport,
+          useMadeWithInfinitePlanner,
+        )
+        setWaypoints(updatedWaypoints)
+        setSuccessMessage("Map editing mode disabled. Waypoint names updated according to rules.")
+      }
+
+      return newEditingState
+    })
   }
 
   const validateICAO = (code: string): boolean => {
@@ -606,6 +617,48 @@ export function FlightPlanEditor() {
       setDestinationToAirport(upperValue)
       setIcaoValidation((prev) => ({ ...prev, destination: isValid }))
     }
+  }
+
+  // Add helper function to apply waypoint naming rules
+  const applyWaypointNamingRules = (
+    waypoints: Waypoint[],
+    origin: string,
+    destination: string,
+    useMadeWith = false,
+  ) => {
+    if (waypoints.length === 0) return waypoints
+
+    const updatedWaypoints = waypoints.map((wp, index) => {
+      const isFirst = index === 0
+      const isLast = index === waypoints.length - 1
+
+      // First waypoint is always origin ICAO (locked)
+      if (isFirst) {
+        return { ...wp, name: origin || "ORIG", locked: true }
+      }
+
+      // Last waypoint is always destination ICAO (locked)
+      if (isLast) {
+        return { ...wp, name: destination || "DEST", locked: true }
+      }
+
+      // Marketing feature: last 4 waypoints before arrival (if enabled and enough waypoints)
+      if (useMadeWith && waypoints.length >= 6) {
+        // Need at least 6 waypoints (origin + 4 marketing + destination)
+        const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
+        const isInMadeWithRange = index >= waypoints.length - 5 && index <= waypoints.length - 2
+
+        if (isInMadeWithRange) {
+          const madeWithIndex = index - (waypoints.length - 5)
+          return { ...wp, name: madeWithNames[madeWithIndex], locked: true }
+        }
+      }
+
+      // All other waypoints get sequential numbering (not locked)
+      return { ...wp, name: String(index).padStart(3, "0"), locked: false }
+    })
+
+    return updatedWaypoints
   }
 
   return (
@@ -869,8 +922,12 @@ export function FlightPlanEditor() {
                           onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
                           onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
                           onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
+                          className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full ${
+                            waypoint.locked ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""
+                          }`}
                           style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                          disabled={waypoint.locked}
+                          readOnly={waypoint.locked}
                         />
                       </TableCell>
                       <TableCell className="hidden md:table-cell py-2">
@@ -1005,10 +1062,10 @@ export function FlightPlanEditor() {
                       id="madeWithInfinitePlanner"
                       checked={useMadeWithInfinitePlanner}
                       onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
-                      disabled={waypoints.length < 4}
+                      disabled={waypoints.length < 6} // Changed from 4 to 6
                     />
                     <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
-                      Use "Made with Infinite Planner" for last 4 waypoints
+                      Use "Made with Infinite Planner" for waypoints before arrival (requires at least 6 waypoints)
                     </Label>
                   </div>
                 </div>
