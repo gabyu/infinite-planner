@@ -669,64 +669,78 @@ export function FlightPlanEditor() {
           <CardHeader className="pb-4 border-b bg-background shadow-sm">
             <div className="flex flex-col gap-4">
               {/* ICAO Fields and Import KML - Dedicated Top Row */}
-              <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
-                    Origin ICAO
-                  </Label>
-                  <Input
-                    id="origin"
-                    value={originAirport}
-                    onChange={(e) => handleICAOChange("origin", e.target.value)}
-                    placeholder="EHAM"
-                    className={`h-8 w-20 text-center font-mono ${
-                      originAirport && !icaoValidation.origin
-                        ? "border-red-500 focus:border-red-500"
-                        : icaoValidation.origin
-                          ? "border-green-500 focus:border-green-500"
-                          : ""
-                    }`}
-                    maxLength={4}
-                  />
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Step 1: Enter departure and arrival ICAO codes, then import your KML file
+                  </p>
                 </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
+                      Origin ICAO
+                    </Label>
+                    <Input
+                      id="origin"
+                      value={originAirport}
+                      onChange={(e) => handleICAOChange("origin", e.target.value)}
+                      placeholder="EHAM"
+                      className={`h-10 w-20 text-center font-mono ${
+                        originAirport && !icaoValidation.origin
+                          ? "border-red-500 focus:border-red-500"
+                          : icaoValidation.origin
+                            ? "border-green-500 focus:border-green-500"
+                            : ""
+                      }`}
+                      maxLength={4}
+                    />
+                  </div>
 
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
-                    Destination ICAO
-                  </Label>
-                  <Input
-                    id="destination"
-                    value={destinationAirport}
-                    onChange={(e) => handleICAOChange("destination", e.target.value)}
-                    placeholder="KSFO"
-                    className={`h-8 w-20 text-center font-mono ${
-                      destinationAirport && !icaoValidation.destination
-                        ? "border-red-500 focus:border-red-500"
-                        : icaoValidation.destination
-                          ? "border-green-500 focus:border-green-500"
-                          : ""
-                    }`}
-                    maxLength={4}
-                  />
-                </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
+                      Destination ICAO
+                    </Label>
+                    <Input
+                      id="destination"
+                      value={destinationAirport}
+                      onChange={(e) => handleICAOChange("destination", e.target.value)}
+                      placeholder="KSFO"
+                      className={`h-10 w-20 text-center font-mono ${
+                        destinationAirport && !icaoValidation.destination
+                          ? "border-red-500 focus:border-red-500"
+                          : icaoValidation.destination
+                            ? "border-green-500 focus:border-green-500"
+                            : ""
+                      }`}
+                      maxLength={4}
+                    />
+                  </div>
 
-                <div className="relative">
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="default"
-                    size="sm"
-                    className="flex items-center gap-2 h-10 px-4"
-                    disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
-                    title={
-                      !icaoValidation.origin || !icaoValidation.destination
-                        ? "Enter departure and arrival ICAO codes to enable import"
-                        : undefined
-                    }
-                  >
-                    <Upload size={14} />
-                    <span>{isLoading ? "Importing..." : "Import KML"}</span>
-                  </Button>
-                  <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
+                  <div className="relative">
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="default"
+                      size="sm"
+                      className="flex items-center gap-2 h-10 px-4"
+                      disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
+                      title={
+                        !icaoValidation.origin || !icaoValidation.destination
+                          ? "Enter departure and arrival ICAO codes to enable import"
+                          : undefined
+                      }
+                    >
+                      <Upload size={14} />
+                      <span>{isLoading ? "Importing..." : "Import KML"}</span>
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".kml"
+                      onChange={handleFileImport}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -855,7 +869,7 @@ export function FlightPlanEditor() {
                 <span className="sm:hidden">Insert</span>
               </Button>
 
-              {/* Batch Rename Button */}
+              {/* Options Button */}
               <Button
                 onClick={() =>
                   document.getElementById("waypoints-batch-section")?.scrollIntoView({ behavior: "smooth" })
@@ -866,8 +880,8 @@ export function FlightPlanEditor() {
                 disabled={waypoints.length === 0 || isLoading}
               >
                 <Layers size={14} />
-                <span className="hidden sm:inline">Batch Renaming...</span>
-                <span className="sm:hidden">Batch</span>
+                <span className="hidden sm:inline">Options</span>
+                <span className="sm:hidden">Options</span>
               </Button>
             </div>
           </div>
