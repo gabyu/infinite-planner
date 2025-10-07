@@ -12,14 +12,13 @@ import {
   Download,
   Upload,
   Trash2,
-  Plus,
   Info,
   Map,
-  AlertTriangle,
   CheckCircle2,
-  FileText,
   Layers,
   Pencil,
+  ChevronRight,
+  HelpCircle,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
@@ -33,9 +32,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
+import Image from "next/image"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -53,14 +55,14 @@ interface Waypoint {
   lng: number
   altitude: number
   selected?: boolean
-  locked?: boolean // Add locked property
+  locked?: boolean
 }
 
 interface SimplificationInfo {
   originalCount: number
   simplifiedCount: number
   reason: string
-  source?: string // Added to track the source of the KML file
+  source?: string
 }
 
 export function FlightPlanEditor() {
@@ -80,20 +82,19 @@ export function FlightPlanEditor() {
   const [originAirport, setOriginAirport] = useState("")
   const [destinationAirport, setDestinationToAirport] = useState("")
   const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
-  const [isEditingMap, setIsEditingMap] = useState(false) // New state for map editing mode
+  const [isEditingMap, setIsEditingMap] = useState(false)
   const [icaoValidation, setIcaoValidation] = useState({
     origin: false,
     destination: false,
   })
-
-  // Refs for sticky header height calculation
-  const cardHeaderRef = useRef<HTMLDivElement>(null)
-  const [tableBarTopPosition, setTableBarTopPosition] = useState(0)
+  const [hasImported, setHasImported] = useState(false)
+  const [showOptionsPanel, setShowOptionsPanel] = useState(false)
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
 
   // Check if device is mobile
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      setIsMobile(window.innerWidth < 1024)
     }
 
     checkMobile()
@@ -101,26 +102,6 @@ export function FlightPlanEditor() {
 
     return () => {
       window.removeEventListener("resize", checkMobile)
-    }
-  }, [])
-
-  // Calculate sticky table bar top position
-  useEffect(() => {
-    const calculateTopPosition = () => {
-      if (cardHeaderRef.current) {
-        // Get the height of the card header (which is sticky at top-0)
-        const headerHeight = cardHeaderRef.current.offsetHeight
-        // Set the top position to 81px as requested
-        setTableBarTopPosition(81)
-      }
-    }
-
-    // Recalculate on mount and resize
-    calculateTopPosition()
-    window.addEventListener("resize", calculateTopPosition)
-
-    return () => {
-      window.removeEventListener("resize", calculateTopPosition)
     }
   }, [])
 
@@ -134,19 +115,15 @@ export function FlightPlanEditor() {
     }
   }, [successMessage])
 
-  // Validate the flight plan when waypoints change
+  // Validate the flight plan when waypoints change - REMOVED WARNING LOGIC
   useEffect(() => {
-    if (waypoints.length > 2) {
-      validateFlightPlan(waypoints)
-    } else {
-      setWarning(null)
-    }
+    // Validation removed as requested
+    setWarning(null)
   }, [waypoints])
 
   // Apply "Made with Infinite Planner" when checkbox changes
   useEffect(() => {
     if (waypoints.length >= 6) {
-      // Need at least 6 waypoints for marketing feature
       const updatedWaypoints = applyWaypointNamingRules(
         waypoints,
         originAirport,
@@ -159,7 +136,6 @@ export function FlightPlanEditor() {
 
   // Handle focus event to select all text in the input field
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Select all text when the input is focused
     e.target.select()
   }
 
@@ -172,55 +148,21 @@ export function FlightPlanEditor() {
     if (e.key === "Tab" && !e.shiftKey && fieldName === "name") {
       e.preventDefault()
 
-      // Find the current waypoint index
       const currentIndex = waypoints.findIndex((wp) => wp.id === waypointId)
 
-      // If there's a next waypoint, focus its name input
       if (currentIndex < waypoints.length - 1) {
         const nextWaypointId = waypoints[currentIndex + 1].id
         const nextInput = document.getElementById(`name-${nextWaypointId}`)
         if (nextInput) {
           nextInput.focus()
-          // The focus event will trigger the selection of all text
         }
       }
     }
   }
 
-  // Validate the flight plan for potential issues
-  const validateFlightPlan = (waypoints: Waypoint[]) => {
-    // Check for large jumps in the route (potential duplicate segments)
-    let maxDistance = 0
-    let avgDistance = 0
-    let totalDistance = 0
-
-    for (let i = 1; i < waypoints.length; i++) {
-      const prev = waypoints[i - 1]
-      const curr = waypoints[i]
-
-      const distance = calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng)
-      totalDistance += distance
-
-      if (distance > maxDistance) {
-        maxDistance = distance
-      }
-    }
-
-    avgDistance = totalDistance / (waypoints.length - 1)
-
-    // If the max distance is significantly larger than the average, there might be a jump
-    if (maxDistance > avgDistance * 5 && waypoints.length > 10) {
-      setWarning(
-        `Possible route discontinuity detected. The flight plan may have gaps or jumps. Consider reviewing the route in the map preview.`,
-      )
-    } else {
-      setWarning(null)
-    }
-  }
-
   // Calculate distance between two points in kilometers (Haversine formula)
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371 // Radius of the earth in km
+    const R = 6371
     const dLat = deg2rad(lat2 - lat1)
     const dLon = deg2rad(lon2 - lon1)
     const a =
@@ -244,33 +186,25 @@ export function FlightPlanEditor() {
     setWarning(null)
     setSuccessMessage(null)
 
-    // Store the original file name without extension for later use
     const fileName = file.name.replace(/\.[^/.]+$/, "")
     setImportedFileName(fileName)
 
-    // Get current airport values at the time of import
     const currentOrigin = originAirport.trim()
     const currentDestination = destinationAirport.trim()
 
-    // Try to extract origin and destination from FlightAware filename format
-    // FlightAware format: "FlightAware_AAL123_KJFK_KLAX_20231201.kml"
     const flightAwareMatch = fileName.match(/FlightAware_[^_]+_([A-Z]{4})_([A-Z]{4})_/)
     if (flightAwareMatch) {
       const extractedOrigin = flightAwareMatch[1]
       const extractedDestination = flightAwareMatch[2]
 
-      // Update the UI fields immediately so user can see the extracted data
       setOriginAirport(extractedOrigin)
       setDestinationToAirport(extractedDestination)
 
-      // Use the extracted values for saving
       await processKMLFile(file, fileName, extractedOrigin, extractedDestination)
     } else {
-      // For non-FlightAware files (like FlightRadar24), use current user input
       await processKMLFile(file, fileName, currentOrigin, currentDestination)
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -286,7 +220,6 @@ export function FlightPlanEditor() {
       if (result.waypoints.length === 0) {
         setError("No valid waypoints found in the KML file. Please check the file format.")
       } else {
-        // Apply waypoint naming rules
         const renamedWaypoints = applyWaypointNamingRules(
           result.waypoints,
           origin,
@@ -301,7 +234,9 @@ export function FlightPlanEditor() {
           source: result.source,
         })
 
-        // Automatically open map preview if we have waypoints
+        // Set hasImported to true to reveal the rest of the UI
+        setHasImported(true)
+
         if (renamedWaypoints.length > 0) {
           setShowMapPreview(true)
         }
@@ -330,22 +265,17 @@ export function FlightPlanEditor() {
     try {
       const text = await file.text()
 
-      // Split the text file by lines and filter out empty lines
       const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "")
 
-      // Create a copy of the waypoints
       const updatedWaypoints = [...waypoints]
 
-      // Update waypoint names with the lines from the text file
       for (let i = 0; i < updatedWaypoints.length; i++) {
         if (i < lines.length && !updatedWaypoints[i].locked) {
-          // If we have a line for this waypoint and it's not locked, use it as the name
           updatedWaypoints[i] = {
             ...updatedWaypoints[i],
             name: lines[i].trim(),
           }
         } else if (i >= lines.length) {
-          // If we don't have a line for this waypoint, clear the name if it's not locked
           updatedWaypoints[i] = {
             ...updatedWaypoints[i],
             name: updatedWaypoints[i].locked ? updatedWaypoints[i].name : "",
@@ -353,10 +283,8 @@ export function FlightPlanEditor() {
         }
       }
 
-      // Update the waypoints
       setWaypoints(updatedWaypoints)
 
-      // Show a warning if there are more lines than waypoints
       if (lines.length > waypoints.length) {
         setWarning(
           `The text file contains ${lines.length} lines, but there are only ${waypoints.length} waypoints. Some lines were not used.`,
@@ -371,7 +299,6 @@ export function FlightPlanEditor() {
       setError(`Error importing TXT file: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    // Reset file input
     if (txtFileInputRef.current) {
       txtFileInputRef.current.value = ""
     }
@@ -391,7 +318,6 @@ export function FlightPlanEditor() {
       const a = document.createElement("a")
       a.href = url
 
-      // Use the imported file name if available, otherwise use default
       const fileName = importedFileName ? `${importedFileName}.fpl` : "flightplan.fpl"
       a.download = fileName
 
@@ -400,7 +326,6 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      // Increment the counter using the API endpoint
       try {
         await fetch("/api/counter", {
           method: "POST",
@@ -420,40 +345,6 @@ export function FlightPlanEditor() {
     }
   }
 
-  // Insert a new waypoint after each selected waypoint
-  const insertWaypoint = () => {
-    const selectedWaypoints = waypoints.filter((wp) => wp.selected)
-    if (selectedWaypoints.length === 0) {
-      setError("Please select at least one waypoint to insert after.")
-      return
-    }
-
-    const newWaypoints: Waypoint[] = []
-    let insertedCount = 0
-
-    waypoints.forEach((wp) => {
-      newWaypoints.push(wp)
-      if (wp.selected) {
-        const newWaypoint: Waypoint = {
-          id: Date.now().toString() + insertedCount, // Ensure unique ID
-          name: "New Waypoint", // Name new waypoints as "New Waypoint"
-          lat: wp.lat, // Inherit lat/lng from the selected waypoint
-          lng: wp.lng,
-          altitude: wp.altitude, // Inherit altitude
-          selected: false,
-        }
-        newWaypoints.push(newWaypoint)
-        insertedCount++
-      }
-    })
-
-    // Do NOT renumber existing waypoints
-    setWaypoints(newWaypoints)
-    setSuccessMessage(
-      `Inserted ${insertedCount} new waypoint${insertedCount !== 1 ? "s" : ""} after selected waypoints!`,
-    )
-  }
-
   // Update waypoint field
   const updateWaypoint = (id: string, field: keyof Waypoint, value: string | number) => {
     setWaypoints(
@@ -463,9 +354,31 @@ export function FlightPlanEditor() {
     )
   }
 
-  // Toggle waypoint selection
-  const toggleWaypointSelection = (id: string) => {
-    setWaypoints(waypoints.map((wp) => (wp.id === id ? { ...wp, selected: !wp.selected } : wp)))
+  // Toggle waypoint selection with shift+click support
+  const handleRowClick = (e: React.MouseEvent, id: string, index: number) => {
+    // Prevent if clicking on input fields
+    if ((e.target as HTMLElement).tagName === "INPUT") {
+      return
+    }
+
+    if (e.shiftKey && lastSelectedIndex !== null) {
+      // Shift+click: select range
+      const start = Math.min(lastSelectedIndex, index)
+      const end = Math.max(lastSelectedIndex, index)
+
+      setWaypoints(
+        waypoints.map((wp, idx) => {
+          if (idx >= start && idx <= end) {
+            return { ...wp, selected: true }
+          }
+          return wp
+        }),
+      )
+    } else {
+      // Normal click: toggle single
+      setWaypoints(waypoints.map((wp) => (wp.id === id ? { ...wp, selected: !wp.selected } : wp)))
+      setLastSelectedIndex(index)
+    }
   }
 
   // Delete selected waypoints
@@ -479,7 +392,6 @@ export function FlightPlanEditor() {
 
     const newWaypoints = waypoints.filter((wp) => !wp.selected)
 
-    // Do NOT renumber existing waypoints
     setWaypoints(newWaypoints)
     setSuccessMessage(`${selectedCount} waypoint${selectedCount !== 1 ? "s" : ""} removed successfully!`)
   }
@@ -511,7 +423,6 @@ export function FlightPlanEditor() {
     }
 
     const renamedWaypoints = waypoints.map((wp, index) => {
-      // Skip locked waypoints
       if (wp.locked) return wp
 
       return {
@@ -524,18 +435,6 @@ export function FlightPlanEditor() {
     setSuccessMessage(`Prefix "${waypointPrefix}" applied to unlocked waypoints!`)
   }
 
-  // Apply "Made with Infinite Planner" to last 4 waypoints
-  const applyMadeWithInfinitePlanner = () => {
-    if (waypoints.length < 6) {
-      setError("Need at least 6 waypoints to apply 'Made with Infinite Planner'")
-      return
-    }
-
-    const updatedWaypoints = applyWaypointNamingRules(waypoints, originAirport, destinationAirport, true)
-    setWaypoints(updatedWaypoints)
-    setSuccessMessage("Applied 'Made with Infinite Planner' to waypoints before arrival!")
-  }
-
   // Callback for when a waypoint is dragged on the map
   const handleWaypointDragEnd = useCallback((id: string, newLat: number, newLng: number) => {
     setWaypoints((prevWaypoints) => {
@@ -545,7 +444,7 @@ export function FlightPlanEditor() {
               ...wp,
               lat: newLat,
               lng: newLng,
-              altitude: 0, // Clear altitude when position is manually edited
+              altitude: 0,
             }
           : wp,
       )
@@ -559,10 +458,10 @@ export function FlightPlanEditor() {
     setWaypoints((prevWaypoints) => {
       const newWaypoint: Waypoint = {
         id: `${Date.now()}-map-insert`,
-        name: "", // Empty name as requested
+        name: "",
         lat,
         lng,
-        altitude: 0, // Empty altitude as requested
+        altitude: 0,
         selected: false,
       }
 
@@ -586,7 +485,6 @@ export function FlightPlanEditor() {
           "Map editing mode enabled. Drag waypoints to adjust their position or hover over the route to add new waypoints.",
         )
       } else {
-        // Apply naming rules when done editing
         const updatedWaypoints = applyWaypointNamingRules(
           waypoints,
           originAirport,
@@ -602,7 +500,6 @@ export function FlightPlanEditor() {
   }
 
   const validateICAO = (code: string): boolean => {
-    // Must be exactly 4 characters and all letters
     return /^[A-Z]{4}$/.test(code.toUpperCase())
   }
 
@@ -632,19 +529,15 @@ export function FlightPlanEditor() {
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
 
-      // First waypoint is always origin ICAO (locked)
       if (isFirst) {
         return { ...wp, name: origin || "ORIG", locked: true }
       }
 
-      // Last waypoint is always destination ICAO (locked)
       if (isLast) {
         return { ...wp, name: destination || "DEST", locked: true }
       }
 
-      // Marketing feature: last 4 waypoints before arrival (if enabled and enough waypoints)
       if (useMadeWith && waypoints.length >= 6) {
-        // Need at least 6 waypoints (origin + 4 marketing + destination)
         const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
         const isInMadeWithRange = index >= waypoints.length - 5 && index <= waypoints.length - 2
 
@@ -654,7 +547,6 @@ export function FlightPlanEditor() {
         }
       }
 
-      // All other waypoints get sequential numbering (not locked)
       return { ...wp, name: String(index).padStart(3, "0"), locked: false }
     })
 
@@ -662,490 +554,617 @@ export function FlightPlanEditor() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <Card className="bg-background shadow-sm border-border">
-        {/* Make the header sticky */}
-        <div ref={cardHeaderRef} className="sticky top-0 z-10">
-          <CardHeader className="pb-4 border-b bg-background shadow-sm">
-            <div className="flex flex-col gap-4">
-              {/* ICAO Fields and Import KML - Dedicated Top Row */}
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    Step 1: Enter departure and arrival ICAO codes, then import your KML file
-                  </p>
+    <TooltipProvider>
+      <div className="container mx-auto py-8 px-4">
+        <div className={`${!isMobile && hasImported ? "flex gap-6" : ""}`}>
+          {/* Main Content Area */}
+          <div className={`${!isMobile && hasImported ? "flex-1" : "w-full"}`}>
+            <Card className="bg-background shadow-sm border-border">
+              {/* Header - Conditional rendering based on hasImported */}
+              {!hasImported ? (
+                /* Pre-import state - Large centered form */
+                <div className="p-12">
+                  <div className="text-center max-w-2xl mx-auto">
+                    {/* Logo */}
+                    <div className="flex justify-center mb-6">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center p-3">
+                        <Image
+                          src="/ip_logo.svg"
+                          alt="Infinite Planner Logo"
+                          width={48}
+                          height={48}
+                          className="w-full h-full"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Title */}
+                    <h2 className="text-3xl font-normal text-gray-900 dark:text-gray-100 mb-4">Flight Information</h2>
+
+                    {/* Description */}
+                    <p className="text-gray-600 dark:text-gray-300 mb-10 text-lg">
+                      Enter your flight's origin and destination airport codes, then upload your KML file from
+                      FlightRadar24 or FlightAware.
+                    </p>
+
+                    {/* Form */}
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg p-8">
+                      <div className="flex flex-col gap-6">
+                        {/* ICAO inputs row */}
+                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                          <div className="flex items-center gap-3">
+                            <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap w-24 text-right">
+                              Origin
+                            </Label>
+                            <Input
+                              id="origin"
+                              value={originAirport}
+                              onChange={(e) => handleICAOChange("origin", e.target.value)}
+                              placeholder="EHAM"
+                              className={`h-12 w-28 text-center font-mono text-lg ${
+                                originAirport && !icaoValidation.origin
+                                  ? "border-red-500 focus:border-red-500"
+                                  : icaoValidation.origin
+                                    ? "border-green-500 focus:border-green-500"
+                                    : ""
+                              }`}
+                              maxLength={4}
+                            />
+                          </div>
+
+                          <ChevronRight className="text-gray-400" size={24} />
+
+                          <div className="flex items-center gap-3">
+                            <Label
+                              htmlFor="destination"
+                              className="text-sm font-medium whitespace-nowrap w-24 text-right"
+                            >
+                              Destination
+                            </Label>
+                            <Input
+                              id="destination"
+                              value={destinationAirport}
+                              onChange={(e) => handleICAOChange("destination", e.target.value)}
+                              placeholder="KSFO"
+                              className={`h-12 w-28 text-center font-mono text-lg ${
+                                destinationAirport && !icaoValidation.destination
+                                  ? "border-red-500 focus:border-red-500"
+                                  : icaoValidation.destination
+                                    ? "border-green-500 focus:border-green-500"
+                                    : ""
+                              }`}
+                              maxLength={4}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Import button */}
+                        <div className="flex justify-center">
+                          <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="default"
+                            size="lg"
+                            className="h-12 px-8 text-base"
+                            disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
+                            title={
+                              !icaoValidation.origin || !icaoValidation.destination
+                                ? "Enter valid departure and arrival ICAO codes to enable import"
+                                : undefined
+                            }
+                          >
+                            <Upload size={18} className="mr-2" />
+                            <span>{isLoading ? "Importing..." : "Import KML File"}</span>
+                          </Button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".kml"
+                            onChange={handleFileImport}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap">
-                      Origin ICAO
-                    </Label>
-                    <Input
-                      id="origin"
-                      value={originAirport}
-                      onChange={(e) => handleICAOChange("origin", e.target.value)}
-                      placeholder="EHAM"
-                      className={`h-10 w-20 text-center font-mono ${
-                        originAirport && !icaoValidation.origin
-                          ? "border-red-500 focus:border-red-500"
-                          : icaoValidation.origin
-                            ? "border-green-500 focus:border-green-500"
-                            : ""
-                      }`}
-                      maxLength={4}
-                    />
-                  </div>
+              ) : (
+                /* Post-import state - Content without header */
+                <CardContent className="pt-6">
+                  {error && (
+                    <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                      <Info className="h-4 w-4 text-red-500 dark:text-red-400" />
+                      <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
+                      <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
+                    </Alert>
+                  )}
 
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="destination" className="text-sm font-medium whitespace-nowrap">
-                      Destination ICAO
-                    </Label>
-                    <Input
-                      id="destination"
-                      value={destinationAirport}
-                      onChange={(e) => handleICAOChange("destination", e.target.value)}
-                      placeholder="KSFO"
-                      className={`h-10 w-20 text-center font-mono ${
-                        destinationAirport && !icaoValidation.destination
-                          ? "border-red-500 focus:border-red-500"
-                          : icaoValidation.destination
-                            ? "border-green-500 focus:border-green-500"
-                            : ""
-                      }`}
-                      maxLength={4}
-                    />
-                  </div>
+                  {successMessage && (
+                    <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+                      <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
+                      <AlertDescription className="text-green-600 dark:text-green-300">
+                        {successMessage}
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
-                  <div className="relative">
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      variant="default"
-                      size="sm"
-                      className="flex items-center gap-2 h-10 px-4"
-                      disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
-                      title={
-                        !icaoValidation.origin || !icaoValidation.destination
-                          ? "Enter departure and arrival ICAO codes to enable import"
-                          : undefined
-                      }
-                    >
-                      <Upload size={14} />
-                      <span>{isLoading ? "Importing..." : "Import KML"}</span>
-                    </Button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".kml"
-                      onChange={handleFileImport}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
+                  {simplificationInfo && (
+                    <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                      <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      <AlertTitle className="text-blue-700 dark:text-blue-400">
+                        Waypoint Simplification Applied
+                      </AlertTitle>
+                      <AlertDescription className="text-blue-600 dark:text-blue-300">
+                        <p>
+                          Imported filename: <strong>{importedFileName || "Unknown"}.kml</strong>
+                        </p>
+                        <p>Original waypoints: {simplificationInfo.originalCount}</p>
+                        <p>After simplification: {simplificationInfo.simplifiedCount}</p>
+                        {simplificationInfo.source && (
+                          <p>
+                            Source: <strong>{simplificationInfo.source}</strong>
+                          </p>
+                        )}
+                        <p className="text-xs mt-1">{simplificationInfo.reason}</p>
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
-              {/* Other Action Buttons Row */}
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => setShowMapPreview(true)}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                    disabled={waypoints.length === 0 || isLoading}
+                  {/* Table Action Bar */}
+                  <div
+                    className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
+                    style={{ top: "0px" }}
                   >
-                    <Map size={14} />
-                    <span className="hidden sm:inline">Flight Map</span>
-                  </Button>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
+                      <Label htmlFor="selectAll" className="text-sm font-medium">
+                        Select All
+                      </Label>
+                    </div>
 
-                  <Button
-                    onClick={handleExportFPL}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 h-10 px-3 sm:px-4 bg-transparent"
-                    disabled={waypoints.length === 0 || isLoading}
-                  >
-                    <Download size={14} />
-                    <span className="hidden sm:inline">Export FPL</span>
-                    <span className="sm:hidden">Export</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-        </div>
-        <CardContent className="pt-6">
-          {error && (
-            <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-              <Info className="h-4 w-4 text-red-500 dark:text-red-400" />
-              <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
-              <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
-            </Alert>
-          )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={deleteSelectedWaypoints}
+                        disabled={!waypoints.some((wp) => wp.selected) || isLoading}
+                        className="flex items-center gap-1 h-10"
+                      >
+                        <Trash2 size={14} />
+                        <span className="hidden sm:inline">Delete</span>
+                        <span className="sm:hidden">Delete</span>
+                      </Button>
 
-          {warning && (
-            <Alert className="mb-4 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
-              <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
-              <AlertTitle className="text-amber-700 dark:text-amber-400">Warning</AlertTitle>
-              <AlertDescription className="text-amber-600 dark:text-amber-300">{warning}</AlertDescription>
-            </Alert>
-          )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={clearSelectedAltitudes}
+                        disabled={!waypoints.some((wp) => wp.selected) || isLoading}
+                        className="flex items-center gap-1 h-10"
+                      >
+                        <Info size={14} />
+                        <span className="hidden sm:inline">Clear Alt</span>
+                        <span className="sm:hidden">Clear Alt</span>
+                      </Button>
+                    </div>
+                  </div>
 
-          {successMessage && (
-            <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-              <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-              <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
-              <AlertDescription className="text-green-600 dark:text-green-300">{successMessage}</AlertDescription>
-            </Alert>
-          )}
+                  {/* Waypoint Table */}
+                  <div className="border rounded-md overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-12"></TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead className="hidden md:table-cell">Latitude</TableHead>
+                          <TableHead className="hidden md:table-cell">Longitude</TableHead>
+                          <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {isLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                              Loading waypoints...
+                            </TableCell>
+                          </TableRow>
+                        ) : waypoints.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                              No waypoints added. Import a KML file to get started.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          waypoints.map((waypoint, index) => (
+                            <TableRow
+                              key={waypoint.id}
+                              className="bg-card hover:bg-muted/50 h-12 cursor-pointer"
+                              onClick={(e) => handleRowClick(e, waypoint.id, index)}
+                            >
+                              <TableCell className="w-12 py-2 pl-4 pr-2">
+                                <Checkbox
+                                  id={`wp-${waypoint.id}`}
+                                  checked={waypoint.selected}
+                                  onCheckedChange={() => {}}
+                                  className="flex-shrink-0 pointer-events-none"
+                                />
+                              </TableCell>
+                              <TableCell className="py-2">
+                                <Input
+                                  id={`name-${waypoint.id}`}
+                                  value={waypoint.name}
+                                  onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
+                                  onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
+                                  onFocus={handleInputFocus}
+                                  className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full ${
+                                    waypoint.locked ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""
+                                  }`}
+                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                                  disabled={waypoint.locked}
+                                  readOnly={waypoint.locked}
+                                />
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell py-2">
+                                <Input
+                                  type="number"
+                                  step="0.0001"
+                                  value={waypoint.lat}
+                                  onChange={(e) =>
+                                    updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)
+                                  }
+                                  onFocus={handleInputFocus}
+                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
+                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                                />
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell py-2">
+                                <Input
+                                  type="number"
+                                  step="0.0001"
+                                  value={waypoint.lng}
+                                  onChange={(e) =>
+                                    updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)
+                                  }
+                                  onFocus={handleInputFocus}
+                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
+                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                                />
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell py-2">
+                                <Input
+                                  type="number"
+                                  value={waypoint.altitude}
+                                  onChange={(e) =>
+                                    updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
+                                  }
+                                  onFocus={handleInputFocus}
+                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
+                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
 
-          {simplificationInfo && (
-            <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-              <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-              <AlertTitle className="text-blue-700 dark:text-blue-400">Waypoint Simplification Applied</AlertTitle>
-              <AlertDescription className="text-blue-600 dark:text-blue-300">
-                <p>
-                  Imported filename: <strong>{importedFileName || "Unknown"}.kml</strong>
-                </p>
-                <p>Original waypoints: {simplificationInfo.originalCount}</p>
-                <p>After simplification: {simplificationInfo.simplifiedCount}</p>
-                {simplificationInfo.source && (
-                  <p>
-                    Source: <strong>{simplificationInfo.source}</strong>
-                  </p>
-                )}
-                <p className="text-xs mt-1">{simplificationInfo.reason}</p>
-              </AlertDescription>
-            </Alert>
-          )}
+                  {/* Options for mobile - show below table */}
+                  {isMobile && showOptionsPanel && waypoints.length > 0 && (
+                    <div className="mt-6 border-t pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Layers className="h-5 w-5 text-primary" />
+                        <h3 className="text-lg font-medium">Options</h3>
+                      </div>
+                      <div className="space-y-6">
+                        {/* Import TXT to Waypoints */}
+                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                          <div className="flex items-center gap-2 mb-3">
+                            <h4 className="font-medium">Import TXT to Waypoints</h4>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs">
+                                <p>Import a text file to populate waypoint names.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <Button
+                            onClick={() => txtFileInputRef.current?.click()}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1 h-9 w-full"
+                            disabled={waypoints.length === 0}
+                          >
+                            <Upload size={14} />
+                            <span>Import TXT File</span>
+                          </Button>
+                          <input
+                            ref={txtFileInputRef}
+                            type="file"
+                            accept=".txt"
+                            onChange={handleTxtImport}
+                            className="hidden"
+                          />
+                        </div>
 
-          {/* Table Action Bar (Select All, Delete, Clear Altitudes, Insert Waypoint, Batch Rename) */}
-          <div
-            className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
-            style={{ top: `${tableBarTopPosition}px` }}
-          >
-            <div className="flex items-center space-x-2">
-              <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
-              <Label htmlFor="selectAll" className="text-sm font-medium">
-                Select All
-              </Label>
-            </div>
+                        <Separator />
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={deleteSelectedWaypoints}
-                disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                className="flex items-center gap-1 h-10"
-              >
-                <Trash2 size={14} />
-                <span className="hidden sm:inline">Delete</span>
-                <span className="sm:hidden">Delete</span>
-              </Button>
+                        {/* Waypoint Prefix */}
+                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                          <div className="flex items-center gap-2 mb-3">
+                            <h4 className="font-medium">Waypoint Prefix</h4>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs">
+                                <p>Add a prefix to all waypoint names (e.g., "WP").</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="space-y-2">
+                            <Input
+                              id="waypointPrefix"
+                              value={waypointPrefix}
+                              onChange={(e) => setWaypointPrefix(e.target.value)}
+                              placeholder="Enter prefix (e.g., WP)"
+                              onFocus={handleInputFocus}
+                              className="h-9 font-[var(--font-ibm-plex-mono)]"
+                              style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                            />
+                            <Button
+                              onClick={applyWaypointPrefix}
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-9 bg-transparent"
+                              disabled={isLoading || waypoints.length === 0}
+                            >
+                              Apply Prefix
+                            </Button>
+                          </div>
+                        </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearSelectedAltitudes}
-                disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                className="flex items-center gap-1 h-10"
-              >
-                <Info size={14} />
-                <span className="hidden sm:inline">Clear Alt</span>
-                <span className="sm:hidden">Clear Alt</span>
-              </Button>
+                        <Separator />
 
-              {/* Insert Waypoint button */}
-              <Button
-                variant="default"
-                size="sm"
-                onClick={insertWaypoint}
-                className="flex items-center gap-1 h-10"
-                disabled={isLoading || waypoints.filter((wp) => wp.selected).length === 0} // Disabled if no selection
-              >
-                <Plus size={14} />
-                <span className="hidden sm:inline">Insert Waypoint</span>
-                <span className="sm:hidden">Insert</span>
-              </Button>
+                        {/* Made with Infinite Planner */}
+                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
+                          <div className="flex items-center gap-2 mb-3">
+                            <h4 className="font-medium">Made with Infinite Planner</h4>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-xs">
+                                <p>Replace the last 4 waypoint names to share the love!</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="madeWithInfinitePlanner"
+                              checked={useMadeWithInfinitePlanner}
+                              onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
+                              disabled={waypoints.length < 6}
+                            />
+                            <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
+                              Use "Made with Infinite Planner"
+                            </Label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-              {/* Options Button */}
-              <Button
-                onClick={() =>
-                  document.getElementById("waypoints-batch-section")?.scrollIntoView({ behavior: "smooth" })
-                }
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1 h-10 px-3 sm:px-4"
-                disabled={waypoints.length === 0 || isLoading}
-              >
-                <Layers size={14} />
-                <span className="hidden sm:inline">Options</span>
-                <span className="sm:hidden">Options</span>
-              </Button>
-            </div>
+                  {waypoints.length > 0 && (
+                    <div className="mt-4 text-sm text-muted-foreground">
+                      <p>
+                        Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
+                      </p>
+                      <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
           </div>
 
-          {/* Waypoint Table */}
-          <div className="border rounded-md overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">Latitude</TableHead>
-                  <TableHead className="hidden md:table-cell">Longitude</TableHead>
-                  <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
-                      Loading waypoints...
-                    </TableCell>
-                  </TableRow>
-                ) : waypoints.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
-                      No waypoints added. Import a KML file or add waypoints manually.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  waypoints.map((waypoint) => (
-                    <TableRow
-                      key={waypoint.id}
-                      className="bg-card hover:bg-muted/50 h-12" // Removed drag-related classes
-                    >
-                      <TableCell className="w-12 py-2 pl-4 pr-2">
-                        {" "}
-                        {/* Reverted to default padding, removed flex for vertical alignment */}
-                        <Checkbox
-                          id={`wp-${waypoint.id}`}
-                          checked={waypoint.selected}
-                          onCheckedChange={() => toggleWaypointSelection(waypoint.id)}
-                          className="flex-shrink-0"
-                        />
-                      </TableCell>
-                      <TableCell className="py-2">
-                        {" "}
-                        {/* Reverted to default padding */}
-                        <Input
-                          id={`name-${waypoint.id}`}
-                          value={waypoint.name}
-                          onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
-                          onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
-                          onFocus={handleInputFocus}
-                          className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full ${
-                            waypoint.locked ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""
-                          }`}
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                          disabled={waypoint.locked}
-                          readOnly={waypoint.locked}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-2">
-                        {" "}
-                        {/* Reverted to default padding */}
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          value={waypoint.lat}
-                          onChange={(e) => updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)}
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-2">
-                        {" "}
-                        {/* Reverted to default padding */}
-                        <Input
-                          type="number"
-                          step="0.0001"
-                          value={waypoint.lng}
-                          onChange={(e) => updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)}
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-2">
-                        {" "}
-                        {/* Reverted to default padding */}
-                        <Input
-                          type="number"
-                          value={waypoint.altitude}
-                          onChange={(e) =>
-                            updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
-                          }
-                          onFocus={handleInputFocus}
-                          className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full" // Added w-full to input
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Waypoints Batch Section - Moved here */}
-          {waypoints.length > 0 && (
-            <div id="waypoints-batch-section" className="mb-6 border-t pt-6 mt-6">
-              {" "}
-              {/* Added mt-6 for spacing */}
-              <div className="flex items-center gap-2 mb-4">
-                <Layers className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-medium">Waypoints Batch Rename Options</h3>
-              </div>
-              <div className="space-y-6">
-                {/* Import TXT to Waypoints */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <h4 className="font-medium">Import TXT to Waypoints</h4>
+          {/* Options Panel - Desktop only, right side */}
+          {!isMobile && hasImported && waypoints.length > 0 && (
+            <div className="w-80 flex-shrink-0">
+              <Card className="sticky bg-background shadow-sm border-border" style={{ top: "2rem" }}>
+                <CardHeader className="pb-4 border-b">
+                  <div className="text-center">
+                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Your Flight Plan:</h3>
+                    <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
+                      {originAirport || "ORIG"} → {destinationAirport || "DEST"}
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Import a text file to populate waypoint names. Each line in the file will be used as a waypoint
-                    name.
-                  </p>
-                  <Button
-                    onClick={() => txtFileInputRef.current?.click()}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 h-9"
-                    disabled={waypoints.length === 0}
-                  >
-                    <Upload size={14} />
-                    <span>Import TXT File</span>
-                  </Button>
-                  <input
-                    ref={txtFileInputRef}
-                    type="file"
-                    accept=".txt"
-                    onChange={handleTxtImport}
-                    className="hidden"
-                  />
-                </div>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-6">
+                    {/* Flight Plan Map Button - First item */}
+                    <div>
+                      <Button
+                        onClick={() => setShowMapPreview(true)}
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center justify-center gap-2 h-10"
+                        disabled={waypoints.length === 0 || isLoading}
+                      >
+                        <Map size={16} />
+                        <span>Flight Plan Map</span>
+                      </Button>
+                    </div>
 
-                {/* Waypoint Prefix */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    <h4 className="font-medium">Waypoint Prefix</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Add a prefix to all waypoint names (e.g., "WP" will result in "WP001", "WP002", etc.).
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex-grow max-w-xs">
-                      <Input
-                        id="waypointPrefix"
-                        value={waypointPrefix}
-                        onChange={(e) => setWaypointPrefix(e.target.value)}
-                        placeholder="Enter prefix (e.g., WP)"
-                        onFocus={handleInputFocus}
-                        className="h-9 font-[var(--font-ibm-plex-mono)]"
-                        style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                    <Separator className="my-4" />
+
+                    {/* Import TXT to Waypoints */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-medium text-sm">Import TXT to Waypoints</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p>Import a text file to populate waypoint names.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Button
+                        onClick={() => txtFileInputRef.current?.click()}
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center gap-1 h-9"
+                        disabled={waypoints.length === 0}
+                      >
+                        <Upload size={14} />
+                        <span>Import TXT File</span>
+                      </Button>
+                      <input
+                        ref={txtFileInputRef}
+                        type="file"
+                        accept=".txt"
+                        onChange={handleTxtImport}
+                        className="hidden"
                       />
                     </div>
-                    <Button
-                      onClick={applyWaypointPrefix}
-                      size="sm"
-                      className="h-9"
-                      disabled={isLoading || waypoints.length === 0}
-                    >
-                      Apply Prefix
-                    </Button>
-                  </div>
-                </div>
 
-                {/* Made with Infinite Planner */}
-                <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    <h4 className="font-medium">Made with Infinite Planner</h4>
+                    <Separator className="my-4" />
+
+                    {/* Waypoint Prefix */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-medium text-sm">Waypoint Prefix</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p>Add a prefix to all waypoint names (e.g., "WP").</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="space-y-2">
+                        <Input
+                          id="waypointPrefix"
+                          value={waypointPrefix}
+                          onChange={(e) => setWaypointPrefix(e.target.value)}
+                          placeholder="Enter prefix"
+                          onFocus={handleInputFocus}
+                          className="h-9 font-[var(--font-ibm-plex-mono)]"
+                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
+                        />
+                        <Button
+                          onClick={applyWaypointPrefix}
+                          variant="outline"
+                          size="sm"
+                          className="w-full h-9 bg-transparent"
+                          disabled={isLoading || waypoints.length === 0}
+                        >
+                          Apply Prefix
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    {/* Made with Infinite Planner */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="font-medium text-sm">Made with Infinite Planner</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p>Replace the last 4 waypoint names to share the love!</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="madeWithInfinitePlanner"
+                          checked={useMadeWithInfinitePlanner}
+                          onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
+                          disabled={waypoints.length < 6}
+                        />
+                        <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
+                          Use "Made with Infinite Planner"
+                        </Label>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Replace the last 4 waypoint names with "MADE", "WITH", "INFINITE", "PLANNER" to share the love!
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="madeWithInfinitePlanner"
-                      checked={useMadeWithInfinitePlanner}
-                      onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
-                      disabled={waypoints.length < 6} // Changed from 4 to 6
-                    />
-                    <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
-                      Use "Made with Infinite Planner" for waypoints before arrival (requires at least 6 waypoints)
-                    </Label>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+
+                {/* Export button at the bottom */}
+                <CardContent className="pt-0 pb-6">
+                  <Separator className="mb-4" />
+                  <Button
+                    onClick={handleExportFPL}
+                    size="lg"
+                    className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={waypoints.length === 0 || isLoading}
+                  >
+                    <Download size={16} />
+                    <span>Export FPL</span>
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           )}
+        </div>
 
-          {waypoints.length > 0 && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              <p>
-                Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
-              </p>
-              <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Map Preview Dialog */}
-      <Dialog
-        open={showMapPreview}
-        onOpenChange={(open) => {
-          // Prevent closing if editing is active
-          if (!isEditingMap) {
-            setShowMapPreview(open)
-          }
-        }}
-      >
-        <DialogContent
-          className="max-w-6xl" // Increased max-width
-          onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
-          onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
+        {/* Map Preview Dialog */}
+        <Dialog
+          open={showMapPreview}
+          onOpenChange={(open) => {
+            if (!isEditingMap) {
+              setShowMapPreview(open)
+            }
+          }}
         >
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <DialogTitle>Flight Plan Preview</DialogTitle>
-              <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
+          <DialogContent
+            className="max-w-6xl"
+            onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
+            onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
+          >
+            <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <DialogTitle>Flight Plan Preview</DialogTitle>
+                <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
+              </div>
+              {waypoints.length > 0 && (
+                <Button
+                  onClick={toggleMapEditing}
+                  variant={isEditingMap ? "default" : "outline"}
+                  className="flex items-center gap-2 ml-auto mr-4"
+                >
+                  <Pencil size={16} />
+                  {isEditingMap ? "Done Editing" : "Edit Waypoints"}
+                </Button>
+              )}
+            </DialogHeader>
+            <div className="h-[500px] w-full relative">
+              <MapPreview
+                waypoints={waypoints}
+                isEditing={isEditingMap}
+                onWaypointDragEnd={handleWaypointDragEnd}
+                onWaypointInsert={handleWaypointInsert}
+              />
             </div>
-            {waypoints.length > 0 && (
-              <Button
-                onClick={toggleMapEditing}
-                variant={isEditingMap ? "default" : "outline"}
-                className="flex items-center gap-2 ml-auto mr-4" // Adjusted margin
-              >
-                <Pencil size={16} />
-                {isEditingMap ? "Done Editing" : "Edit Waypoints"}
+            <DialogFooter>
+              <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
+                Close
               </Button>
-            )}
-          </DialogHeader>
-          <div className="h-[500px] w-full relative">
-            <MapPreview
-              waypoints={waypoints}
-              isEditing={isEditingMap}
-              onWaypointDragEnd={handleWaypointDragEnd}
-              onWaypointInsert={handleWaypointInsert}
-            />
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Toaster />
-    </div>
+        <Toaster />
+      </div>
+    </TooltipProvider>
   )
 }
