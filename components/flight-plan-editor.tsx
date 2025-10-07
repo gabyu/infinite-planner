@@ -241,6 +241,11 @@ export function FlightPlanEditor() {
           setShowMapPreview(true)
         }
 
+        // Show options panel on mobile after import
+        if (isMobile) {
+          setShowOptionsPanel(true)
+        }
+
         setSuccessMessage(
           `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source || "KML file"}`,
         )
@@ -567,12 +572,12 @@ export function FlightPlanEditor() {
                   <div className="text-center max-w-2xl mx-auto">
                     {/* Logo */}
                     <div className="flex justify-center mb-6">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center p-3">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center p-3">
                         <Image
                           src="/ip_logo.svg"
                           alt="Infinite Planner Logo"
-                          width={64}
-                          height={64}
+                          width={48}
+                          height={48}
                           className="w-full h-full"
                         />
                       </div>
@@ -715,24 +720,21 @@ export function FlightPlanEditor() {
                     className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
                     style={{ top: "0px" }}
                   >
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
                       <Label htmlFor="selectAll" className="text-sm font-medium">
                         Select All
                       </Label>
-                    </div>
 
-                    <div className="flex flex-wrap gap-2">
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={deleteSelectedWaypoints}
                         disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="flex items-center gap-1 h-10"
+                        className="flex items-center gap-1 h-10 ml-2"
                       >
                         <Trash2 size={14} />
                         <span className="hidden sm:inline">Delete</span>
-                        <span className="sm:hidden">Delete</span>
                       </Button>
 
                       <Button
@@ -744,7 +746,29 @@ export function FlightPlanEditor() {
                       >
                         <Info size={14} />
                         <span className="hidden sm:inline">Clear Alt</span>
-                        <span className="sm:hidden">Clear Alt</span>
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => setShowMapPreview(true)}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-1 h-10"
+                        disabled={waypoints.length === 0 || isLoading}
+                      >
+                        <Map size={14} />
+                        <span className="hidden sm:inline">Map</span>
+                      </Button>
+
+                      <Button
+                        onClick={handleExportFPL}
+                        size="sm"
+                        className="flex items-center gap-1 h-10 bg-blue-600 hover:bg-blue-700 text-white"
+                        disabled={waypoints.length === 0 || isLoading}
+                      >
+                        <Download size={14} />
+                        <span className="hidden sm:inline">Export</span>
                       </Button>
                     </div>
                   </div>
@@ -850,7 +874,7 @@ export function FlightPlanEditor() {
                   </div>
 
                   {/* Options for mobile - show below table */}
-                  {isMobile && showOptionsPanel && waypoints.length > 0 && (
+                  {isMobile && waypoints.length > 0 && (
                     <div className="mt-6 border-t pt-6">
                       <div className="flex items-center gap-2 mb-4">
                         <Layers className="h-5 w-5 text-primary" />
@@ -1127,11 +1151,11 @@ export function FlightPlanEditor() {
           }}
         >
           <DialogContent
-            className="max-w-6xl"
+            className="max-w-6xl w-[95vw] max-h-[95vh] flex flex-col p-0"
             onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
             onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
           >
-            <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
               <div>
                 <DialogTitle>Flight Plan Preview</DialogTitle>
                 <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
@@ -1143,11 +1167,15 @@ export function FlightPlanEditor() {
                   className="flex items-center gap-2 ml-auto mr-4"
                 >
                   <Pencil size={16} />
-                  {isEditingMap ? "Done Editing" : "Edit Waypoints"}
+                  <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>
+                  <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span>
                 </Button>
               )}
             </DialogHeader>
-            <div className="h-[500px] w-full relative">
+            <div
+              className="flex-1 w-full relative px-6"
+              style={{ minHeight: "300px", maxHeight: "calc(95vh - 180px)" }}
+            >
               <MapPreview
                 waypoints={waypoints}
                 isEditing={isEditingMap}
@@ -1155,7 +1183,7 @@ export function FlightPlanEditor() {
                 onWaypointInsert={handleWaypointInsert}
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 pb-6">
               <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
                 Close
               </Button>
