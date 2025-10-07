@@ -567,12 +567,12 @@ export function FlightPlanEditor() {
                   <div className="text-center max-w-2xl mx-auto">
                     {/* Logo */}
                     <div className="flex justify-center mb-6">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center p-3">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center p-3">
                         <Image
                           src="/ip_logo.svg"
                           alt="Infinite Planner Logo"
-                          width={48}
-                          height={48}
+                          width={64}
+                          height={64}
                           className="w-full h-full"
                         />
                       </div>
