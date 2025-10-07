@@ -572,7 +572,7 @@ export function FlightPlanEditor() {
                   <div className="text-center max-w-2xl mx-auto">
                     {/* Logo */}
                     <div className="flex justify-center mb-6">
-                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center p-3">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center p-3">
                         <Image
                           src="/ip_logo.svg"
                           alt="Infinite Planner Logo"
@@ -588,8 +588,7 @@ export function FlightPlanEditor() {
 
                     {/* Description */}
                     <p className="text-gray-600 dark:text-gray-300 mb-10 text-lg">
-                      Enter your flight's origin and destination airport codes, then upload your KML file from
-                      FlightRadar24 or FlightAware.
+                      Enter your flight's origin and destination airport codes, then upload your KML file from FlightRadar24 or FlightAware.
                     </p>
 
                     {/* Form */}
