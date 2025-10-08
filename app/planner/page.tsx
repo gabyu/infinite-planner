@@ -16,17 +16,17 @@ export default function PlannerPage() {
       <header className="border-b bg-white dark:bg-slate-900">
         <div className="container mx-auto py-4 px-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 no-underline group">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md overflow-hidden">
+            <div className="w-8 h-8 rounded-md overflow-hidden">
               <Image
                 src="/ip_logo.svg"
                 alt="Infinite Planner Logo"
                 width={32}
                 height={32}
                 priority
-                className="group-hover:opacity-80 transition-opacity w-full h-full"
+                className="group-hover:opacity-80 transition-opacity"
               />
             </div>
-            <h1 className="text-sm sm:text-xl font-bold text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap">
+            <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer">
               Infinite Planner
             </h1>
           </Link>
@@ -35,7 +35,7 @@ export default function PlannerPage() {
               href="/how-it-works"
               className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center hidden sm:block"
             >
-              Guide
+              How it Works
             </Link>
             <Link
               href="/faq"
@@ -43,15 +43,10 @@ export default function PlannerPage() {
             >
               FAQ
             </Link>
-            <Link
-              href="https://discord.gg/ZdB72sjET5"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden lg:flex"
-            >
+            <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
-                <span>Join Discord</span>
+                <span className="hidden sm:inline">Join Discord</span>
               </Button>
             </Link>
             <Button
