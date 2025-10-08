@@ -3,6 +3,16 @@
 import { useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+
+// Fix for default markers in Leaflet with webpack
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "/marker-icon.png",
+  iconUrl: "/marker-icon.png",
+  shadowUrl: "/marker-shadow.png",
+})
 
 interface Waypoint {
   id: string
@@ -33,38 +43,6 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
-  const [L, setL] = useState<any>(null)
-  const [isMapReady, setIsMapReady] = useState(false)
-
-  // Load Leaflet dynamically
-  useEffect(() => {
-    const loadLeaflet = async () => {
-      try {
-        // Dynamic import of Leaflet
-        const leaflet = await import("leaflet")
-
-        // Import CSS
-        await import("leaflet/dist/leaflet.css")
-
-        // Fix for default markers in Leaflet with webpack
-        delete (leaflet.Icon.Default.prototype as any)._getIconUrl
-        leaflet.Icon.Default.mergeOptions({
-          iconRetinaUrl: "/marker-icon.png",
-          iconUrl: "/marker-icon.png",
-          shadowUrl: "/marker-shadow.png",
-        })
-
-        setL(leaflet.default || leaflet)
-        setIsMapReady(true)
-      } catch (error) {
-        console.error("Failed to load Leaflet:", error)
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      loadLeaflet()
-    }
-  }, [])
 
   // Custom icon SVG data for rounded pins
   const getCustomIconSvg = (color: string, size: number) => {
@@ -242,7 +220,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   }
 
   useEffect(() => {
-    if (!mapRef.current || !L || !isMapReady) return
+    if (!mapRef.current || !L) return
 
     // Initialize map if it doesn't exist
     if (!mapInstanceRef.current) {
@@ -519,7 +497,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         clearTimeout(mouseMoveTimeoutRef.current)
       }
     }
-  }, [waypoints, isDark, isEditing, onWaypointDragEnd, L, isMapReady])
+  }, [waypoints, isDark, isEditing, onWaypointDragEnd, L])
 
   // Effect to handle the insert marker - ONLY in edit mode
   useEffect(() => {
@@ -568,7 +546,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     }
   }, [])
 
-  if (!isMapReady || !L) {
+  if (!L) {
     return (
       <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
         Loading map...
