@@ -218,6 +218,7 @@ export function FlightPlanEditor() {
 
       if (result.waypoints.length === 0) {
         setError("No valid waypoints found in the KML file. Please check the file format.")
+        setIsLoading(false)
       } else {
         const renamedWaypoints = applyWaypointNamingRules(
           result.waypoints,
@@ -236,18 +237,20 @@ export function FlightPlanEditor() {
         // Set hasImported to true to reveal the rest of the UI
         setHasImported(true)
 
-        if (renamedWaypoints.length > 0) {
-          setShowMapPreview(true)
-        }
-
         setSuccessMessage(
           `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source || "KML file"}`,
         )
+
+        // IMPORTANT: Show map preview after successful import
+        // Add a small delay to ensure waypoints are set
+        setTimeout(() => {
+          setShowMapPreview(true)
+          setIsLoading(false)
+        }, 100)
       }
     } catch (error) {
       console.error("Error importing KML file:", error)
       setError(`Error importing KML file: ${error instanceof Error ? error.message : String(error)}`)
-    } finally {
       setIsLoading(false)
     }
   }
@@ -552,6 +555,12 @@ export function FlightPlanEditor() {
     return updatedWaypoints
   }
 
+  // Function to open map preview
+  const openMapPreview = () => {
+    console.log("Opening map preview, waypoints count:", waypoints.length)
+    setShowMapPreview(true)
+  }
+
   return (
     <TooltipProvider>
       <div className="container mx-auto py-8 px-4">
@@ -751,11 +760,11 @@ export function FlightPlanEditor() {
                     {/* Right side - Map and Export */}
                     <div className="flex gap-2">
                       <Button
-                        onClick={() => setShowMapPreview(true)}
+                        onClick={openMapPreview}
                         variant="outline"
                         size="sm"
                         disabled={waypoints.length === 0 || isLoading}
-                        className="h-9 w-9 p-0 sm:w-auto sm:px-3"
+                        className="h-9 w-9 p-0 sm:w-auto sm:px-3 bg-transparent"
                         title="View flight plan on map"
                       >
                         <Map size={16} />
@@ -1013,10 +1022,10 @@ export function FlightPlanEditor() {
                     {/* Flight Plan Map Button - First item */}
                     <div>
                       <Button
-                        onClick={() => setShowMapPreview(true)}
+                        onClick={openMapPreview}
                         variant="outline"
                         size="sm"
-                        className="w-full flex items-center justify-center gap-2 h-10"
+                        className="w-full flex items-center justify-center gap-2 h-10 bg-transparent"
                         disabled={waypoints.length === 0 || isLoading}
                       >
                         <Map size={16} />
@@ -1144,14 +1153,7 @@ export function FlightPlanEditor() {
         </div>
 
         {/* Map Preview Dialog */}
-        <Dialog
-          open={showMapPreview}
-          onOpenChange={(open) => {
-            if (!isEditingMap) {
-              setShowMapPreview(open)
-            }
-          }}
-        >
+        <Dialog open={showMapPreview} onOpenChange={setShowMapPreview}>
           <DialogContent
             className="max-w-6xl w-[95vw] max-h-[95vh] flex flex-col p-0"
             onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
@@ -1181,12 +1183,14 @@ export function FlightPlanEditor() {
               className="flex-1 w-full relative px-6"
               style={{ minHeight: "300px", maxHeight: "calc(95vh - 180px)" }}
             >
-              <MapPreview
-                waypoints={waypoints}
-                isEditing={isEditingMap}
-                onWaypointDragEnd={handleWaypointDragEnd}
-                onWaypointInsert={handleWaypointInsert}
-              />
+              {waypoints.length > 0 && (
+                <MapPreview
+                  waypoints={waypoints}
+                  isEditing={isEditingMap}
+                  onWaypointDragEnd={handleWaypointDragEnd}
+                  onWaypointInsert={handleWaypointInsert}
+                />
+              )}
             </div>
             <DialogFooter className="px-6 pb-6">
               <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
