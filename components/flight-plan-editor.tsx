@@ -12,13 +12,13 @@ import {
   Download,
   Upload,
   Trash2,
-  Info,
   Map,
   CheckCircle2,
   Layers,
   Pencil,
   ChevronRight,
   HelpCircle,
+  Mountain,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
@@ -565,8 +565,8 @@ export function FlightPlanEditor() {
                 /* Pre-import state - Large centered form */
                 <div className="p-12">
                   <div className="text-center max-w-2xl mx-auto">
-                    {/* Logo */}
-                    <div className="flex justify-center mb-6">
+                    {/* Logo - hidden on mobile */}
+                    <div className="hidden sm:flex justify-center mb-6">
                       <div className="w-16 h-16 rounded-full flex items-center justify-center p-3">
                         <Image
                           src="/ip_logo.svg"
@@ -612,7 +612,8 @@ export function FlightPlanEditor() {
                             />
                           </div>
 
-                          <ChevronRight className="text-gray-400" size={24} />
+                          {/* Chevron - hidden on mobile and tablet */}
+                          <ChevronRight className="hidden lg:block text-gray-400" size={24} />
 
                           <div className="flex items-center gap-3">
                             <Label
@@ -670,9 +671,10 @@ export function FlightPlanEditor() {
               ) : (
                 /* Post-import state - Content without header */
                 <CardContent className="pt-6">
+                  {/* Error Alert */}
                   {error && (
                     <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-                      <Info className="h-4 w-4 text-red-500 dark:text-red-400" />
+                      <Mountain className="h-4 w-4 text-red-500 dark:text-red-400" /> {/* Updated icon */}
                       <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
                       <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
                     </Alert>
@@ -688,9 +690,10 @@ export function FlightPlanEditor() {
                     </Alert>
                   )}
 
+                  {/* Simplification Info Alert */}
                   {simplificationInfo && (
                     <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                      <Info className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      <Mountain className="h-4 w-4 text-blue-500 dark:text-blue-400" /> {/* Updated icon */}
                       <AlertTitle className="text-blue-700 dark:text-blue-400">
                         Waypoint Simplification Applied
                       </AlertTitle>
@@ -717,34 +720,63 @@ export function FlightPlanEditor() {
                   >
                     <div className="flex items-center space-x-2">
                       <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
-                      <Label htmlFor="selectAll" className="text-sm font-medium">
-                        Select All
+                      <Label htmlFor="selectAll" className="text-sm font-medium cursor-pointer">
+                        <span className="hidden sm:inline">Select All</span>
+                        <span className="sm:hidden">All</span> {/* Updated label */}
                       </Label>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    {/* Right side - Delete, Clear Alt, Map and Export */}
+                    <div className="flex gap-2">
+                      {/* Delete Button */}
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={deleteSelectedWaypoints}
                         disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="flex items-center gap-1 h-10"
+                        className="h-9 w-9 p-0 sm:w-auto sm:px-3" // Compact on mobile
+                        title="Delete selected waypoints"
                       >
-                        <Trash2 size={14} />
-                        <span className="hidden sm:inline">Delete</span>
-                        <span className="sm:hidden">Delete</span>
+                        <Trash2 size={16} />
+                        <span className="hidden sm:inline ml-1">Delete</span>
                       </Button>
 
+                      {/* Clear Alt Button */}
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={clearSelectedAltitudes}
                         disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="flex items-center gap-1 h-10"
+                        className="h-9 w-9 p-0 sm:w-auto sm:px-3" // Compact on mobile
+                        title="Clear altitudes of selected waypoints"
                       >
-                        <Info size={14} />
-                        <span className="hidden sm:inline">Clear Alt</span>
-                        <span className="sm:hidden">Clear Alt</span>
+                        <Mountain size={16} /> {/* Updated icon */}
+                        <span className="hidden sm:inline ml-1">Clear Alt</span>
+                      </Button>
+
+                      {/* Map Button */}
+                      <Button
+                        onClick={() => setShowMapPreview(true)}
+                        variant="outline"
+                        size="sm"
+                        disabled={waypoints.length === 0 || isLoading}
+                        className="h-9 w-9 p-0 sm:w-auto sm:px-3"
+                        title="View flight plan on map"
+                      >
+                        <Map size={16} />
+                        <span className="hidden sm:inline ml-1">Map</span>
+                      </Button>
+
+                      {/* Export Button */}
+                      <Button
+                        onClick={handleExportFPL}
+                        size="sm"
+                        disabled={waypoints.length === 0 || isLoading}
+                        className="h-9 w-9 p-0 sm:w-auto sm:px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                        title="Export flight plan"
+                      >
+                        <Download size={16} />
+                        <span className="hidden sm:inline ml-1">Export</span>
                       </Button>
                     </div>
                   </div>
@@ -758,7 +790,8 @@ export function FlightPlanEditor() {
                           <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Latitude</TableHead>
                           <TableHead className="hidden md:table-cell">Longitude</TableHead>
-                          <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>
+                          <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>{" "}
+                          {/* Updated to show on tablet */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -831,6 +864,8 @@ export function FlightPlanEditor() {
                                 />
                               </TableCell>
                               <TableCell className="hidden md:table-cell py-2">
+                                {" "}
+                                {/* Updated to show on tablet */}
                                 <Input
                                   type="number"
                                   value={waypoint.altitude}
@@ -1134,7 +1169,10 @@ export function FlightPlanEditor() {
             <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <DialogTitle>Flight Plan Preview</DialogTitle>
-                <DialogDescription>Visualize your flight plan with {waypoints.length} waypoints</DialogDescription>
+                <DialogDescription>
+                  <span className="hidden lg:inline">Visualize your flight plan with {waypoints.length} waypoints</span>
+                  <span className="lg:hidden">{waypoints.length} waypoints</span> {/* Responsive description */}
+                </DialogDescription>
               </div>
               {waypoints.length > 0 && (
                 <Button
@@ -1143,7 +1181,9 @@ export function FlightPlanEditor() {
                   className="flex items-center gap-2 ml-auto mr-4"
                 >
                   <Pencil size={16} />
-                  {isEditingMap ? "Done Editing" : "Edit Waypoints"}
+                  <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>{" "}
+                  {/* Responsive button text */}
+                  <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span> {/* Responsive button text */}
                 </Button>
               )}
             </DialogHeader>
