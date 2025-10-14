@@ -33,13 +33,13 @@ export default function PlannerPage() {
           <nav className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/how-it-works"
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center hidden sm:block"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 items-center hidden sm:flex"
             >
               Guide
             </Link>
             <Link
               href="/faq"
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center hidden sm:block"
+              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 items-center hidden sm:flex"
             >
               FAQ
             </Link>
@@ -52,11 +52,6 @@ export default function PlannerPage() {
               <Button variant="outline" className="h-10 flex items-center gap-2 px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
                 <span>Join Discord</span>
-              </Button>
-            </Link>
-            <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer" className="md:hidden">
-              <Button variant="outline" className="h-10 w-10 p-0 bg-transparent">
-                <DiscordIcon className="w-5 h-5" />
               </Button>
             </Link>
             <Button

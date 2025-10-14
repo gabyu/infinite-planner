@@ -33,7 +33,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
@@ -90,6 +90,7 @@ export function FlightPlanEditor() {
   const [hasImported, setHasImported] = useState(false)
   const [showOptionsPanel, setShowOptionsPanel] = useState(false)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
+  const [showOptions, setShowOptions] = useState(false) // Added state for options panel visibility
 
   // Check if device is mobile
   useEffect(() => {
@@ -715,18 +716,15 @@ export function FlightPlanEditor() {
 
                   {/* Table Action Bar */}
                   <div
-                    className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex flex-wrap items-center justify-between gap-4"
+                    className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex items-center justify-between gap-2"
                     style={{ top: "0px" }}
                   >
-                    <div className="flex items-center space-x-2">
+                    {/* Left side - Checkbox only */}
+                    <div className="flex items-center">
                       <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
-                      <Label htmlFor="selectAll" className="text-sm font-medium cursor-pointer">
-                        <span className="hidden sm:inline">Select All</span>
-                        <span className="sm:hidden">All</span> {/* Updated label */}
-                      </Label>
                     </div>
 
-                    {/* Right side - Delete, Clear Alt, Map and Export */}
+                    {/* Right side - Delete, Clear Alt, Options, Map and Export */}
                     <div className="flex gap-2">
                       {/* Delete Button */}
                       <Button
@@ -734,11 +732,10 @@ export function FlightPlanEditor() {
                         size="sm"
                         onClick={deleteSelectedWaypoints}
                         disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="h-9 w-9 p-0 sm:w-auto sm:px-3" // Compact on mobile
+                        className="h-9 w-9 p-0"
                         title="Delete selected waypoints"
                       >
                         <Trash2 size={16} />
-                        <span className="hidden sm:inline ml-1">Delete</span>
                       </Button>
 
                       {/* Clear Alt Button */}
@@ -747,11 +744,29 @@ export function FlightPlanEditor() {
                         size="sm"
                         onClick={clearSelectedAltitudes}
                         disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="h-9 w-9 p-0 sm:w-auto sm:px-3" // Compact on mobile
+                        className="h-9 w-9 p-0"
                         title="Clear altitudes of selected waypoints"
                       >
-                        <Mountain size={16} /> {/* Updated icon */}
-                        <span className="hidden sm:inline ml-1">Clear Alt</span>
+                        <Mountain size={16} />
+                      </Button>
+
+                      {/* Options Button - Mobile/Tablet only */}
+                      <Button
+                        onClick={() => {
+                          setShowOptions(!showOptions)
+                          // Scroll to options section
+                          setTimeout(() => {
+                            document
+                              .getElementById("options-section")
+                              ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                          }, 100)
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-9 w-9 p-0 lg:hidden"
+                        title="Show options"
+                      >
+                        <Layers size={16} />
                       </Button>
 
                       {/* Map Button */}
@@ -760,11 +775,10 @@ export function FlightPlanEditor() {
                         variant="outline"
                         size="sm"
                         disabled={waypoints.length === 0 || isLoading}
-                        className="h-9 w-9 p-0 sm:w-auto sm:px-3"
+                        className="h-9 w-9 p-0"
                         title="View flight plan on map"
                       >
                         <Map size={16} />
-                        <span className="hidden sm:inline ml-1">Map</span>
                       </Button>
 
                       {/* Export Button */}
@@ -772,11 +786,11 @@ export function FlightPlanEditor() {
                         onClick={handleExportFPL}
                         size="sm"
                         disabled={waypoints.length === 0 || isLoading}
-                        className="h-9 w-9 p-0 sm:w-auto sm:px-3 bg-blue-600 hover:bg-blue-700 text-white"
+                        className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
                         title="Export flight plan"
                       >
                         <Download size={16} />
-                        <span className="hidden sm:inline ml-1">Export</span>
+                        <span className="text-sm">Export</span>
                       </Button>
                     </div>
                   </div>
@@ -790,20 +804,23 @@ export function FlightPlanEditor() {
                           <TableHead>Name</TableHead>
                           <TableHead className="hidden md:table-cell">Latitude</TableHead>
                           <TableHead className="hidden md:table-cell">Longitude</TableHead>
-                          <TableHead className="hidden md:table-cell">Altitude (ft)</TableHead>{" "}
-                          {/* Updated to show on tablet */}
+                          <TableHead className="w-24">Altitude (ft)</TableHead> {/* Updated to show on mobile */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {isLoading ? (
                           <TableRow>
-                            <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={isMobile ? 3 : 5} className="text-center py-8 text-muted-foreground">
+                              {" "}
+                              {/* Adjusted colSpan */}
                               Loading waypoints...
                             </TableCell>
                           </TableRow>
                         ) : waypoints.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={isMobile ? 2 : 5} className="text-center py-8 text-muted-foreground">
+                            <TableCell colSpan={isMobile ? 3 : 5} className="text-center py-8 text-muted-foreground">
+                              {" "}
+                              {/* Adjusted colSpan */}
                               No waypoints added. Import a KML file to get started.
                             </TableCell>
                           </TableRow>
@@ -863,9 +880,9 @@ export function FlightPlanEditor() {
                                   style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                                 />
                               </TableCell>
-                              <TableCell className="hidden md:table-cell py-2">
+                              <TableCell className="py-2 w-24">
                                 {" "}
-                                {/* Updated to show on tablet */}
+                                {/* Updated to show on mobile */}
                                 <Input
                                   type="number"
                                   value={waypoint.altitude}
@@ -884,9 +901,9 @@ export function FlightPlanEditor() {
                     </Table>
                   </div>
 
-                  {/* Options for mobile - show below table */}
-                  {isMobile && showOptionsPanel && waypoints.length > 0 && (
-                    <div className="mt-6 border-t pt-6">
+                  {/* Options Section - Below table on mobile/tablet */}
+                  {showOptions && waypoints.length > 0 && (
+                    <div id="options-section" className="mt-6 border-t pt-6 lg:hidden">
                       <div className="flex items-center gap-2 mb-4">
                         <Layers className="h-5 w-5 text-primary" />
                         <h3 className="text-lg font-medium">Options</h3>
@@ -978,12 +995,12 @@ export function FlightPlanEditor() {
                           </div>
                           <div className="flex items-center space-x-2">
                             <Checkbox
-                              id="madeWithInfinitePlanner"
+                              id="madeWithInfinitePlannerMobile"
                               checked={useMadeWithInfinitePlanner}
                               onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
                               disabled={waypoints.length < 6}
                             />
-                            <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
+                            <Label htmlFor="madeWithInfinitePlannerMobile" className="text-sm">
                               Use "Made with Infinite Planner"
                             </Label>
                           </div>

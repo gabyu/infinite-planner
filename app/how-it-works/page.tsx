@@ -10,24 +10,24 @@ export default function HowItWorksPage() {
     <div className="flex flex-col min-h-screen">
       {/* Navigation */}
       <header className="border-b">
-        <div className="container mx-auto py-4 px-4 flex justify-between items-center">
+        <div className="container mx-auto py-2 sm:py-4 px-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2 no-underline group">
-            <div className="w-8 h-8 rounded-md flex items-center justify-center">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md flex items-center justify-center">
               <Image
                 src="/ip_logo.svg"
                 alt="Infinite Planner Logo"
                 width={32}
                 height={32}
-                className="w-8 h-8 group-hover:opacity-80 transition-opacity"
+                className="w-full h-full group-hover:opacity-80 transition-opacity"
               />
             </div>
-            <h1 className="text-xl font-bold text-xs sm:text-xl text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer">
+            <h1 className="text-sm sm:text-xl font-bold text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap">
               Infinite Planner
             </h1>
           </Link>
-          <nav className="flex items-center gap-4 sm:gap-6">
+          <nav className="flex items-center gap-2 sm:gap-4 md:gap-6">
             <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-md text-sm font-medium h-10 flex items-center">
-              How it Works
+              Guide
             </span>
             <Link
               href="/faq"
@@ -35,10 +35,15 @@ export default function HowItWorksPage() {
             >
               FAQ
             </Link>
-            <Link href="https://discord.gg/ZdB72sjET5" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent">
+            <Link
+              href="https://discord.gg/ZdB72sjET5"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden md:block"
+            >
+              <Button variant="outline" className="h-10 flex items-center gap-2 px-4 bg-transparent">
                 <DiscordIcon className="w-5 h-5" />
-                <span className="hidden sm:inline">Join Discord</span>
+                <span>Join Discord</span>
               </Button>
             </Link>
             <Link href="/planner">
