@@ -248,32 +248,19 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current).setView([0, 0], 2)
 
-      // Use a better dark theme map with improved infrastructure visibility
+      // Use a dark theme map if in dark mode
       const tileLayer = isDark
         ? L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
             attribution:
               '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
             subdomains: "abcd",
             maxZoom: 19,
-            // Add custom CSS filter to enhance infrastructure visibility
-            className: "dark-map-enhanced",
           })
         : L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           })
 
       tileLayer.addTo(mapInstanceRef.current)
-
-      // Add custom CSS for dark map enhancement
-      if (isDark) {
-        const style = document.createElement("style")
-        style.innerHTML = `
-          .dark-map-enhanced {
-            filter: brightness(1.2) saturate(1.3) hue-rotate(10deg);
-          }
-        `
-        document.head.appendChild(style)
-      }
 
       // Add legend only once during initial map setup
       const legend = L.control({ position: "bottomright" })
@@ -313,44 +300,30 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     if (!map) return
 
     // Update tile layer based on theme
-    map.eachLayer((layer: any) => {
-      if (layer instanceof L.TileLayer) {
-        map.removeLayer(layer)
-      }
-    })
-
-    if (isDark) {
-      const darkTileLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    const currentTileLayer = map.hasLayer(
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {}),
+    )
+    if (isDark && !currentTileLayer) {
+      map.eachLayer((layer: any) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
+      })
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: "abcd",
         maxZoom: 19,
-        className: "dark-map-enhanced",
+      }).addTo(map)
+    } else if (!isDark && currentTileLayer) {
+      map.eachLayer((layer: any) => {
+        if (layer instanceof L.TileLayer) {
+          map.removeLayer(layer)
+        }
       })
-      darkTileLayer.addTo(map)
-
-      // Ensure CSS filter is applied
-      const existingStyle = document.getElementById("dark-map-style")
-      if (!existingStyle) {
-        const style = document.createElement("style")
-        style.id = "dark-map-style"
-        style.innerHTML = `
-          .dark-map-enhanced {
-            filter: brightness(1.2) saturate(1.3) hue-rotate(10deg);
-          }
-        `
-        document.head.appendChild(style)
-      }
-    } else {
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map)
-
-      // Remove dark mode style if it exists
-      const existingStyle = document.getElementById("dark-map-style")
-      if (existingStyle) {
-        existingStyle.remove()
-      }
     }
 
     // Update polyline
