@@ -801,10 +801,10 @@ export function FlightPlanEditor() {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-12"></TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead className="hidden md:table-cell">Latitude</TableHead>
-                          <TableHead className="hidden md:table-cell">Longitude</TableHead>
-                          <TableHead className="w-24">Altitude (ft)</TableHead> {/* Updated to show on mobile */}
+                          <TableHead className="w-32">Name</TableHead>
+                          <TableHead className="hidden md:table-cell w-40">Latitude</TableHead>
+                          <TableHead className="hidden md:table-cell w-40">Longitude</TableHead>
+                          <TableHead className="w-20">Alt ft.</TableHead> {/* Updated to show on mobile */}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -846,15 +846,16 @@ export function FlightPlanEditor() {
                                   onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
                                   onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
                                   onFocus={handleInputFocus}
-                                  className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full ${
+                                  className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full max-w-[12ch] ${
                                     waypoint.locked ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""
                                   }`}
                                   style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                                   disabled={waypoint.locked}
                                   readOnly={waypoint.locked}
+                                  maxLength={12}
                                 />
                               </TableCell>
-                              <TableCell className="hidden md:table-cell py-2">
+                              <TableCell className="hidden md:table-cell py-2 w-40">
                                 <Input
                                   type="number"
                                   step="0.0001"
@@ -867,7 +868,7 @@ export function FlightPlanEditor() {
                                   style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                                 />
                               </TableCell>
-                              <TableCell className="hidden md:table-cell py-2">
+                              <TableCell className="hidden md:table-cell py-2 w-40">
                                 <Input
                                   type="number"
                                   step="0.0001"
@@ -880,7 +881,7 @@ export function FlightPlanEditor() {
                                   style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                                 />
                               </TableCell>
-                              <TableCell className="py-2 w-24">
+                              <TableCell className="py-2 w-20">
                                 {" "}
                                 {/* Updated to show on mobile */}
                                 <Input
@@ -890,7 +891,7 @@ export function FlightPlanEditor() {
                                     updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
                                   }
                                   onFocus={handleInputFocus}
-                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
+                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full min-w-[80px]"
                                   style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
                                 />
                               </TableCell>
