@@ -400,8 +400,8 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
   const originalCount = waypoints.length
   let simplificationReason = ""
 
-  // If we have fewer than 250 waypoints, just rename them and return
-  if (originalCount <= 250) {
+  // If we have fewer than 248 waypoints, just rename them and return
+  if (originalCount <= 248) {
     const renamedWaypoints = waypoints.map((wp, index) => ({
       ...wp,
       name: String(index + 1).padStart(3, "0"),
@@ -411,21 +411,21 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
       waypoints: renamedWaypoints,
       originalCount,
       simplifiedCount: originalCount,
-      simplificationReason: "No simplification needed (fewer than 250 waypoints)",
+      simplificationReason: "No simplification needed (fewer than 248 waypoints)",
     }
   }
 
   try {
-    // For routes with more than 250 waypoints, we need to simplify
+    // For routes with more than 248 waypoints, we need to simplify
     // We'll ensure a balanced distribution as requested:
-    // - 20% for departure/ground operations
-    // - 60% for en-route
-    // - 20% for arrival/ground operations
+    // - 25% for departure/ground operations
+    // - 50% for en-route
+    // - 25% for arrival/ground operations
 
-    // Calculate the number of waypoints for each segment
-    const maxWaypoints = 250
-    const departureCount = Math.max(Math.floor(maxWaypoints * 0.2), 10)
-    const arrivalCount = Math.max(Math.floor(maxWaypoints * 0.2), 10)
+    // Calculate the number of waypoints for each segment - more balanced allocation
+    const maxWaypoints = 248 // Target 248 instead of 250 to have some buffer
+    const departureCount = Math.max(Math.floor(maxWaypoints * 0.25), 15) // Increased from 20% to 25%
+    const arrivalCount = Math.max(Math.floor(maxWaypoints * 0.25), 15) // Increased from 20% to 25%
     const enRouteCount = maxWaypoints - departureCount - arrivalCount
 
     // console.log(
@@ -433,9 +433,9 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
     // )
 
     // Determine the segments of the flight
-    const departureSegment = waypoints.slice(0, Math.floor(waypoints.length * 0.2))
-    const arrivalSegment = waypoints.slice(Math.floor(waypoints.length * 0.8))
-    const enRouteSegment = waypoints.slice(Math.floor(waypoints.length * 0.2), Math.floor(waypoints.length * 0.8))
+    const departureSegment = waypoints.slice(0, Math.floor(waypoints.length * 0.25))
+    const arrivalSegment = waypoints.slice(Math.floor(waypoints.length * 0.75))
+    const enRouteSegment = waypoints.slice(Math.floor(waypoints.length * 0.25), Math.floor(waypoints.length * 0.75))
 
     // console.log(
     //   `Original segment sizes: Departure=${departureSegment.length}, En-route=${enRouteSegment.length}, Arrival=${arrivalSegment.length}`,
@@ -446,12 +446,12 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
     let simplifiedEnRoute: Waypoint[]
     let simplifiedArrival: Waypoint[]
 
-    // Simplify departure segment - preserve more detail at the beginning
+    // Simplify departure segment - preserve MORE detail at the beginning
     if (departureSegment.length <= departureCount) {
       simplifiedDeparture = departureSegment
     } else {
-      // Use a combination of methods to preserve important points
-      const criticalPoints = identifyCriticalPoints(departureSegment, Math.floor(departureCount * 0.3))
+      // Use a combination of methods to preserve important points - INCREASED from 30% to 60%
+      const criticalPoints = identifyCriticalPoints(departureSegment, Math.floor(departureCount * 0.6))
       const remainingCount = departureCount - criticalPoints.length
       const simplifiedRemaining = douglasPeucker(
         departureSegment.filter((wp) => !criticalPoints.some((cp) => cp.id === wp.id)),
@@ -469,12 +469,12 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
       simplifiedEnRoute = douglasPeucker(enRouteSegment, enRouteCount)
     }
 
-    // Simplify arrival segment - preserve more detail at the end
+    // Simplify arrival segment - preserve MORE detail at the end
     if (arrivalSegment.length <= arrivalCount) {
       simplifiedArrival = arrivalSegment
     } else {
-      // Use a combination of methods to preserve important points
-      const criticalPoints = identifyCriticalPoints(arrivalSegment, Math.floor(arrivalCount * 0.3))
+      // Use a combination of methods to preserve important points - INCREASED from 30% to 60%
+      const criticalPoints = identifyCriticalPoints(arrivalSegment, Math.floor(arrivalCount * 0.6))
       const remainingCount = arrivalCount - criticalPoints.length
       const simplifiedRemaining = douglasPeucker(
         arrivalSegment.filter((wp) => !criticalPoints.some((cp) => cp.id === wp.id)),
@@ -563,7 +563,7 @@ function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
       console.error("Fallback simplification also failed:", fallbackError)
 
       // Last resort: just take evenly spaced points
-      const evenlySampled = selectEvenlySpacedWaypoints(waypoints, 250)
+      const evenlySampled = selectEvenlySpacedWaypoints(waypoints, 248)
 
       const renamedWaypoints = evenlySampled.map((wp, index) => ({
         ...wp,
@@ -608,9 +608,8 @@ function identifyCriticalPoints(waypoints: Waypoint[], maxPoints: number): Waypo
     // Calculate altitude change (using feet, as converted earlier)
     const altChange = Math.abs(next.altitude - prev.altitude)
 
-    // Combined score (normalize turn angle to [0,1] range)
-    // Altitude change is scaled to be comparable to angular change
-    const score = turnAngle / Math.PI + altChange / 10000 // Divide by a larger number for altitude to prevent it from dominating
+    // Combined score - altitude changes are MORE important now
+    const score = turnAngle / Math.PI + altChange / 5000 // Changed from 10000 to 5000 to make altitude changes more significant
 
     importanceScores.push({ waypoint: curr, score })
   }
@@ -663,11 +662,11 @@ function douglasPeucker(points: Waypoint[], targetCount: number): Waypoint[] {
     return points
   }
 
-  // Start with a very small tolerance and increase until we get fewer than targetCount points
-  let tolerance = 0.00001
+  // Start with a SMALLER tolerance for more conservative simplification
+  let tolerance = 0.000005 // Changed from 0.00001 to 0.000005 (half the previous value)
   let simplified = points
   let iterations = 0
-  const maxIterations = 20 // Prevent infinite loops
+  const maxIterations = 25 // Increased from 20 to allow more iterations
 
   while (simplified.length > targetCount && tolerance < 1 && iterations < maxIterations) {
     try {
