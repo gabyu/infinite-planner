@@ -387,13 +387,16 @@ function selectWaypointsByImportance(
 
     let phaseTarget: number
     if (phase.type === "ground") {
-      // Keep all ground waypoints (taxi routes)
-      phaseTarget = phaseLength
-    } else if (phase.type === "climb" || phase.type === "descent") {
-      // Allocate 30% more for climb/descent
+      // Keep 50% of ground waypoints for both departure and arrival taxi
+      phaseTarget = Math.ceil(phaseLength * 0.5)
+    } else if (phase.type === "descent") {
+      // Allocate MORE for descent - 70% more than proportional to capture entire approach
+      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.7)
+    } else if (phase.type === "climb") {
+      // Allocate 30% more for climb
       phaseTarget = Math.ceil(phaseRatio * targetCount * 1.3)
     } else {
-      // Cruise can be simplified more
+      // Cruise can be simplified more (20% less)
       phaseTarget = Math.floor(phaseRatio * targetCount * 0.8)
     }
 
@@ -415,24 +418,13 @@ function selectWaypointsByImportance(
     const phaseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
     const phaseTarget = allocation.get(`${phase.start}-${phase.end}`) || 0
 
-    if (phase.type === "ground") {
-      // Keep all ground waypoints
-      for (const item of phaseWaypoints) {
-        if (!selectedIndices.has(item.index)) {
-          selected.push(item.waypoint)
-          selectedIndices.add(item.index)
-        }
-      }
-    } else {
-      // Sort by importance and take top N
-      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
-      const toTake = Math.min(phaseTarget, sorted.length)
+    const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
+    const toTake = Math.min(phaseTarget, sorted.length)
 
-      for (let i = 0; i < toTake; i++) {
-        if (!selectedIndices.has(sorted[i].index)) {
-          selected.push(sorted[i].waypoint)
-          selectedIndices.add(sorted[i].index)
-        }
+    for (let i = 0; i < toTake; i++) {
+      if (!selectedIndices.has(sorted[i].index)) {
+        selected.push(sorted[i].waypoint)
+        selectedIndices.add(sorted[i].index)
       }
     }
   }
