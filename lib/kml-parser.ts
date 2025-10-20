@@ -418,13 +418,29 @@ function selectWaypointsByImportance(
     const phaseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
     const phaseTarget = allocation.get(`${phase.start}-${phase.end}`) || 0
 
-    const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
-    const toTake = Math.min(phaseTarget, sorted.length)
+    // Different selection strategy for ground vs airborne
+    if (phase.type === "ground") {
+      // For ground waypoints, use evenly spaced selection for cleaner reduction
+      const step = Math.max(2, Math.ceil(phaseWaypoints.length / phaseTarget))
+      let count = 0
 
-    for (let i = 0; i < toTake; i++) {
-      if (!selectedIndices.has(sorted[i].index)) {
-        selected.push(sorted[i].waypoint)
-        selectedIndices.add(sorted[i].index)
+      for (let i = 0; i < phaseWaypoints.length && count < phaseTarget; i += step) {
+        if (!selectedIndices.has(phaseWaypoints[i].index)) {
+          selected.push(phaseWaypoints[i].waypoint)
+          selectedIndices.add(phaseWaypoints[i].index)
+          count++
+        }
+      }
+    } else {
+      // For airborne waypoints, use importance-based selection
+      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
+      const toTake = Math.min(phaseTarget, sorted.length)
+
+      for (let i = 0; i < toTake; i++) {
+        if (!selectedIndices.has(sorted[i].index)) {
+          selected.push(sorted[i].waypoint)
+          selectedIndices.add(sorted[i].index)
+        }
       }
     }
   }
@@ -453,7 +469,15 @@ function enforceMinimumDistance(waypoints: Waypoint[]): Waypoint[] {
       continue
     }
 
-    // Check distance
+    // Check altitude change - if significant, ALWAYS keep regardless of horizontal distance
+    const altChange = Math.abs(curr.altitude - prev.altitude)
+    if (altChange > 1000) {
+      // More than 1000ft altitude change
+      filtered.push(curr)
+      continue
+    }
+
+    // Only check horizontal distance if altitude change is small
     const distance = calculateDistanceNM(prev.lat, prev.lng, curr.lat, curr.lng)
 
     if (distance >= MIN_AIRBORNE_DISTANCE_NM) {
