@@ -418,7 +418,7 @@ function selectWaypointsByImportance(
     const phaseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
     const phaseTarget = allocation.get(`${phase.start}-${phase.end}`) || 0
 
-    // Different selection strategy for ground vs airborne
+    // Different selection strategy for each phase type
     if (phase.type === "ground") {
       // For ground waypoints, use evenly spaced selection for cleaner reduction
       const step = Math.max(2, Math.ceil(phaseWaypoints.length / phaseTarget))
@@ -431,8 +431,39 @@ function selectWaypointsByImportance(
           count++
         }
       }
+    } else if (phase.type === "descent") {
+      // For descent, use altitude-based even distribution to avoid gaps
+      // Split into two altitude bands for better distribution
+      const above10k = phaseWaypoints.filter((wp) => wp.waypoint.altitude >= 10000)
+      const below10k = phaseWaypoints.filter((wp) => wp.waypoint.altitude < 10000)
+
+      // Allocate 40% to above 10k, 60% to below 10k (approach is more critical)
+      const above10kTarget = Math.ceil(phaseTarget * 0.4)
+      const below10kTarget = Math.ceil(phaseTarget * 0.6)
+
+      // Select evenly from above 10k
+      if (above10k.length > 0) {
+        const step = Math.max(1, Math.floor(above10k.length / above10kTarget))
+        for (let i = 0; i < above10k.length; i += step) {
+          if (!selectedIndices.has(above10k[i].index)) {
+            selected.push(above10k[i].waypoint)
+            selectedIndices.add(above10k[i].index)
+          }
+        }
+      }
+
+      // Select evenly from below 10k
+      if (below10k.length > 0) {
+        const step = Math.max(1, Math.floor(below10k.length / below10kTarget))
+        for (let i = 0; i < below10k.length; i += step) {
+          if (!selectedIndices.has(below10k[i].index)) {
+            selected.push(below10k[i].waypoint)
+            selectedIndices.add(below10k[i].index)
+          }
+        }
+      }
     } else {
-      // For airborne waypoints, use importance-based selection
+      // For climb and cruise, use importance-based selection
       const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
       const toTake = Math.min(phaseTarget, sorted.length)
 
