@@ -329,7 +329,7 @@ function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
 interface FlightPhase {
   start: number
   end: number
-  type: "ground" | "climb" | "cruise" | "descent"
+  type: "ground" | "initial_climb" | "climb" | "cruise" | "descent" | "approach" | "final"
 }
 
 function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
@@ -351,7 +351,21 @@ function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
     } else {
       // Check if climbing or descending
       const nextAlt = i < waypoints.length - 1 ? waypoints[i + 1].altitude : wp.altitude
-      phaseType = nextAlt > wp.altitude ? "climb" : "descent"
+      const isClimbing = nextAlt > wp.altitude
+
+      if (isClimbing) {
+        // Split climb into initial (below 10k) and high altitude
+        phaseType = wp.altitude < 10000 ? "initial_climb" : "climb"
+      } else {
+        // Split descent into high altitude, approach, and final
+        if (wp.altitude >= 10000) {
+          phaseType = "descent"
+        } else if (wp.altitude >= 3000) {
+          phaseType = "approach"
+        } else {
+          phaseType = "final"
+        }
+      }
     }
 
     if (!currentPhase || currentPhase.type !== phaseType) {
@@ -387,16 +401,25 @@ function selectWaypointsByImportance(
 
     let phaseTarget: number
     if (phase.type === "ground") {
-      // Keep 50% of ground waypoints for both departure and arrival taxi
+      // Keep 50% of ground waypoints
       phaseTarget = Math.ceil(phaseLength * 0.5)
-    } else if (phase.type === "descent") {
-      // Allocate MORE for descent - 70% more than proportional to capture entire approach
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.7)
+    } else if (phase.type === "initial_climb") {
+      // Initial climb is CRITICAL - keep 80% to preserve turns and climb profile
+      phaseTarget = Math.ceil(phaseLength * 0.8)
     } else if (phase.type === "climb") {
-      // Allocate 30% more for climb
+      // High altitude climb - less critical
+      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.2)
+    } else if (phase.type === "final") {
+      // Final approach is CRITICAL - keep 80% to preserve pattern and turns
+      phaseTarget = Math.ceil(phaseLength * 0.8)
+    } else if (phase.type === "approach") {
+      // Approach - important but can be simplified somewhat
+      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.5)
+    } else if (phase.type === "descent") {
+      // High altitude descent
       phaseTarget = Math.ceil(phaseRatio * targetCount * 1.3)
     } else {
-      // Cruise can be simplified more (20% less)
+      // Cruise can be simplified more
       phaseTarget = Math.floor(phaseRatio * targetCount * 0.8)
     }
 
@@ -420,7 +443,7 @@ function selectWaypointsByImportance(
 
     // Different selection strategy for each phase type
     if (phase.type === "ground") {
-      // For ground waypoints, use evenly spaced selection for cleaner reduction
+      // For ground waypoints, use evenly spaced selection
       const step = Math.max(2, Math.ceil(phaseWaypoints.length / phaseTarget))
       let count = 0
 
@@ -431,39 +454,40 @@ function selectWaypointsByImportance(
           count++
         }
       }
-    } else if (phase.type === "descent") {
-      // For descent, use altitude-based even distribution to avoid gaps
-      // Split into two altitude bands for better distribution
-      const above10k = phaseWaypoints.filter((wp) => wp.waypoint.altitude >= 10000)
-      const below10k = phaseWaypoints.filter((wp) => wp.waypoint.altitude < 10000)
+    } else if (phase.type === "initial_climb" || phase.type === "final") {
+      // CRITICAL phases - use importance scoring to preserve turns
+      // Sort by importance and take the most important waypoints
+      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
+      const toTake = Math.min(phaseTarget, sorted.length)
 
-      // Allocate 40% to above 10k, 60% to below 10k (approach is more critical)
-      const above10kTarget = Math.ceil(phaseTarget * 0.4)
-      const below10kTarget = Math.ceil(phaseTarget * 0.6)
-
-      // Select evenly from above 10k
-      if (above10k.length > 0) {
-        const step = Math.max(1, Math.floor(above10k.length / above10kTarget))
-        for (let i = 0; i < above10k.length; i += step) {
-          if (!selectedIndices.has(above10k[i].index)) {
-            selected.push(above10k[i].waypoint)
-            selectedIndices.add(above10k[i].index)
-          }
+      for (let i = 0; i < toTake; i++) {
+        if (!selectedIndices.has(sorted[i].index)) {
+          selected.push(sorted[i].waypoint)
+          selectedIndices.add(sorted[i].index)
         }
       }
+    } else if (phase.type === "approach") {
+      // Approach - use importance scoring but with all waypoints
+      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
+      const toTake = Math.min(phaseTarget, sorted.length)
 
-      // Select evenly from below 10k
-      if (below10k.length > 0) {
-        const step = Math.max(1, Math.floor(below10k.length / below10kTarget))
-        for (let i = 0; i < below10k.length; i += step) {
-          if (!selectedIndices.has(below10k[i].index)) {
-            selected.push(below10k[i].waypoint)
-            selectedIndices.add(below10k[i].index)
-          }
+      for (let i = 0; i < toTake; i++) {
+        if (!selectedIndices.has(sorted[i].index)) {
+          selected.push(sorted[i].waypoint)
+          selectedIndices.add(sorted[i].index)
+        }
+      }
+    } else if (phase.type === "descent") {
+      // High altitude descent - use even spacing by altitude
+      const step = Math.max(1, Math.floor(phaseWaypoints.length / phaseTarget))
+      for (let i = 0; i < phaseWaypoints.length; i += step) {
+        if (!selectedIndices.has(phaseWaypoints[i].index)) {
+          selected.push(phaseWaypoints[i].waypoint)
+          selectedIndices.add(phaseWaypoints[i].index)
         }
       }
     } else {
-      // For climb and cruise, use importance-based selection
+      // Climb and cruise - use importance-based selection
       const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
       const toTake = Math.min(phaseTarget, sorted.length)
 
