@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { MapPin } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
+import { VideoSelector } from "@/components/video-selector"
 
 export default function HowItWorksPage() {
   return (
@@ -80,8 +81,12 @@ export default function HowItWorksPage() {
               flight plans that work seamlessly with Infinite Flight's 250-waypoint limitation.
             </p>
 
+            {/* Video Tutorials */}
+            <h2 className="text-3xl font-bold mb-6">Video Tutorials</h2>
+            <VideoSelector />
+
             {/* Step by Step Process */}
-            <h2 className="text-3xl font-bold mb-6">Step-by-Step Process</h2>
+            <h2 className="text-3xl font-bold mb-6 mt-12">Step-by-Step Process</h2>
 
             <h3 className="text-2xl font-semibold mb-4">1. Obtaining Your KML File</h3>
             <p className="mb-4">
@@ -219,21 +224,6 @@ export default function HowItWorksPage() {
                 <strong>Path Smoothing:</strong> Optimizes route while preserving shape
               </li>
             </ul>
-
-            {/* Video Tutorial */}
-            <h2 className="text-3xl font-bold mb-6">Video Tutorial</h2>
-            <p className="mb-4">Watch our comprehensive tutorial to see Infinite Planner in action:</p>
-
-            <div className="relative w-full mb-8" style={{ paddingBottom: "56.25%" }}>
-              <iframe
-                className="absolute top-0 left-0 w-full h-full rounded-lg"
-                src="https://www.youtube.com/embed/1PxZdh3p6Xg"
-                title="How to Use Infinite Planner - Complete Tutorial"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
 
             {/* Tips and Best Practices */}
             <h2 className="text-3xl font-bold mb-6">Tips and Best Practices</h2>
