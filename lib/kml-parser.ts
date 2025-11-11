@@ -27,6 +27,9 @@ const MIN_AIRBORNE_DISTANCE_NM = 0.5
 // Altitude threshold to consider a waypoint as "on ground" (in feet)
 const GROUND_ALTITUDE_THRESHOLD = 1000
 
+// Base density: ~1 waypoint per 6 NM for turns
+const TURN_WAYPOINT_DENSITY = 0.15
+
 export function parseKML(
   kmlString: string,
   filename?: string,
@@ -223,7 +226,6 @@ function calculateTurnAngle(prev: Waypoint, curr: Waypoint, next: Waypoint): num
   return turnAngle
 }
 
-// Calculate importance score for a waypoint
 function calculateImportance(prev: Waypoint, curr: Waypoint, next: Waypoint, index: number, total: number): number {
   // Always keep first and last waypoints
   if (index === 0 || index === total - 1) {
@@ -232,21 +234,29 @@ function calculateImportance(prev: Waypoint, curr: Waypoint, next: Waypoint, ind
 
   let score = 0
 
-  // Turn angle (0 to π) - normalized to 0-1
+  // Turn angle (0 to π) - highly weighted for capturing turns
   const turnAngle = calculateTurnAngle(prev, curr, next)
-  score += turnAngle / Math.PI
+  const turnAngleNormalized = turnAngle / Math.PI // 0 to 1
 
-  // Altitude change - normalized
+  // Significant turns (>15 degrees) get exponential boost
+  if (turnAngleNormalized > 0.083) {
+    // ~15 degrees
+    score += Math.pow(turnAngleNormalized, 0.8) * 3.0
+  } else {
+    score += turnAngleNormalized
+  }
+
+  // Altitude change - highly important for descent/climb visualization
   const altChange = Math.abs(next.altitude - prev.altitude)
-  score += altChange / 10000
+  score += Math.min(altChange / 5000, 2.0) // Normalized altitude change
 
-  // Distance to next point - prefer points that are well-spaced
+  // Distance to next point - prefer well-distributed waypoints
   const distance = calculateDistanceNM(curr.lat, curr.lng, next.lat, next.lng)
-  score += Math.min(distance / 10, 0.5) // Cap distance bonus
+  score += Math.min(distance / 5, 1.0) // Cap distance bonus
 
-  // Ground operations bonus - keep more ground waypoints
+  // Ground operations bonus
   if (isOnGround(curr)) {
-    score += 2.0
+    score += 1.5
   }
 
   return score
@@ -401,26 +411,21 @@ function selectWaypointsByImportance(
 
     let phaseTarget: number
     if (phase.type === "ground") {
-      // Keep 50% of ground waypoints
-      phaseTarget = Math.ceil(phaseLength * 0.5)
+      phaseTarget = Math.ceil(phaseLength * 0.27)
     } else if (phase.type === "initial_climb") {
-      // Initial climb is CRITICAL - keep 80% to preserve turns and climb profile
-      phaseTarget = Math.ceil(phaseLength * 0.8)
+      phaseTarget = Math.ceil(phaseLength * 0.25)
     } else if (phase.type === "climb") {
-      // High altitude climb - less critical
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.2)
+      // High altitude climb
+      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.0)
     } else if (phase.type === "final") {
-      // Final approach is CRITICAL - keep 80% to preserve pattern and turns
-      phaseTarget = Math.ceil(phaseLength * 0.8)
+      phaseTarget = Math.ceil(phaseLength * 0.25)
     } else if (phase.type === "approach") {
-      // Approach - important but can be simplified somewhat
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.5)
+      phaseTarget = Math.ceil(phaseLength * 0.25)
     } else if (phase.type === "descent") {
-      // High altitude descent
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.3)
+      phaseTarget = Math.ceil(phaseLength * 0.25)
     } else {
-      // Cruise can be simplified more
-      phaseTarget = Math.floor(phaseRatio * targetCount * 0.8)
+      // Cruise can be simplified
+      phaseTarget = Math.floor(phaseRatio * targetCount * 0.6)
     }
 
     allocation.set(`${phase.start}-${phase.end}`, phaseTarget)
@@ -441,22 +446,17 @@ function selectWaypointsByImportance(
     const phaseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
     const phaseTarget = allocation.get(`${phase.start}-${phase.end}`) || 0
 
-    // Different selection strategy for each phase type
     if (phase.type === "ground") {
-      // For ground waypoints, use evenly spaced selection
-      const step = Math.max(2, Math.ceil(phaseWaypoints.length / phaseTarget))
-      let count = 0
-
-      for (let i = 0; i < phaseWaypoints.length && count < phaseTarget; i += step) {
-        if (!selectedIndices.has(phaseWaypoints[i].index)) {
-          selected.push(phaseWaypoints[i].waypoint)
-          selectedIndices.add(phaseWaypoints[i].index)
-          count++
-        }
-      }
-    } else if (phase.type === "initial_climb" || phase.type === "final") {
-      // CRITICAL phases - use importance scoring to preserve turns
-      // Sort by importance and take the most important waypoints
+      // Ground: Keep first waypoint (pushback location)
+      // and select runway turns by importance
+      selectGroundWaypoints(phaseWaypoints, phaseTarget, selected, selectedIndices)
+    } else if (
+      phase.type === "initial_climb" ||
+      phase.type === "final" ||
+      phase.type === "approach" ||
+      phase.type === "descent"
+    ) {
+      // This ensures we get 3-4 waypoints for 90° turns and 5-6 for 180° turns
       const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
       const toTake = Math.min(phaseTarget, sorted.length)
 
@@ -464,26 +464,6 @@ function selectWaypointsByImportance(
         if (!selectedIndices.has(sorted[i].index)) {
           selected.push(sorted[i].waypoint)
           selectedIndices.add(sorted[i].index)
-        }
-      }
-    } else if (phase.type === "approach") {
-      // Approach - use importance scoring but with all waypoints
-      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
-      const toTake = Math.min(phaseTarget, sorted.length)
-
-      for (let i = 0; i < toTake; i++) {
-        if (!selectedIndices.has(sorted[i].index)) {
-          selected.push(sorted[i].waypoint)
-          selectedIndices.add(sorted[i].index)
-        }
-      }
-    } else if (phase.type === "descent") {
-      // High altitude descent - use even spacing by altitude
-      const step = Math.max(1, Math.floor(phaseWaypoints.length / phaseTarget))
-      for (let i = 0; i < phaseWaypoints.length; i += step) {
-        if (!selectedIndices.has(phaseWaypoints[i].index)) {
-          selected.push(phaseWaypoints[i].waypoint)
-          selectedIndices.add(phaseWaypoints[i].index)
         }
       }
     } else {
@@ -506,6 +486,33 @@ function selectWaypointsByImportance(
     const indexB = scoredWaypoints.findIndex((sw) => sw.waypoint.id === b.id)
     return indexA - indexB
   })
+}
+
+function selectGroundWaypoints(
+  phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
+  phaseTarget: number,
+  selected: Waypoint[],
+  selectedIndices: Set<number>,
+): void {
+  if (phaseWaypoints.length === 0) return
+
+  // Always keep first waypoint (pushback location)
+  if (!selectedIndices.has(phaseWaypoints[0].index)) {
+    selected.push(phaseWaypoints[0].waypoint)
+    selectedIndices.add(phaseWaypoints[0].index)
+  }
+
+  // For remaining waypoints, select by importance to capture runway turns
+  const remaining = phaseWaypoints.slice(1)
+  const sorted = remaining.sort((a, b) => b.score - a.score)
+  const toTake = Math.max(0, phaseTarget - 1) // -1 because we already kept first
+
+  for (let i = 0; i < Math.min(toTake, sorted.length); i++) {
+    if (!selectedIndices.has(sorted[i].index)) {
+      selected.push(sorted[i].waypoint)
+      selectedIndices.add(sorted[i].index)
+    }
+  }
 }
 
 // Enforce minimum distance between airborne waypoints
