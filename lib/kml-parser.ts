@@ -459,10 +459,9 @@ function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
   const phases: FlightPhase[] = []
   let currentPhase: FlightPhase | null = null
 
-  // Find max altitude
+  // Find max altitude to determine cruise phase
   const maxAltitude = Math.max(...waypoints.map((wp) => wp.altitude))
-
-  const cruiseAltitudeThreshold = maxAltitude * 0.85
+  const cruiseAltitude = maxAltitude * 0.9 // Consider 90% of max as cruise
 
   for (let i = 0; i < waypoints.length; i++) {
     const wp = waypoints[i]
@@ -470,7 +469,7 @@ function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
 
     if (wp.altitude < GROUND_ALTITUDE_THRESHOLD) {
       phaseType = "ground"
-    } else if (wp.altitude >= cruiseAltitudeThreshold) {
+    } else if (wp.altitude >= cruiseAltitude) {
       phaseType = "cruise"
     } else {
       // Check if climbing or descending
@@ -481,8 +480,8 @@ function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
         // Split climb into initial (below 10k) and high altitude
         phaseType = wp.altitude < 10000 ? "initial_climb" : "climb"
       } else {
-        // Split descent into phases
-        if (wp.altitude >= 15000) {
+        // Split descent into high altitude, approach, and final
+        if (wp.altitude >= 12000) {
           phaseType = "descent"
         } else if (wp.altitude >= 3000) {
           phaseType = "approach"
@@ -531,7 +530,7 @@ function selectWaypointsByImportance(
     } else if (phase.type === "climb") {
       phaseTarget = Math.ceil(phaseRatio * targetCount * 0.8)
     } else if (phase.type === "descent") {
-      phaseTarget = Math.ceil(phaseLength * 0.4)
+      phaseTarget = Math.ceil(phaseLength * 0.18)
     } else if (phase.type === "approach") {
       phaseTarget = Math.ceil(phaseLength * 0.55)
     } else if (phase.type === "final") {
