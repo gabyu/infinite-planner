@@ -535,6 +535,8 @@ function selectWaypointsByImportance(
       phaseTarget = Math.ceil(phaseLength * 0.55)
     } else if (phase.type === "final") {
       phaseTarget = Math.ceil(phaseLength * 0.75)
+    } else if (phase.type === "cruise") {
+      phaseTarget = calculateCruiseWaypoints(scoredWaypoints, phase)
     } else {
       phaseTarget = Math.floor(phaseRatio * targetCount * 0.6)
     }
@@ -561,6 +563,8 @@ function selectWaypointsByImportance(
       // Ground: Keep first waypoint (pushback location)
       // and select runway turns by importance
       selectGroundWaypoints(phaseWaypoints, phaseTarget, selected, selectedIndices)
+    } else if (phase.type === "cruise") {
+      selectCruiseWaypoints(phaseWaypoints, selected, selectedIndices)
     } else if (
       phase.type === "initial_climb" ||
       phase.type === "final" ||
@@ -578,7 +582,7 @@ function selectWaypointsByImportance(
         }
       }
     } else {
-      // Climb and cruise - use importance-based selection
+      // Climb and other phases - use importance-based selection
       const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
       const toTake = Math.min(phaseTarget, sorted.length)
 
@@ -599,30 +603,94 @@ function selectWaypointsByImportance(
   })
 }
 
-function selectGroundWaypoints(
+function calculateCruiseWaypoints(
+  scoredWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
+  phase: FlightPhase,
+): number {
+  const cruiseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
+  if (cruiseWaypoints.length <= 1) return 0
+
+  let totalDistance = 0
+  for (let i = 0; i < cruiseWaypoints.length - 1; i++) {
+    const current = cruiseWaypoints[i].waypoint
+    const next = cruiseWaypoints[i + 1].waypoint
+    totalDistance += calculateDistanceNM(current.lat, current.lng, next.lat, next.lng)
+  }
+
+  // Aim for 1 waypoint every 50 NM
+  const targetSpacing = 50
+  const waypointsNeeded = Math.max(2, Math.ceil(totalDistance / targetSpacing))
+  return waypointsNeeded
+}
+
+function selectCruiseWaypoints(
   phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  phaseTarget: number,
   selected: Waypoint[],
   selectedIndices: Set<number>,
 ): void {
-  if (phaseWaypoints.length === 0) return
+  if (phaseWaypoints.length <= 2) {
+    // If very few waypoints, take them all
+    for (const item of phaseWaypoints) {
+      if (!selectedIndices.has(item.index)) {
+        selected.push(item.waypoint)
+        selectedIndices.add(item.index)
+      }
+    }
+    return
+  }
 
-  // Always keep first waypoint (pushback location)
+  // Always take first waypoint
   if (!selectedIndices.has(phaseWaypoints[0].index)) {
     selected.push(phaseWaypoints[0].waypoint)
     selectedIndices.add(phaseWaypoints[0].index)
   }
 
-  // For remaining waypoints, select by importance to capture runway turns
-  const remaining = phaseWaypoints.slice(1)
-  const sorted = remaining.sort((a, b) => b.score - a.score)
-  const toTake = Math.max(0, phaseTarget - 1) // -1 because we already kept first
+  // Calculate cumulative distances for even spacing
+  const waypoints = phaseWaypoints.map((item) => item.waypoint)
+  const distances: number[] = [0]
 
-  for (let i = 0; i < Math.min(toTake, sorted.length); i++) {
-    if (!selectedIndices.has(sorted[i].index)) {
-      selected.push(sorted[i].waypoint)
-      selectedIndices.add(sorted[i].index)
+  for (let i = 1; i < waypoints.length; i++) {
+    const distance =
+      distances[i - 1] +
+      calculateDistanceNM(waypoints[i - 1].lat, waypoints[i - 1].lng, waypoints[i].lat, waypoints[i].lng)
+    distances.push(distance)
+  }
+
+  const totalDistance = distances[distances.length - 1]
+  if (totalDistance === 0) return
+
+  // Target 1 waypoint every 50 NM
+  const targetSpacing = 50
+  const numWaypoints = Math.max(2, Math.ceil(totalDistance / targetSpacing))
+  const step = totalDistance / (numWaypoints - 1)
+
+  // Select waypoints at regular distance intervals
+  for (let i = 1; i < numWaypoints - 1; i++) {
+    const targetDistance = step * i
+    let closestIndex = 0
+    let closestDiff = Math.abs(distances[0] - targetDistance)
+
+    // Find waypoint closest to target distance
+    for (let j = 1; j < distances.length; j++) {
+      const diff = Math.abs(distances[j] - targetDistance)
+      if (diff < closestDiff) {
+        closestDiff = diff
+        closestIndex = j
+      }
     }
+
+    const waypoint = phaseWaypoints[closestIndex]
+    if (!selectedIndices.has(waypoint.index)) {
+      selected.push(waypoint.waypoint)
+      selectedIndices.add(waypoint.index)
+    }
+  }
+
+  // Always take last waypoint
+  const lastItem = phaseWaypoints[phaseWaypoints.length - 1]
+  if (!selectedIndices.has(lastItem.index)) {
+    selected.push(lastItem.waypoint)
+    selectedIndices.add(lastItem.index)
   }
 }
 
@@ -655,4 +723,32 @@ function trimToLimit(waypoints: Waypoint[], limit: number): Waypoint[] {
       return indexA - indexB
     })
     .map((item) => item.waypoint)
+}
+
+// Select ground waypoints by importance
+function selectGroundWaypoints(
+  phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
+  phaseTarget: number,
+  selected: Waypoint[],
+  selectedIndices: Set<number>,
+): void {
+  if (phaseWaypoints.length === 0) return
+
+  // Always keep first waypoint (pushback location)
+  if (!selectedIndices.has(phaseWaypoints[0].index)) {
+    selected.push(phaseWaypoints[0].waypoint)
+    selectedIndices.add(phaseWaypoints[0].index)
+  }
+
+  // For remaining waypoints, select by importance to capture runway turns
+  const remaining = phaseWaypoints.slice(1)
+  const sorted = remaining.sort((a, b) => b.score - a.score)
+  const toTake = Math.max(0, phaseTarget - 1) // -1 because we already kept first
+
+  for (let i = 0; i < Math.min(toTake, sorted.length); i++) {
+    if (!selectedIndices.has(sorted[i].index)) {
+      selected.push(sorted[i].waypoint)
+      selectedIndices.add(sorted[i].index)
+    }
+  }
 }
