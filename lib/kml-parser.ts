@@ -18,6 +18,15 @@ interface SimplificationResult {
   source?: string
 }
 
+interface SimplificationAttempt {
+  waypoints: Waypoint[]
+  count: number
+  score: number // How close to target (230)
+  attempt: number
+  minDistance: number
+  importanceThreshold: number
+}
+
 // Conversion factor from meters to feet
 const METERS_TO_FEET = 3.28084
 
@@ -276,42 +285,58 @@ function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
   }
 
   try {
-    // Step 1: Identify flight phases
-    const phases = identifyFlightPhases(waypoints)
+    const attempts: SimplificationAttempt[] = []
+    const target = 230
+    const minTarget = 220
+    const maxTarget = 240
 
-    // Step 2: Score each waypoint by importance
-    const scoredWaypoints = waypoints.map((wp, index, arr) => {
-      if (index === 0 || index === arr.length - 1) {
-        return { waypoint: wp, score: Number.MAX_VALUE, index }
+    // Attempt 1: Standard parameters
+    attempts.push(attemptSimplification(waypoints, 1, 0.5, 0.1))
+
+    // Attempt 2: More lenient (lower min distance)
+    attempts.push(attemptSimplification(waypoints, 2, 0.35, 0.08))
+
+    // Attempt 3: Most lenient (even lower min distance)
+    attempts.push(attemptSimplification(waypoints, 3, 0.2, 0.05))
+
+    // Attempt 4: Aggressive phase allocation (more waypoints to critical phases)
+    attempts.push(attemptSimplification(waypoints, 4, 0.3, 0.06))
+
+    // Select best attempt (closest to target in range)
+    let bestAttempt = attempts[0]
+    let bestScore = Number.MAX_VALUE
+
+    for (const attempt of attempts) {
+      let score: number
+
+      if (attempt.count >= minTarget && attempt.count <= maxTarget) {
+        // Perfect range - score by distance from exact target
+        score = Math.abs(attempt.count - target)
+      } else if (attempt.count < minTarget) {
+        // Below range - penalize heavily (2x multiplier)
+        score = (minTarget - attempt.count) * 2
+      } else {
+        // Above range - penalize moderately
+        score = (attempt.count - maxTarget) * 1.5
       }
 
-      const prev = arr[index - 1]
-      const next = arr[index + 1]
-      const score = calculateImportance(prev, wp, next, index, arr.length)
+      console.log(`[v0] Attempt ${attempt.attempt}: ${attempt.count} waypoints (score: ${score.toFixed(2)})`)
 
-      return { waypoint: wp, score, index }
-    })
-
-    // Step 3: Select waypoints based on score and phase
-    const targetCount = 245 // Leave small buffer
-    const selected = selectWaypointsByImportance(scoredWaypoints, phases, targetCount)
-
-    // Step 4: Enforce minimum distance between airborne waypoints
-    const filtered = enforceMinimumDistance(selected)
-
-    // Step 5: Final check - if still over limit, trim by importance
-    let final = filtered
-    if (final.length > 248) {
-      final = trimToLimit(final, 248)
+      if (score < bestScore) {
+        bestScore = score
+        bestAttempt = attempt
+      }
     }
 
+    console.log(`[v0] Selected attempt ${bestAttempt.attempt} with ${bestAttempt.count} waypoints`)
+
     // Rename waypoints sequentially
-    const renamedWaypoints = final.map((wp, index) => ({
+    const renamedWaypoints = bestAttempt.waypoints.map((wp, index) => ({
       ...wp,
       name: String(index + 1).padStart(3, "0"),
     }))
 
-    const simplificationReason = `Simplified from ${originalCount} to ${renamedWaypoints.length} waypoints using importance-based selection with minimum distance enforcement`
+    const simplificationReason = `Simplified from ${originalCount} to ${renamedWaypoints.length} waypoints using multi-attempt importance-based selection`
 
     return {
       waypoints: renamedWaypoints,
@@ -323,7 +348,7 @@ function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
     console.error("Error during simplification:", error)
 
     // Fallback: evenly spaced selection
-    const step = Math.floor(originalCount / 245)
+    const step = Math.floor(originalCount / 230)
     const fallback = waypoints.filter((_, i) => i === 0 || i === originalCount - 1 || i % step === 0)
 
     return {
@@ -333,6 +358,94 @@ function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
       simplificationReason: `Fallback simplification from ${originalCount} to ${fallback.length} waypoints`,
     }
   }
+}
+
+function attemptSimplification(
+  waypoints: Waypoint[],
+  attemptNumber: number,
+  minDistanceMultiplier: number,
+  importanceThreshold: number,
+): SimplificationAttempt {
+  // Identify phases
+  const phases = identifyFlightPhases(waypoints)
+
+  // Score waypoints
+  const scoredWaypoints = waypoints.map((wp, index, arr) => {
+    if (index === 0 || index === arr.length - 1) {
+      return { waypoint: wp, score: Number.MAX_VALUE, index }
+    }
+
+    const prev = arr[index - 1]
+    const next = arr[index + 1]
+    const score = calculateImportance(prev, wp, next, index, arr.length)
+
+    return { waypoint: wp, score, index }
+  })
+
+  // Select waypoints - aim for 235 to give buffer
+  const targetCount = 235
+  const selected = selectWaypointsByImportance(scoredWaypoints, phases, targetCount)
+
+  // Enforce minimum distance with custom multiplier
+  const filtered = enforceMinimumDistanceWithParams(selected, minDistanceMultiplier, importanceThreshold)
+
+  // Trim if needed
+  let final = filtered
+  if (final.length > 248) {
+    final = trimToLimit(final, 248)
+  }
+
+  return {
+    waypoints: final,
+    count: final.length,
+    score: 0, // Calculated in caller
+    attempt: attemptNumber,
+    minDistance: minDistanceMultiplier,
+    importanceThreshold: importanceThreshold,
+  }
+}
+
+function enforceMinimumDistanceWithParams(
+  waypoints: Waypoint[],
+  minDistanceMultiplier: number,
+  importanceThreshold: number,
+): Waypoint[] {
+  if (waypoints.length <= 2) return waypoints
+
+  const filtered: Waypoint[] = [waypoints[0]] // Always keep first
+
+  for (let i = 1; i < waypoints.length - 1; i++) {
+    const prev = filtered[filtered.length - 1]
+    const curr = waypoints[i]
+
+    // If on ground, always keep
+    if (isOnGround(curr) || isOnGround(prev)) {
+      filtered.push(curr)
+      continue
+    }
+
+    // Base leg zone: more lenient
+    const isBaseLegZone = curr.altitude >= 3000 && curr.altitude <= 6000
+    const minDistance = isBaseLegZone ? 0.2 * minDistanceMultiplier : 0.5 * minDistanceMultiplier
+
+    // Check altitude change
+    const altChange = Math.abs(curr.altitude - prev.altitude)
+    const minAltChange = isBaseLegZone ? 150 : 800
+
+    if (altChange > minAltChange) {
+      filtered.push(curr)
+      continue
+    }
+
+    // Check distance
+    const distance = calculateDistanceNM(prev.lat, prev.lng, curr.lat, curr.lng)
+    if (distance >= minDistance) {
+      filtered.push(curr)
+    }
+  }
+
+  filtered.push(waypoints[waypoints.length - 1])
+  return filtered
 }
 
 // Identify flight phases based on altitude
@@ -419,9 +532,9 @@ function selectWaypointsByImportance(
     } else if (phase.type === "descent") {
       phaseTarget = Math.ceil(phaseLength * 0.18)
     } else if (phase.type === "approach") {
-      phaseTarget = Math.ceil(phaseLength * 0.4)
+      phaseTarget = Math.ceil(phaseLength * 0.55)
     } else if (phase.type === "final") {
-      phaseTarget = Math.ceil(phaseLength * 0.45)
+      phaseTarget = Math.ceil(phaseLength * 0.75)
     } else {
       phaseTarget = Math.floor(phaseRatio * targetCount * 0.6)
     }
@@ -511,45 +624,6 @@ function selectGroundWaypoints(
       selectedIndices.add(sorted[i].index)
     }
   }
-}
-
-// Enforce minimum distance between airborne waypoints
-function enforceMinimumDistance(waypoints: Waypoint[]): Waypoint[] {
-  if (waypoints.length <= 2) return waypoints
-
-  const filtered: Waypoint[] = [waypoints[0]] // Always keep first
-
-  for (let i = 1; i < waypoints.length - 1; i++) {
-    const prev = filtered[filtered.length - 1]
-    const curr = waypoints[i]
-
-    // If on ground, always keep
-    if (isOnGround(curr) || isOnGround(prev)) {
-      filtered.push(curr)
-      continue
-    }
-
-    // Check altitude change - if significant, ALWAYS keep regardless of horizontal distance
-    const altChange = Math.abs(curr.altitude - prev.altitude)
-    if (altChange > 1000) {
-      // More than 1000ft altitude change
-      filtered.push(curr)
-      continue
-    }
-
-    // Only check horizontal distance if altitude change is small
-    const distance = calculateDistanceNM(prev.lat, prev.lng, curr.lat, curr.lng)
-
-    if (distance >= MIN_AIRBORNE_DISTANCE_NM) {
-      filtered.push(curr)
-    }
-    // Otherwise skip this waypoint
-  }
-
-  // Always keep last
-  filtered.push(waypoints[waypoints.length - 1])
-
-  return filtered
 }
 
 // Trim to exact limit by removing lowest importance waypoints
