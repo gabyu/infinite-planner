@@ -368,7 +368,7 @@ function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
         phaseType = wp.altitude < 10000 ? "initial_climb" : "climb"
       } else {
         // Split descent into high altitude, approach, and final
-        if (wp.altitude >= 10000) {
+        if (wp.altitude >= 12000) {
           phaseType = "descent"
         } else if (wp.altitude >= 3000) {
           phaseType = "approach"
@@ -413,18 +413,16 @@ function selectWaypointsByImportance(
     if (phase.type === "ground") {
       phaseTarget = Math.ceil(phaseLength * 0.27)
     } else if (phase.type === "initial_climb") {
-      phaseTarget = Math.ceil(phaseLength * 0.25)
+      phaseTarget = Math.ceil(phaseLength * 0.3)
     } else if (phase.type === "climb") {
-      // High altitude climb
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 1.0)
-    } else if (phase.type === "final") {
-      phaseTarget = Math.ceil(phaseLength * 0.25)
-    } else if (phase.type === "approach") {
-      phaseTarget = Math.ceil(phaseLength * 0.25)
+      phaseTarget = Math.ceil(phaseRatio * targetCount * 0.8)
     } else if (phase.type === "descent") {
-      phaseTarget = Math.ceil(phaseLength * 0.25)
+      phaseTarget = Math.ceil(phaseLength * 0.18)
+    } else if (phase.type === "approach") {
+      phaseTarget = Math.ceil(phaseLength * 0.4)
+    } else if (phase.type === "final") {
+      phaseTarget = Math.ceil(phaseLength * 0.45)
     } else {
-      // Cruise can be simplified
       phaseTarget = Math.floor(phaseRatio * targetCount * 0.6)
     }
 
