@@ -319,7 +319,10 @@ export function FlightPlanEditor() {
       const a = document.createElement("a")
       a.href = url
 
-      const fileName = importedFileName ? `${importedFileName}.fpl` : "flightplan.fpl"
+      const origin = originAirport || "ORIG"
+      const destination = destinationAirport || "DEST"
+      const fileName = `Infinite Planner - ${origin}-${destination}.fpl`
+
       a.download = fileName
 
       document.body.appendChild(a)
