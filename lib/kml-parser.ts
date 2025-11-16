@@ -15,29 +15,11 @@ interface SimplificationResult {
   originalCount: number
   simplifiedCount: number
   simplificationReason: string
-  source?: string
+  source?: string // Added to track the source of the KML file
 }
 
-interface SimplificationAttempt {
-  waypoints: Waypoint[]
-  count: number
-  score: number // How close to target (230)
-  attempt: number
-  minDistance: number
-  importanceThreshold: number
-}
-
-// Conversion factor from meters to feet
+// Conversion factor from meters to feet (1 meter = 3.28084 feet)
 const METERS_TO_FEET = 3.28084
-
-// Minimum distance between airborne waypoints in nautical miles
-const MIN_AIRBORNE_DISTANCE_NM = 0.5
-
-// Altitude threshold to consider a waypoint as "on ground" (in feet)
-const GROUND_ALTITUDE_THRESHOLD = 1000
-
-// Base density: ~1 waypoint per 6 NM for turns
-const TURN_WAYPOINT_DENSITY = 0.15
 
 export function parseKML(
   kmlString: string,
@@ -49,27 +31,232 @@ export function parseKML(
     const parser = new DOMParser()
     const xmlDoc = parser.parseFromString(kmlString, "text/xml")
 
+    // Initialize waypoints array
     const originalWaypoints: Waypoint[] = []
+
+    // Detect the source of the KML file (FlightRadar24 or FlightAware)
     let source = "Unknown"
 
-    // Detect source
+    // Check for FlightAware signature (gx:Track elements with gx:coord)
     const gxTracks = xmlDoc.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "Track")
-    const lineStrings = xmlDoc.getElementsByTagName("LineString")
-    const docNames = xmlDoc.getElementsByTagName("name")
-    const docName = docNames?.[0]?.textContent || ""
+    const hasFlightAwareSignature = gxTracks && gxTracks.length > 0
 
-    if (gxTracks?.length > 0 || docName.includes("FlightAware")) {
+    // Check for FlightRadar24 signature (typically has LineString with coordinates)
+    const lineStrings = xmlDoc.getElementsByTagName("LineString")
+    const hasFlightRadarSignature = lineStrings && lineStrings.length > 0
+
+    // Also check document name or description for additional clues
+    const docNames = xmlDoc.getElementsByTagName("name")
+    let docName = ""
+    if (docNames && docNames.length > 0 && docNames[0].textContent) {
+      docName = docNames[0].textContent
+    }
+
+    if (hasFlightAwareSignature || (docName && docName.includes("FlightAware"))) {
       source = "FlightAware"
-      parseFlightAwareFormat(gxTracks, originalWaypoints)
+      // console.log("Detected FlightAware KML format")
+
+      // Process FlightAware format (gx:Track with gx:coord elements)
+      for (let i = 0; i < gxTracks.length; i++) {
+        try {
+          const track = gxTracks[i]
+          if (!track) continue
+
+          // Get all gx:coord elements
+          const gxCoords = track.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "coord")
+          // console.log(`Found ${gxCoords.length} gx:coord elements in track ${i + 1}`)
+
+          if (gxCoords && gxCoords.length > 0) {
+            for (let j = 0; j < gxCoords.length; j++) {
+              if (gxCoords[j].textContent) {
+                // FlightAware format: longitude latitude altitude (space-separated)
+                const coordText = gxCoords[j].textContent.trim()
+                const parts = coordText.split(/\s+/)
+
+                if (parts.length >= 2) {
+                  const lng = Number.parseFloat(parts[0])
+                  const lat = Number.parseFloat(parts[1])
+                  // Get altitude if available, otherwise default to 0
+                  // KML altitude is in meters, convert to feet
+                  const altitudeMeters = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
+                  const altitudeFeet = Math.round(altitudeMeters * METERS_TO_FEET)
+
+                  if (!isNaN(lat) && !isNaN(lng)) {
+                    originalWaypoints.push({
+                      id: `${Date.now()}-fa-${i}-${j}`,
+                      name: String(originalWaypoints.length + 1).padStart(3, "0"),
+                      lat,
+                      lng,
+                      altitude: altitudeFeet,
+                      selected: false,
+                    })
+                  }
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Error processing FlightAware track ${i}:`, err)
+        }
+      }
+
+      // If we found waypoints, we're done with FlightAware processing
+      if (originalWaypoints.length > 0) {
+        // console.log(`Found ${originalWaypoints.length} waypoints in FlightAware KML`)
+      } else {
+        // Fallback to standard KML processing if no waypoints were found
+        // console.log("No waypoints found in FlightAware format, trying standard KML processing")
+      }
     } else {
       source = "FlightRadar24"
+      // console.log("Processing as FlightRadar24 KML format")
     }
 
-    // Parse standard KML if no waypoints found
+    // If we haven't found waypoints yet, process as FlightRadar24 or standard KML
     if (originalWaypoints.length === 0) {
-      parseStandardKML(xmlDoc, originalWaypoints)
+      // Process LineString elements (common in FlightRadar24)
+      // console.log(`Found ${lineStrings.length} LineString elements`)
+
+      for (let i = 0; i < lineStrings.length; i++) {
+        try {
+          const lineString = lineStrings[i]
+          if (!lineString) continue
+
+          const coordinatesElements = lineString.getElementsByTagName("coordinates")
+          if (!coordinatesElements || coordinatesElements.length === 0 || !coordinatesElements[0].textContent) {
+            continue
+          }
+
+          const coordinatesText = coordinatesElements[0].textContent.trim()
+          if (!coordinatesText) continue
+
+          // FlightRadar24 typically has one long string of coordinates separated by spaces
+          const coordLines = coordinatesText.split(/\s+/)
+          // console.log(`LineString ${i + 1}: Found ${coordLines.length} coordinate points`)
+
+          if (coordLines.length > 0) {
+            const waypoints = processCoordinates(coordLines, i, originalWaypoints.length)
+            originalWaypoints.push(...waypoints)
+          }
+        } catch (err) {
+          console.error(`Error processing LineString ${i}:`, err)
+        }
+      }
+
+      // If we still have no waypoints, try other elements
+      if (originalWaypoints.length === 0) {
+        // console.log("No coordinates found in LineString elements, checking Placemarks...")
+
+        // Try to find coordinates in Placemarks (alternative format)
+        const placemarks = xmlDoc.getElementsByTagName("Placemark")
+        // console.log(`Found ${placemarks.length} Placemark elements`)
+
+        for (let i = 0; i < placemarks.length; i++) {
+          try {
+            const placemark = placemarks[i]
+            if (!placemark) continue
+
+            // Check for coordinates directly in the Placemark
+            const coordinatesElements = placemark.getElementsByTagName("coordinates")
+            if (coordinatesElements && coordinatesElements.length > 0 && coordinatesElements[0].textContent) {
+              const coordinatesText = coordinatesElements[0].textContent.trim()
+              if (coordinatesText) {
+                const coordLines = coordinatesText.split(/\s+/)
+                // console.log(`Placemark ${i + 1}: Found ${coordLines.length} coordinate points`)
+
+                if (coordLines.length > 0) {
+                  const waypoints = processCoordinates(coordLines, i, originalWaypoints.length)
+                  originalWaypoints.push(...waypoints)
+                }
+              }
+            }
+
+            // Also check for Track elements (another possible format)
+            const tracks = placemark.getElementsByTagName("Track")
+            if (tracks && tracks.length > 0) {
+              for (let j = 0; j < tracks.length; j++) {
+                const track = tracks[j]
+                if (!track) continue
+
+                // Track can have coordinates in different formats
+                // First check for <coord> elements
+                const coordElements = track.getElementsByTagName("coord")
+                if (coordElements && coordElements.length > 0) {
+                  // console.log(`Track ${j + 1} in Placemark ${i + 1}: Found ${coordElements.length} coord elements`)
+
+                  const trackCoords: string[] = []
+                  for (let k = 0; k < coordElements.length; k++) {
+                    if (coordElements[k].textContent) {
+                      // Format is typically "lon lat alt"
+                      const coordText = coordElements[k].textContent
+                      // Convert to KML format "lon,lat,alt"
+                      trackCoords.push(coordText.replace(/\s+/g, ","))
+                    }
+                  }
+
+                  if (trackCoords.length > 0) {
+                    const waypoints = processCoordinates(trackCoords, i * 1000 + j, originalWaypoints.length)
+                    originalWaypoints.push(...waypoints)
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Error processing Placemark ${i}:`, err)
+          }
+        }
+      }
+
+      // If we still have no waypoints, try one more approach - look for any coordinates element
+      if (originalWaypoints.length === 0) {
+        // console.log("Still no coordinates found, searching for any coordinates element...")
+
+        const allCoordinatesElements = xmlDoc.getElementsByTagName("coordinates")
+        // console.log(`Found ${allCoordinatesElements.length} coordinates elements in total`)
+
+        for (let i = 0; i < allCoordinatesElements.length; i++) {
+          try {
+            if (!allCoordinatesElements[i].textContent) continue
+
+            const coordinatesText = allCoordinatesElements[i].textContent.trim()
+            if (!coordinatesText) continue
+
+            const coordLines = coordinatesText.split(/\s+/)
+            // console.log(`Coordinates element ${i + 1}: Found ${coordLines.length} coordinate points`)
+
+            if (coordLines.length > 0) {
+              const waypoints = processCoordinates(coordLines, i + 10000, originalWaypoints.length)
+              originalWaypoints.push(...waypoints)
+            }
+          } catch (err) {
+            console.error(`Error processing coordinates element ${i}:`, err)
+          }
+        }
+      }
     }
 
+    // console.log(`Total waypoints found in KML: ${originalWaypoints.length}`)
+
+    // Save flight statistics if filename is provided and waypoints were found
+    if (filename && originalWaypoints.length > 0) {
+      try {
+        const flightData = parseFlightFilename(filename)
+        flightData.source = source
+
+        // console.log("Parsed flight data:", flightData)
+        // console.log("Origin airport parameter:", originAirport)
+        // console.log("Destination airport parameter:", destinationAirport)
+
+        // Save flight data asynchronously (don't wait for it)
+        saveFlightData(flightData, originAirport, destinationAirport).catch((error) => {
+          console.error("Failed to save flight statistics:", error)
+        })
+      } catch (error) {
+        console.error("Error parsing flight filename:", error)
+      }
+    }
+
+    // If we still have no waypoints, return empty result
     if (originalWaypoints.length === 0) {
       console.error("No valid waypoints found in KML file")
       return {
@@ -81,22 +268,14 @@ export function parseKML(
       }
     }
 
-    // Save flight statistics
-    if (filename && originalWaypoints.length > 0) {
-      try {
-        const flightData = parseFlightFilename(filename)
-        flightData.source = source
-        saveFlightData(flightData, originAirport, destinationAirport).catch((error) => {
-          console.error("Failed to save flight statistics:", error)
-        })
-      } catch (error) {
-        console.error("Error parsing flight filename:", error)
-      }
-    }
+    // Validate and clean the route
+    const validatedWaypoints = validateAndCleanRoute(originalWaypoints)
+    // console.log(`After validation: ${validatedWaypoints.length} waypoints`)
 
-    // Clean and simplify
-    const cleanedWaypoints = removeExactDuplicates(originalWaypoints)
-    const result = simplifyFlightPlan(cleanedWaypoints)
+    // Simplify the waypoints
+    const result = simplifyWaypoints(validatedWaypoints)
+
+    // Add the source to the result
     result.source = source
 
     return result
@@ -112,31 +291,29 @@ export function parseKML(
   }
 }
 
-// Parse FlightAware format
-function parseFlightAwareFormat(gxTracks: any, waypoints: Waypoint[]) {
-  for (let i = 0; i < gxTracks.length; i++) {
-    const track = gxTracks[i]
-    if (!track) continue
+// Helper function to process coordinate lines into waypoints
+function processCoordinates(coordLines: string[], placemarkIndex: number, startIndex: number): Waypoint[] {
+  const waypoints: Waypoint[] = []
 
-    const gxCoords = track.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "coord")
-    if (!gxCoords?.length) continue
+  for (let j = 0; j < coordLines.length; j++) {
+    const coordLine = coordLines[j]
+    if (!coordLine.trim()) continue
 
-    for (let j = 0; j < gxCoords.length; j++) {
-      const coordText = gxCoords[j].textContent?.trim()
-      if (!coordText) continue
+    // KML format is longitude,latitude,altitude
+    const parts = coordLine.trim().split(",")
 
-      const parts = coordText.split(/\s+/)
-      if (parts.length < 2) continue
-
+    if (parts.length >= 2) {
       const lng = Number.parseFloat(parts[0])
       const lat = Number.parseFloat(parts[1])
+      // Get altitude if available, otherwise default to 0
+      // KML altitude is in meters, convert to feet
       const altitudeMeters = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
       const altitudeFeet = Math.round(altitudeMeters * METERS_TO_FEET)
 
       if (!isNaN(lat) && !isNaN(lng)) {
         waypoints.push({
-          id: `${Date.now()}-fa-${i}-${j}`,
-          name: String(waypoints.length + 1).padStart(3, "0"),
+          id: `${Date.now()}-line-${placemarkIndex}-${j}`,
+          name: String(startIndex + waypoints.length + 1).padStart(3, "0"),
           lat,
           lng,
           altitude: altitudeFeet,
@@ -145,173 +322,87 @@ function parseFlightAwareFormat(gxTracks: any, waypoints: Waypoint[]) {
       }
     }
   }
+
+  return waypoints
 }
 
-// Parse standard KML format
-function parseStandardKML(xmlDoc: Document, waypoints: Waypoint[]) {
-  const allCoordinatesElements = xmlDoc.getElementsByTagName("coordinates")
-
-  for (let i = 0; i < allCoordinatesElements.length; i++) {
-    const coordinatesText = allCoordinatesElements[i].textContent?.trim()
-    if (!coordinatesText) continue
-
-    const coordLines = coordinatesText.split(/\s+/)
-
-    for (let j = 0; j < coordLines.length; j++) {
-      const coordLine = coordLines[j].trim()
-      if (!coordLine) continue
-
-      const parts = coordLine.split(",")
-      if (parts.length < 2) continue
-
-      const lng = Number.parseFloat(parts[0])
-      const lat = Number.parseFloat(parts[1])
-      const altitudeMeters = parts.length >= 3 ? Number.parseFloat(parts[2]) : 0
-      const altitudeFeet = Math.round(altitudeMeters * METERS_TO_FEET)
-
-      if (!isNaN(lat) && !isNaN(lng)) {
-        waypoints.push({
-          id: `${Date.now()}-std-${i}-${j}`,
-          name: String(waypoints.length + 1).padStart(3, "0"),
-          lat,
-          lng,
-          altitude: altitudeFeet,
-          selected: false,
-        })
-      }
-    }
+// Function to validate and clean the route
+function validateAndCleanRoute(waypoints: Waypoint[]): Waypoint[] {
+  if (waypoints.length <= 2) {
+    return waypoints
   }
-}
 
-// Remove exact duplicate waypoints
-function removeExactDuplicates(waypoints: Waypoint[]): Waypoint[] {
-  const unique: Waypoint[] = []
+  // Step 1: Remove duplicate waypoints (exact same coordinates)
+  const uniqueWaypoints: Waypoint[] = []
   const seen = new Set<string>()
 
   for (const wp of waypoints) {
     const key = `${wp.lat.toFixed(6)},${wp.lng.toFixed(6)}`
     if (!seen.has(key)) {
       seen.add(key)
-      unique.push(wp)
+      uniqueWaypoints.push(wp)
     }
   }
 
-  return unique
-}
+  // Step 2: Detect and fix any route loops or duplicated segments
+  if (uniqueWaypoints.length > 3) {
+    const cleanedWaypoints: Waypoint[] = [uniqueWaypoints[0]]
+    const visitedSegments = new Set<string>()
 
-// Calculate distance between two points in nautical miles
-function calculateDistanceNM(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3440.065 // Earth's radius in nautical miles
-  const dLat = toRadians(lat2 - lat1)
-  const dLon = toRadians(lon2 - lon1)
+    for (let i = 1; i < uniqueWaypoints.length; i++) {
+      const prev = uniqueWaypoints[i - 1]
+      const current = uniqueWaypoints[i]
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      // Create a segment key (from lower lat/lng to higher lat/lng to handle direction)
+      const segmentKey = createSegmentKey(prev, current)
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  return R * c
-}
-
-function toRadians(degrees: number): number {
-  return degrees * (Math.PI / 180)
-}
-
-// Check if waypoint is on ground
-function isOnGround(waypoint: Waypoint): boolean {
-  return waypoint.altitude < GROUND_ALTITUDE_THRESHOLD
-}
-
-// Calculate turn angle at a waypoint (in radians)
-function calculateTurnAngle(prev: Waypoint, curr: Waypoint, next: Waypoint): number {
-  const angle1 = Math.atan2(curr.lat - prev.lat, curr.lng - prev.lng)
-  const angle2 = Math.atan2(next.lat - curr.lat, next.lng - curr.lng)
-  let turnAngle = Math.abs(angle2 - angle1)
-
-  if (turnAngle > Math.PI) {
-    turnAngle = 2 * Math.PI - turnAngle
-  }
-
-  return turnAngle
-}
-
-function calculateImportance(prev: Waypoint, curr: Waypoint, next: Waypoint, index: number, total: number): number {
-  // Always keep first and last waypoints
-  if (index === 0 || index === total - 1) {
-    return Number.MAX_VALUE
-  }
-
-  let score = 0
-
-  // Turn angle (0 to π) - highly weighted for capturing turns
-  const turnAngle = calculateTurnAngle(prev, curr, next)
-  const turnAngleNormalized = turnAngle / Math.PI // 0 to 1
-
-  // Significant turns (>15 degrees) get exponential boost
-  if (turnAngleNormalized > 0.083) {
-    // ~15 degrees
-    score += Math.pow(turnAngleNormalized, 0.8) * 3.0
-  } else {
-    score += turnAngleNormalized
-  }
-
-  // Altitude change - highly important for descent/climb visualization
-  const altChange = Math.abs(next.altitude - prev.altitude)
-  score += Math.min(altChange / 5000, 2.0) // Normalized altitude change
-
-  // Distance to next point - prefer well-distributed waypoints
-  const distance = calculateDistanceNM(curr.lat, curr.lng, next.lat, next.lng)
-  score += Math.min(distance / 5, 1.0) // Cap distance bonus
-
-  // Ground operations bonus
-  if (isOnGround(curr)) {
-    score += 1.5
-  }
-
-  return score
-}
-
-// Main simplification function
-function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
-  const originalCount = waypoints.length
-
-  if (originalCount <= 248) {
-    return {
-      waypoints: waypoints.map((wp, i) => ({ ...wp, name: String(i + 1).padStart(3, "0") })),
-      originalCount,
-      simplifiedCount: originalCount,
-      simplificationReason: "No simplification needed (fewer than 248 waypoints)",
-    }
-  }
-
-  try {
-    const phases = identifyFlightPhases(waypoints)
-    const scoredWaypoints = waypoints.map((wp, index, arr) => {
-      if (index === 0 || index === arr.length - 1) {
-        return { waypoint: wp, score: Number.MAX_VALUE, index }
+      // Skip if we've seen this segment before (potential loop)
+      if (!visitedSegments.has(segmentKey)) {
+        visitedSegments.add(segmentKey)
+        cleanedWaypoints.push(current)
       }
-
-      const prev = arr[index - 1]
-      const next = arr[index + 1]
-      const score = calculateImportance(prev, wp, next, index, arr.length)
-
-      return { waypoint: wp, score, index }
-    })
-
-    // Select waypoints by phase importance
-    const selected = selectWaypointsByImportance(scoredWaypoints, phases, 240)
-
-    // Enforce minimum distance
-    const filtered = enforceMinimumDistance(selected)
-
-    // Trim to limit if needed
-    let final = filtered
-    if (final.length > 248) {
-      final = trimToLimit(final, 248)
     }
 
-    // Rename waypoints sequentially
-    const renamedWaypoints = final.map((wp, index) => ({
+    // Ensure we always include the last waypoint
+    if (cleanedWaypoints[cleanedWaypoints.length - 1] !== uniqueWaypoints[uniqueWaypoints.length - 1]) {
+      cleanedWaypoints.push(uniqueWaypoints[uniqueWaypoints.length - 1])
+    }
+
+    return cleanedWaypoints
+  }
+
+  return uniqueWaypoints
+}
+
+// Helper to create a unique key for a segment between two waypoints
+function createSegmentKey(wp1: Waypoint, wp2: Waypoint): string {
+  // Order points by latitude then longitude to create a consistent key regardless of direction
+  const [first, second] = [wp1, wp2].sort((a, b) => {
+    if (a.lat !== b.lat) return a.lat - b.lat
+    return a.lng - b.lng
+  })
+
+  return `${first.lat.toFixed(6)},${first.lng.toFixed(6)}-${second.lat.toFixed(6)},${second.lng.toFixed(6)}`
+}
+
+// Completely revised simplification function to ensure balanced distribution of waypoints
+function simplifyWaypoints(waypoints: Waypoint[]): SimplificationResult {
+  // Handle edge cases
+  if (!waypoints || !Array.isArray(waypoints)) {
+    return {
+      waypoints: [],
+      originalCount: 0,
+      simplifiedCount: 0,
+      simplificationReason: "Invalid waypoints array",
+    }
+  }
+
+  const originalCount = waypoints.length
+  let simplificationReason = ""
+
+  // If we have fewer than 250 waypoints, just rename them and return
+  if (originalCount <= 250) {
+    const renamedWaypoints = waypoints.map((wp, index) => ({
       ...wp,
       name: String(index + 1).padStart(3, "0"),
     }))
@@ -319,412 +410,340 @@ function simplifyFlightPlan(waypoints: Waypoint[]): SimplificationResult {
     return {
       waypoints: renamedWaypoints,
       originalCount,
-      simplifiedCount: renamedWaypoints.length,
-      simplificationReason: `Simplified from ${originalCount} to ${renamedWaypoints.length} waypoints`,
+      simplifiedCount: originalCount,
+      simplificationReason: "No simplification needed (fewer than 250 waypoints)",
     }
-  } catch (error) {
-    console.error("Error during simplification:", error)
+  }
 
-    // Fallback: evenly spaced selection
-    const step = Math.floor(originalCount / 230)
-    const fallback = waypoints.filter((_, i) => i === 0 || i === originalCount - 1 || i % step === 0)
+  try {
+    // For routes with more than 250 waypoints, we need to simplify
+    // We'll ensure a balanced distribution as requested:
+    // - 20% for departure/ground operations
+    // - 60% for en-route
+    // - 20% for arrival/ground operations
+
+    // Calculate the number of waypoints for each segment
+    const maxWaypoints = 250
+    const departureCount = Math.max(Math.floor(maxWaypoints * 0.2), 10)
+    const arrivalCount = Math.max(Math.floor(maxWaypoints * 0.2), 10)
+    const enRouteCount = maxWaypoints - departureCount - arrivalCount
+
+    // console.log(
+    //   `Simplification targets: Departure=${departureCount}, En-route=${enRouteCount}, Arrival=${arrivalCount}`,
+    // )
+
+    // Determine the segments of the flight
+    const departureSegment = waypoints.slice(0, Math.floor(waypoints.length * 0.2))
+    const arrivalSegment = waypoints.slice(Math.floor(waypoints.length * 0.8))
+    const enRouteSegment = waypoints.slice(Math.floor(waypoints.length * 0.2), Math.floor(waypoints.length * 0.8))
+
+    // console.log(
+    //   `Original segment sizes: Departure=${departureSegment.length}, En-route=${enRouteSegment.length}, Arrival=${arrivalSegment.length}`,
+    // )
+
+    // Now simplify each segment to the target count
+    let simplifiedDeparture: Waypoint[]
+    let simplifiedEnRoute: Waypoint[]
+    let simplifiedArrival: Waypoint[]
+
+    // Simplify departure segment - preserve more detail at the beginning
+    if (departureSegment.length <= departureCount) {
+      simplifiedDeparture = departureSegment
+    } else {
+      // Use a combination of methods to preserve important points
+      const criticalPoints = identifyCriticalPoints(departureSegment, Math.floor(departureCount * 0.3))
+      const remainingCount = departureCount - criticalPoints.length
+      const simplifiedRemaining = douglasPeucker(
+        departureSegment.filter((wp) => !criticalPoints.some((cp) => cp.id === wp.id)),
+        remainingCount,
+      )
+      simplifiedDeparture = [...criticalPoints, ...simplifiedRemaining].sort((a, b) => {
+        return departureSegment.findIndex((wp) => wp.id === a.id) - departureSegment.findIndex((wp) => wp.id === b.id)
+      })
+    }
+
+    // Simplify en-route segment - can be more aggressive
+    if (enRouteSegment.length <= enRouteCount) {
+      simplifiedEnRoute = enRouteSegment
+    } else {
+      simplifiedEnRoute = douglasPeucker(enRouteSegment, enRouteCount)
+    }
+
+    // Simplify arrival segment - preserve more detail at the end
+    if (arrivalSegment.length <= arrivalCount) {
+      simplifiedArrival = arrivalSegment
+    } else {
+      // Use a combination of methods to preserve important points
+      const criticalPoints = identifyCriticalPoints(arrivalSegment, Math.floor(arrivalCount * 0.3))
+      const remainingCount = arrivalCount - criticalPoints.length
+      const simplifiedRemaining = douglasPeucker(
+        arrivalSegment.filter((wp) => !criticalPoints.some((cp) => cp.id === wp.id)),
+        remainingCount,
+      )
+      simplifiedArrival = [...criticalPoints, ...simplifiedRemaining].sort((a, b) => {
+        return arrivalSegment.findIndex((wp) => wp.id === a.id) - arrivalSegment.findIndex((wp) => wp.id === b.id)
+      })
+    }
+
+    // console.log(
+    //   `Simplified segment sizes: Departure=${simplifiedDeparture.length}, En-route=${simplifiedEnRoute.length}, Arrival=${simplifiedArrival.length}`,
+    // )
+
+    // Combine all segments
+    const simplifiedWaypoints = [...simplifiedDeparture, ...simplifiedEnRoute, ...simplifiedArrival]
+
+    // Ensure we don't have duplicates at segment boundaries
+    const finalWaypoints: Waypoint[] = []
+    const seenIds = new Set<string>()
+
+    for (const wp of simplifiedWaypoints) {
+      if (!seenIds.has(wp.id)) {
+        seenIds.add(wp.id)
+        finalWaypoints.push(wp)
+      }
+    }
+
+    // Ensure we have the first and last waypoints
+    const hasFirst = finalWaypoints.some((wp) => wp.id === waypoints[0].id)
+    const hasLast = finalWaypoints.some((wp) => wp.id === waypoints[waypoints.length - 1].id)
+
+    if (!hasFirst) {
+      finalWaypoints.unshift(waypoints[0])
+    }
+
+    if (!hasLast) {
+      finalWaypoints.push(waypoints[waypoints.length - 1])
+    }
+
+    // Rename waypoints to ensure sequential numbering (001, 002, 003...)
+    const renamedWaypoints = finalWaypoints.map((wp, index) => ({
+      ...wp,
+      name: String(index + 1).padStart(3, "0"),
+    }))
+
+    simplificationReason = `Simplified from ${originalCount} to ${renamedWaypoints.length} waypoints, preserving departure (${simplifiedDeparture.length}), en-route (${simplifiedEnRoute.length}), and arrival (${simplifiedArrival.length}) segments`
 
     return {
-      waypoints: fallback.map((wp, i) => ({ ...wp, name: String(i + 1).padStart(3, "0") })),
+      waypoints: renamedWaypoints,
       originalCount,
-      simplifiedCount: fallback.length,
-      simplificationReason: `Fallback simplification from ${originalCount} to ${fallback.length} waypoints`,
+      simplifiedCount: renamedWaypoints.length,
+      simplificationReason,
+    }
+  } catch (error) {
+    console.error("Error during waypoint simplification:", error)
+
+    // If our advanced simplification fails, fall back to a simpler approach
+    // that still preserves the beginning, middle, and end of the route
+    try {
+      const first = waypoints.slice(0, Math.floor(waypoints.length * 0.05))
+      const last = waypoints.slice(-Math.floor(waypoints.length * 0.05))
+
+      // For the middle section, use evenly spaced points
+      const middleStart = Math.floor(waypoints.length * 0.05)
+      const middleEnd = waypoints.length - Math.floor(waypoints.length * 0.05)
+      const middle = waypoints.slice(middleStart, middleEnd)
+
+      const middleSimplified = selectEvenlySpacedWaypoints(middle, 240 - first.length - last.length)
+
+      const combined = [...first, ...middleSimplified, ...last]
+
+      // Rename waypoints
+      const renamedWaypoints = combined.map((wp, index) => ({
+        ...wp,
+        name: String(index + 1).padStart(3, "0"),
+      }))
+
+      return {
+        waypoints: renamedWaypoints,
+        originalCount,
+        simplifiedCount: renamedWaypoints.length,
+        simplificationReason: `Fallback simplification from ${originalCount} to ${renamedWaypoints.length} waypoints, preserving start and end segments`,
+      }
+    } catch (fallbackError) {
+      console.error("Fallback simplification also failed:", fallbackError)
+
+      // Last resort: just take evenly spaced points
+      const evenlySampled = selectEvenlySpacedWaypoints(waypoints, 250)
+
+      const renamedWaypoints = evenlySampled.map((wp, index) => ({
+        ...wp,
+        name: String(index + 1).padStart(3, "0"),
+      }))
+
+      return {
+        waypoints: renamedWaypoints,
+        originalCount,
+        simplifiedCount: renamedWaypoints.length,
+        simplificationReason: `Emergency fallback simplification from ${originalCount} to ${renamedWaypoints.length} waypoints using evenly spaced selection`,
+      }
     }
   }
 }
 
-function enforceMinimumDistance(waypoints: Waypoint[]): Waypoint[] {
+// Helper function to identify critical points in a segment (turns, altitude changes)
+function identifyCriticalPoints(waypoints: Waypoint[], maxPoints: number): Waypoint[] {
   if (waypoints.length <= 2) return waypoints
 
-  const filtered: Waypoint[] = [waypoints[0]] // Always keep first
+  // Always include first and last points
+  const criticalPoints: Waypoint[] = [waypoints[0], waypoints[waypoints.length - 1]]
+
+  // Calculate "importance" for each intermediate point
+  const importanceScores: { waypoint: Waypoint; score: number }[] = []
 
   for (let i = 1; i < waypoints.length - 1; i++) {
-    const prev = filtered[filtered.length - 1]
+    const prev = waypoints[i - 1]
     const curr = waypoints[i]
+    const next = waypoints[i + 1]
 
-    // If on ground, always keep
-    if (isOnGround(curr) || isOnGround(prev)) {
-      filtered.push(curr)
-      continue
+    // Calculate turn angle
+    const angle1 = Math.atan2(curr.lat - prev.lat, curr.lng - prev.lng)
+    const angle2 = Math.atan2(next.lat - curr.lat, next.lng - curr.lng)
+    let turnAngle = Math.abs(angle2 - angle1)
+
+    // Normalize to [0, π]
+    if (turnAngle > Math.PI) {
+      turnAngle = 2 * Math.PI - turnAngle
     }
 
-    // Base leg zone: more lenient
-    const isBaseLegZone = curr.altitude >= 3000 && curr.altitude <= 6000
-    const minDistance = isBaseLegZone ? 0.25 : 0.5
+    // Calculate altitude change (using feet, as converted earlier)
+    const altChange = Math.abs(next.altitude - prev.altitude)
 
-    // Check altitude change
-    const altChange = Math.abs(curr.altitude - prev.altitude)
-    const minAltChange = isBaseLegZone ? 150 : 800
+    // Combined score (normalize turn angle to [0,1] range)
+    // Altitude change is scaled to be comparable to angular change
+    const score = turnAngle / Math.PI + altChange / 10000 // Divide by a larger number for altitude to prevent it from dominating
 
-    if (altChange > minAltChange) {
-      filtered.push(curr)
-      continue
-    }
-
-    // Check distance
-    const distance = calculateDistanceNM(prev.lat, prev.lng, curr.lat, curr.lng)
-    if (distance >= minDistance) {
-      filtered.push(curr)
-    }
+    importanceScores.push({ waypoint: curr, score })
   }
 
-  filtered.push(waypoints[waypoints.length - 1])
-  return filtered
+  // Sort by importance and take top points
+  importanceScores.sort((a, b) => b.score - a.score)
+
+  // Add top scoring points to critical points
+  for (let i = 0; i < Math.min(maxPoints - 2, importanceScores.length); i++) {
+    criticalPoints.push(importanceScores[i].waypoint)
+  }
+
+  return criticalPoints
 }
 
-// Identify flight phases based on altitude
-interface FlightPhase {
-  start: number
-  end: number
-  type: "ground" | "initial_climb" | "climb" | "cruise" | "descent" | "approach" | "final"
+// Helper function to select evenly spaced waypoints
+function selectEvenlySpacedWaypoints(points: Waypoint[], targetCount: number): Waypoint[] {
+  if (points.length <= targetCount) {
+    return points
+  }
+
+  const result: Waypoint[] = []
+  const step = points.length / targetCount
+
+  // Always include the first point
+  result.push(points[0])
+
+  // Add evenly spaced points
+  for (let i = 1; i < targetCount - 1; i++) {
+    const index = Math.min(Math.floor(i * step), points.length - 1)
+    result.push(points[index])
+  }
+
+  // Always include the last point
+  if (points.length > 1) {
+    result.push(points[points.length - 1])
+  }
+
+  return result
 }
 
-function identifyFlightPhases(waypoints: Waypoint[]): FlightPhase[] {
-  const phases: FlightPhase[] = []
-  let currentPhase: FlightPhase | null = null
+// Douglas-Peucker algorithm to simplify a path
+function douglasPeucker(points: Waypoint[], targetCount: number): Waypoint[] {
+  // Handle edge cases
+  if (!points || !Array.isArray(points) || points.length <= 2) {
+    return points || []
+  }
 
-  // Find max altitude to determine cruise phase
-  const maxAltitude = Math.max(...waypoints.map((wp) => wp.altitude))
-  const cruiseAltitude = maxAltitude * 0.9 // Consider 90% of max as cruise
+  if (targetCount >= points.length) {
+    return points
+  }
 
-  for (let i = 0; i < waypoints.length; i++) {
-    const wp = waypoints[i]
-    let phaseType: FlightPhase["type"]
+  // Start with a very small tolerance and increase until we get fewer than targetCount points
+  let tolerance = 0.00001
+  let simplified = points
+  let iterations = 0
+  const maxIterations = 20 // Prevent infinite loops
 
-    if (wp.altitude < GROUND_ALTITUDE_THRESHOLD) {
-      phaseType = "ground"
-    } else if (wp.altitude >= cruiseAltitude) {
-      phaseType = "cruise"
-    } else {
-      // Check if climbing or descending
-      const nextAlt = i < waypoints.length - 1 ? waypoints[i + 1].altitude : wp.altitude
-      const isClimbing = nextAlt > wp.altitude
-
-      if (isClimbing) {
-        // Split climb into initial (below 10k) and high altitude
-        phaseType = wp.altitude < 10000 ? "initial_climb" : "climb"
-      } else {
-        // Split descent into high altitude, approach, and final
-        if (wp.altitude >= 12000) {
-          phaseType = "descent"
-        } else if (wp.altitude >= 3000) {
-          phaseType = "approach"
-        } else {
-          phaseType = "final"
-        }
-      }
-    }
-
-    if (!currentPhase || currentPhase.type !== phaseType) {
-      if (currentPhase) {
-        currentPhase.end = i - 1
-        phases.push(currentPhase)
-      }
-      currentPhase = { start: i, end: i, type: phaseType }
+  while (simplified.length > targetCount && tolerance < 1 && iterations < maxIterations) {
+    try {
+      simplified = douglasPeuckerRecursive(points, tolerance)
+      tolerance *= 2
+      iterations++
+    } catch (error) {
+      console.error("Error in Douglas-Peucker algorithm:", error)
+      break
     }
   }
 
-  if (currentPhase) {
-    currentPhase.end = waypoints.length - 1
-    phases.push(currentPhase)
+  // If we still have too many points, just take evenly spaced ones
+  if (simplified.length > targetCount) {
+    return selectEvenlySpacedWaypoints(simplified, targetCount)
   }
 
-  return phases
+  return simplified
 }
 
-// Select waypoints by importance with phase-aware allocation
-function selectWaypointsByImportance(
-  scoredWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  phases: FlightPhase[],
-  targetCount: number,
-): Waypoint[] {
-  // Allocate waypoints per phase - rebalanced for FlightAware/FR24 parity
-  const allocation = new Map<string, number>()
-  const totalWaypoints = scoredWaypoints.length
-
-  for (const phase of phases) {
-    const phaseLength = phase.end - phase.start + 1
-    const phaseRatio = phaseLength / totalWaypoints
-
-    let phaseTarget: number
-    
-    // - Ground: 25% (reduce from 27%)
-    // - Initial climb: 12% (reduce from 30% - was too aggressive)
-    // - Climb: 25% (increase - more en-route detail)
-    // - Cruise: Distance-based 50 NM spacing throughout
-    // - Descent: 15% (increase from 18%)
-    // - Approach: 15% (reduce from 55% - was excessive)
-    // - Final: 20% (reduce from 75% - was excessive)
-    
-    if (phase.type === "ground") {
-      phaseTarget = Math.ceil(phaseLength * 0.25)
-    } else if (phase.type === "initial_climb") {
-      phaseTarget = Math.ceil(phaseLength * 0.12)
-    } else if (phase.type === "climb") {
-      phaseTarget = Math.ceil(phaseRatio * targetCount * 0.25)
-    } else if (phase.type === "descent") {
-      phaseTarget = Math.ceil(phaseLength * 0.15)
-    } else if (phase.type === "approach") {
-      phaseTarget = Math.ceil(phaseLength * 0.15)
-    } else if (phase.type === "final") {
-      phaseTarget = Math.ceil(phaseLength * 0.2)
-    } else if (phase.type === "cruise") {
-      phaseTarget = calculateCruiseWaypoints(scoredWaypoints, phase)
-    } else {
-      phaseTarget = Math.floor(phaseRatio * targetCount * 0.2)
-    }
-
-    allocation.set(`${phase.start}-${phase.end}`, phaseTarget)
+function douglasPeuckerRecursive(points: Waypoint[], tolerance: number): Waypoint[] {
+  if (!points || points.length <= 2) {
+    return points || []
   }
 
-  // Select waypoints
-  const selected: Waypoint[] = []
-  const selectedIndices = new Set<number>()
+  // Find the point with the maximum distance
+  let maxDistance = 0
+  let maxDistanceIndex = 0
 
-  // Always include first and last
-  selected.push(scoredWaypoints[0].waypoint)
-  selectedIndices.add(0)
-  selected.push(scoredWaypoints[scoredWaypoints.length - 1].waypoint)
-  selectedIndices.add(scoredWaypoints.length - 1)
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
 
-  // Select from each phase
-  for (const phase of phases) {
-    const phaseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
-    const phaseTarget = allocation.get(`${phase.start}-${phase.end}`) || 0
+  for (let i = 1; i < points.length - 1; i++) {
+    const distance = perpendicularDistance(points[i], firstPoint, lastPoint)
 
-    if (phase.type === "ground") {
-      selectGroundWaypoints(phaseWaypoints, phaseTarget, selected, selectedIndices)
-    } else if (phase.type === "cruise") {
-      selectCruiseWaypoints(phaseWaypoints, selected, selectedIndices)
-    } else if (
-      phase.type === "initial_climb" ||
-      phase.type === "climb" ||
-      phase.type === "descent" ||
-      phase.type === "approach" ||
-      phase.type === "final"
-    ) {
-      selectPhaseWaypointsWithTurnPreservation(
-        phaseWaypoints,
-        phaseTarget,
-        selected,
-        selectedIndices,
-        phase.type,
-      )
-    } else {
-      // Other phases - importance-based
-      const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
-      const toTake = Math.min(phaseTarget, sorted.length)
-
-      for (let i = 0; i < toTake; i++) {
-        if (!selectedIndices.has(sorted[i].index)) {
-          selected.push(sorted[i].waypoint)
-          selectedIndices.add(sorted[i].index)
-        }
-      }
+    if (distance > maxDistance) {
+      maxDistance = distance
+      maxDistanceIndex = i
     }
   }
 
-  // Sort by original order
-  return selected.sort((a, b) => {
-    const indexA = scoredWaypoints.findIndex((sw) => sw.waypoint.id === a.id)
-    const indexB = scoredWaypoints.findIndex((sw) => sw.waypoint.id === b.id)
-    return indexA - indexB
-  })
-}
+  // If max distance is greater than tolerance, recursively simplify
+  if (maxDistance > tolerance) {
+    // Split the points and recursively simplify
+    const firstHalf = douglasPeuckerRecursive(points.slice(0, maxDistanceIndex + 1), tolerance)
+    const secondHalf = douglasPeuckerRecursive(points.slice(maxDistanceIndex), tolerance)
 
-function selectPhaseWaypointsWithTurnPreservation(
-  phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  phaseTarget: number,
-  selected: Waypoint[],
-  selectedIndices: Set<number>,
-  phaseType: string,
-): void {
-  if (phaseWaypoints.length <= 2) {
-    for (const item of phaseWaypoints) {
-      if (!selectedIndices.has(item.index)) {
-        selected.push(item.waypoint)
-        selectedIndices.add(item.index)
-      }
-    }
-    return
-  }
-
-  // Sort by importance score
-  const sorted = phaseWaypoints.sort((a, b) => b.score - a.score)
-  const toTake = Math.min(phaseTarget, sorted.length)
-
-  // For tight approach phases (final, approach), enforce minimum 4-6 waypoints per turn
-  if ((phaseType === "final" || phaseType === "approach") && toTake < 4 && phaseWaypoints.length >= 4) {
-    // If we would select too few, boost to minimum for turn preservation
-    for (let i = 0; i < Math.min(4, sorted.length); i++) {
-      if (!selectedIndices.has(sorted[i].index)) {
-        selected.push(sorted[i].waypoint)
-        selectedIndices.add(sorted[i].index)
-      }
-    }
+    // Concatenate the two halves, removing the duplicate point
+    return [...firstHalf.slice(0, -1), ...secondHalf]
   } else {
-    // Standard importance-based selection
-    for (let i = 0; i < toTake; i++) {
-      if (!selectedIndices.has(sorted[i].index)) {
-        selected.push(sorted[i].waypoint)
-        selectedIndices.add(sorted[i].index)
-      }
-    }
+    // All points in this segment are within tolerance, so simplify to just the endpoints
+    return [firstPoint, lastPoint]
   }
 }
 
-// Calculate cruise waypoints based on distance
-function calculateCruiseWaypoints(
-  scoredWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  phase: FlightPhase,
-): number {
-  const cruiseWaypoints = scoredWaypoints.slice(phase.start, phase.end + 1)
-  if (cruiseWaypoints.length <= 1) return 0
-
-  let totalDistance = 0
-  for (let i = 0; i < cruiseWaypoints.length - 1; i++) {
-    const current = cruiseWaypoints[i].waypoint
-    const next = cruiseWaypoints[i + 1].waypoint
-    totalDistance += calculateDistanceNM(current.lat, current.lng, next.lat, next.lng)
+// Calculate perpendicular distance from a point to a line
+function perpendicularDistance(point: Waypoint, lineStart: Waypoint, lineEnd: Waypoint): number {
+  if (!point || !lineStart || !lineEnd) {
+    return 0
   }
 
-  // Aim for 1 waypoint every 50 NM
-  const targetSpacing = 50
-  const waypointsNeeded = Math.max(2, Math.ceil(totalDistance / targetSpacing))
-  return waypointsNeeded
-}
+  const x = point.lng
+  const y = point.lat
+  const x1 = lineStart.lng
+  const y1 = lineStart.lat
+  const x2 = lineEnd.lng
+  const y2 = lineEnd.lat
 
-function selectCruiseWaypoints(
-  phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  selected: Waypoint[],
-  selectedIndices: Set<number>,
-): void {
-  if (phaseWaypoints.length <= 2) {
-    // If very few waypoints, take them all
-    for (const item of phaseWaypoints) {
-      if (!selectedIndices.has(item.index)) {
-        selected.push(item.waypoint)
-        selectedIndices.add(item.index)
-      }
-    }
-    return
+  // If the line is just a point, return the distance to that point
+  if (x1 === x2 && y1 === y2) {
+    return Math.sqrt(Math.pow(x - x1, 2) + Math.pow(y - y1, 2))
   }
 
-  // Always take first waypoint
-  if (!selectedIndices.has(phaseWaypoints[0].index)) {
-    selected.push(phaseWaypoints[0].waypoint)
-    selectedIndices.add(phaseWaypoints[0].index)
-  }
+  // Calculate the perpendicular distance
+  const numerator = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1)
+  const denominator = Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2))
 
-  // Calculate cumulative distances for even spacing
-  const waypoints = phaseWaypoints.map((item) => item.waypoint)
-  const distances: number[] = [0]
-
-  for (let i = 1; i < waypoints.length; i++) {
-    const distance =
-      distances[i - 1] +
-      calculateDistanceNM(waypoints[i - 1].lat, waypoints[i - 1].lng, waypoints[i].lat, waypoints[i].lng)
-    distances.push(distance)
-  }
-
-  const totalDistance = distances[distances.length - 1]
-  if (totalDistance === 0) return
-
-  // Target 1 waypoint every 50 NM
-  const targetSpacing = 50
-  const numWaypoints = Math.max(2, Math.ceil(totalDistance / targetSpacing))
-  const step = totalDistance / (numWaypoints - 1)
-
-  // Select waypoints at regular distance intervals
-  for (let i = 1; i < numWaypoints - 1; i++) {
-    const targetDistance = step * i
-    let closestIndex = 0
-    let closestDiff = Math.abs(distances[0] - targetDistance)
-
-    // Find waypoint closest to target distance
-    for (let j = 1; j < distances.length; j++) {
-      const diff = Math.abs(distances[j] - targetDistance)
-      if (diff < closestDiff) {
-        closestDiff = diff
-        closestIndex = j
-      }
-    }
-
-    const waypoint = phaseWaypoints[closestIndex]
-    if (!selectedIndices.has(waypoint.index)) {
-      selected.push(waypoint.waypoint)
-      selectedIndices.add(waypoint.index)
-    }
-  }
-
-  // Always take last waypoint
-  const lastItem = phaseWaypoints[phaseWaypoints.length - 1]
-  if (!selectedIndices.has(lastItem.index)) {
-    selected.push(lastItem.waypoint)
-    selectedIndices.add(lastItem.index)
-  }
-}
-
-// Trim to exact limit by removing lowest importance waypoints
-function trimToLimit(waypoints: Waypoint[], limit: number): Waypoint[] {
-  if (waypoints.length <= limit) return waypoints
-
-  // Calculate importance for each waypoint
-  const scored = waypoints.map((wp, index, arr) => {
-    if (index === 0 || index === arr.length - 1) {
-      return { waypoint: wp, score: Number.MAX_VALUE }
-    }
-
-    const prev = arr[index - 1]
-    const next = arr[index + 1]
-    const score = calculateImportance(prev, wp, next, index, arr.length)
-
-    return { waypoint: wp, score }
-  })
-
-  // Sort by score (descending) and take top N
-  const sorted = scored.sort((a, b) => b.score - a.score)
-  const selected = sorted.slice(0, limit)
-
-  // Re-sort by original order
-  return selected
-    .sort((a, b) => {
-      const indexA = waypoints.indexOf(a.waypoint)
-      const indexB = waypoints.indexOf(b.waypoint)
-      return indexA - indexB
-    })
-    .map((item) => item.waypoint)
-}
-
-// Select ground waypoints by importance
-function selectGroundWaypoints(
-  phaseWaypoints: Array<{ waypoint: Waypoint; score: number; index: number }>,
-  phaseTarget: number,
-  selected: Waypoint[],
-  selectedIndices: Set<number>,
-): void {
-  if (phaseWaypoints.length === 0) return
-
-  // Always keep first waypoint (pushback location)
-  if (!selectedIndices.has(phaseWaypoints[0].index)) {
-    selected.push(phaseWaypoints[0].waypoint)
-    selectedIndices.add(phaseWaypoints[0].index)
-  }
-
-  // For remaining waypoints, select by importance to capture runway turns
-  const remaining = phaseWaypoints.slice(1)
-  const sorted = remaining.sort((a, b) => b.score - a.score)
-  const toTake = Math.max(0, phaseTarget - 1) // -1 because we already kept first
-
-  for (let i = 0; i < Math.min(toTake, sorted.length); i++) {
-    if (!selectedIndices.has(sorted[i].index)) {
-      selected.push(sorted[i].waypoint)
-      selectedIndices.add(sorted[i].index)
-    }
-  }
+  return numerator / denominator
 }
