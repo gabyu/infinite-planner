@@ -77,6 +77,10 @@
 
 /* Added high-contrast dark mode filter for map tiles */
 .dark-map-tiles {
-  filter: brightness(1.5) contrast(120%) sepia(100%) hue-rotate(70deg) saturate(500%);
+  /* Updated filter to create Electric Blue theme (#36A6FF) and improve airport visibility */
+  /* hue-rotate(170deg) shifts the sepia (yellow) to electric blue/cyan */
+  /* brightness(1.2) lifts the dark background so buildings/runways are visible */
+  /* contrast(1.5) sharpens the lines */
+  filter: brightness(1.2) contrast(150%) sepia(100%) hue-rotate(170deg) saturate(300%);
   transition: filter 0.3s ease-in-out;
 }
