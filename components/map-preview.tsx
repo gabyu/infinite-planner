@@ -250,11 +250,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
 
       // Use a dark theme map if in dark mode
       const tileLayer = isDark
-        ? L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: "abcd",
-            maxZoom: 20,
+        ? L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
             className: "dark-map-tiles",
           })
         : L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -301,10 +299,6 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     if (!map) return
 
     // Update tile layer based on theme
-    const currentTileLayer = map.hasLayer(
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { className: "dark-map-tiles" }),
-    )
-
     // If we are in dark mode but don't have the dark tiles (or we have the old CartoDB ones)
     if (isDark) {
       // Remove any existing layers to be safe
@@ -314,11 +308,9 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         }
       })
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: "abcd",
-        maxZoom: 20,
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
         className: "dark-map-tiles",
       }).addTo(map)
     } else if (!isDark) {
