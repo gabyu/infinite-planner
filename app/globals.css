@@ -74,3 +74,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Added high-contrast dark mode filter for map tiles */
+.dark-map-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(120%) grayscale(20%);
+}
