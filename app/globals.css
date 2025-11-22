@@ -77,5 +77,6 @@
 
 /* Added high-contrast dark mode filter for map tiles */
 .dark-map-tiles {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(120%) grayscale(20%);
+  filter: grayscale(100%) invert(100%) sepia(100%) saturate(400%) hue-rotate(70deg) brightness(0.8) contrast(250%);
+  transition: filter 0.3s ease-in-out;
 }
