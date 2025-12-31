@@ -321,7 +321,9 @@ export function FlightPlanEditor() {
 
       const origin = originAirport || "ORIG"
       const destination = destinationAirport || "DEST"
-      const fileName = `Infinite Planner - ${origin}-${destination}.fpl`
+      const now = new Date()
+      const timestamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").split(".")[0]
+      const fileName = `Infinite Planner - ${origin}-${destination} - ${timestamp}Z.fpl`
 
       a.download = fileName
 
