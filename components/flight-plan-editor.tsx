@@ -559,6 +559,34 @@ export function FlightPlanEditor() {
     return updatedWaypoints
   }
 
+  const resetPlanner = () => {
+    setWaypoints([])
+    setSimplificationInfo(null)
+    setOriginAirport("")
+    setDestinationToAirport("")
+    setIcaoValidation({ origin: false, destination: false })
+    setUseMadeWithInfinitePlanner(false)
+    setHasImported(false)
+    setError(null)
+    setWarning(null)
+    setSuccessMessage(null)
+    setWaypointPrefix("")
+    setImportedFileName(null)
+    setIsEditingMap(false)
+    setShowMapPreview(false)
+    setLastSelectedIndex(null)
+    setShowOptionsPanel(false)
+    setShowOptions(false)
+
+    // Reset file inputs
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+    if (txtFileInputRef.current) {
+      txtFileInputRef.current.value = ""
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="container mx-auto py-8 px-4">

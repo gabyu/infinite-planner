@@ -8,8 +8,16 @@ import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 import "./planner.css"
 import Image from "next/image"
+import { useRef } from "react"
 
 export default function PlannerPage() {
+  const editorRef = useRef<{ resetPlanner: () => void } | null>(null)
+
+  const handleResetClick = () => {
+    // Call the reset function on the editor component
+    editorRef.current?.resetPlanner()
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-slate-900">
       {/* Navigation */}
@@ -55,7 +63,7 @@ export default function PlannerPage() {
               </Button>
             </Link>
             <Button
-              onClick={() => window.location.reload()}
+              onClick={handleResetClick}
               variant="outline"
               className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent"
             >
@@ -68,7 +76,7 @@ export default function PlannerPage() {
 
       {/* Flight Plan Editor */}
       <main className="flex-grow">
-        <FlightPlanEditor />
+        <FlightPlanEditor ref={editorRef} />
       </main>
 
       {/* Footer */}
