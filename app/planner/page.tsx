@@ -8,14 +8,11 @@ import { DiscordIcon } from "@/components/discord-icon"
 import { SiteFooter } from "@/components/site-footer"
 import "./planner.css"
 import Image from "next/image"
-import { useRef } from "react"
 
 export default function PlannerPage() {
-  const editorRef = useRef<{ resetPlanner: () => void } | null>(null)
-
   const handleResetClick = () => {
-    // Call the reset function on the editor component
-    editorRef.current?.resetPlanner()
+    // Navigate to /planner with a timestamp to force fresh load
+    window.location.href = `/planner?reset=${Date.now()}`
   }
 
   return (
@@ -76,7 +73,7 @@ export default function PlannerPage() {
 
       {/* Flight Plan Editor */}
       <main className="flex-grow">
-        <FlightPlanEditor ref={editorRef} />
+        <FlightPlanEditor />
       </main>
 
       {/* Footer */}

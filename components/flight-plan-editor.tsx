@@ -635,6 +635,7 @@ export function FlightPlanEditor() {
                               value={originAirport}
                               onChange={(e) => handleICAOChange("origin", e.target.value)}
                               placeholder="EHAM"
+                              autoComplete="off"
                               className={`h-12 w-28 text-center font-mono text-lg ${
                                 originAirport && !icaoValidation.origin
                                   ? "border-red-500 focus:border-red-500"
@@ -661,6 +662,7 @@ export function FlightPlanEditor() {
                               value={destinationAirport}
                               onChange={(e) => handleICAOChange("destination", e.target.value)}
                               placeholder="KSFO"
+                              autoComplete="off"
                               className={`h-12 w-28 text-center font-mono text-lg ${
                                 destinationAirport && !icaoValidation.destination
                                   ? "border-red-500 focus:border-red-500"
