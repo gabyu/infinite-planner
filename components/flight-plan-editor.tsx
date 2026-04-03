@@ -24,6 +24,7 @@ import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import AirportAutocomplete from "@/components/airport-autocomplete"
 import {
   Dialog,
   DialogContent,
@@ -626,52 +627,36 @@ export function FlightPlanEditor() {
                       <div className="flex flex-col gap-6">
                         {/* ICAO inputs row */}
                         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 w-full sm:w-auto">
                             <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap w-24 text-right">
                               Origin
                             </Label>
-                            <Input
-                              id="origin"
-                              value={originAirport}
-                              onChange={(e) => handleICAOChange("origin", e.target.value)}
-                              placeholder="EHAM"
-                              autoComplete="off"
-                              className={`h-12 w-28 text-center font-mono text-lg ${
-                                originAirport && !icaoValidation.origin
-                                  ? "border-red-500 focus:border-red-500"
-                                  : icaoValidation.origin
-                                    ? "border-green-500 focus:border-green-500"
-                                    : ""
-                              }`}
-                              maxLength={4}
-                            />
+                            <div className="w-full sm:w-48">
+                              <AirportAutocomplete
+                                value={originAirport}
+                                onChange={(icao) => handleICAOChange("origin", icao)}
+                                placeholder="Search (EHAM, Amsterdam, etc.)"
+                              />
+                            </div>
                           </div>
 
                           {/* Chevron - hidden on mobile and tablet */}
                           <ChevronRight className="hidden lg:block text-gray-400" size={24} />
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 w-full sm:w-auto">
                             <Label
                               htmlFor="destination"
                               className="text-sm font-medium whitespace-nowrap w-24 text-right"
                             >
                               Destination
                             </Label>
-                            <Input
-                              id="destination"
-                              value={destinationAirport}
-                              onChange={(e) => handleICAOChange("destination", e.target.value)}
-                              placeholder="KSFO"
-                              autoComplete="off"
-                              className={`h-12 w-28 text-center font-mono text-lg ${
-                                destinationAirport && !icaoValidation.destination
-                                  ? "border-red-500 focus:border-red-500"
-                                  : icaoValidation.destination
-                                    ? "border-green-500 focus:border-green-500"
-                                    : ""
-                              }`}
-                              maxLength={4}
-                            />
+                            <div className="w-full sm:w-48">
+                              <AirportAutocomplete
+                                value={destinationAirport}
+                                onChange={(icao) => handleICAOChange("destination", icao)}
+                                placeholder="Search (KSFO, San Francisco, etc.)"
+                              />
+                            </div>
                           </div>
                         </div>
 
