@@ -20,7 +20,7 @@ interface AirportAutocompleteProps {
 export default function AirportAutocomplete({
   value,
   onChange,
-  placeholder = 'Search airport (ICAO or name)',
+  placeholder = 'Search',
   label,
 }: AirportAutocompleteProps) {
   const [airports, setAirports] = useState<Airport[]>([]);
