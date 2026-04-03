@@ -1,12 +1,17 @@
 import { getSupabaseClient } from "./supabase"
 
 const COUNTER_ID = "flight_plans"
+let supabaseWarningShown = false
 
 export async function getFlightPlanCount(): Promise<number> {
   try {
     // Check if Supabase is properly configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.warn("Supabase not configured, returning default count")
+      // Only log warning once to avoid console spam
+      if (!supabaseWarningShown) {
+        console.warn("Supabase not configured, returning default count")
+        supabaseWarningShown = true
+      }
       return 0
     }
 
