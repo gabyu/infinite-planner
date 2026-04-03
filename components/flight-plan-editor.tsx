@@ -629,7 +629,7 @@ export function FlightPlanEditor() {
                         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
                           <div className="flex items-center gap-3 w-full sm:w-auto">
                             <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap w-24 text-right">
-                              Origin
+                              Search
                             </Label>
                             <div className="w-full sm:w-48">
                               <AirportAutocomplete
@@ -648,7 +648,7 @@ export function FlightPlanEditor() {
                               htmlFor="destination"
                               className="text-sm font-medium whitespace-nowrap w-24 text-right"
                             >
-                              Destination
+                              Search
                             </Label>
                             <div className="w-full sm:w-48">
                               <AirportAutocomplete
