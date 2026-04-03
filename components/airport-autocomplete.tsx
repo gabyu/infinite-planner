@@ -55,7 +55,7 @@ export default function AirportAutocomplete({
 
   // Filter and search airports
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value.toUpperCase();
+    const query = e.target.value.trim();
     setInput(query);
 
     if (query.length === 0) {
@@ -64,18 +64,15 @@ export default function AirportAutocomplete({
       return;
     }
 
-    if (query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
+    const queryUpper = query.toUpperCase();
     const filtered = airports.filter(
       (airport) =>
-        airport.ICAO.includes(query) || airport.Name.toUpperCase().includes(query)
+        airport.ICAO.startsWith(queryUpper) || 
+        airport.Name.toUpperCase().includes(queryUpper)
     );
 
     setSuggestions(filtered.slice(0, 10)); // Limit to 10 suggestions
-    setIsOpen(true);
+    setIsOpen(filtered.length > 0);
   };
 
   // Handle selection
