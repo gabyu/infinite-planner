@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 
 let supabaseInstance: ReturnType<typeof createClient> | null = null
+let supabaseConfiguredWarningShown = false
 
 // Create a function to get the Supabase client
 // This prevents errors during build/render time
@@ -16,7 +17,11 @@ export function getSupabaseClient() {
 
   // Check if environment variables are available
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Supabase environment variables not found. Counter functionality will be disabled.")
+    // Only show warning once to avoid log spam
+    if (!supabaseConfiguredWarningShown) {
+      console.warn("Supabase environment variables not found. Counter functionality will be disabled.")
+      supabaseConfiguredWarningShown = true
+    }
 
     // Return a mock client that won't cause errors
     return {

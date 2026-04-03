@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getFlightPlanCount } from "@/lib/counter-service"
 import { getSupabaseClient } from "@/lib/supabase"
 
+let postWarningShown = false
+
 export async function GET() {
   try {
     const count = await getFlightPlanCount()
@@ -29,7 +31,10 @@ export async function POST() {
   try {
     // Check if Supabase is properly configured
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.warn("Supabase not configured, cannot increment counter")
+      if (!postWarningShown) {
+        console.warn("Supabase not configured, cannot increment counter")
+        postWarningShown = true
+      }
       return NextResponse.json({ success: false, error: "Supabase not configured" }, { status: 500 })
     }
 
