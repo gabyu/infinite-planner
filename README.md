@@ -17,6 +17,11 @@ Flight Planner enhances the flight planning experience in Infinite Flight by opt
 - ✔️ Show a map with the flight plan.
 
 
+## 🆕 What's New
+**A smoother map, built for phones and tablets too**
+- The flight plan map now works properly on mobile — no more controls hidden off-screen or stuck behind the edges of your device.
+- New **Select Points** mode: drag a selection box around a cluster of waypoints — just like selecting icons in Finder — to select several at once, then delete them all in one tap.
+
 Roadmap:
 - Identifying step climbs, marking TOC (Top of Climb) & TOD (Top of Descent).
 - Detecting and rounding altitudes to the nearest 100 ft.
