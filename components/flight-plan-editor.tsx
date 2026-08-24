@@ -19,6 +19,7 @@ import {
   ChevronRight,
   HelpCircle,
   Mountain,
+  LassoSelect,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
@@ -83,6 +84,7 @@ export function FlightPlanEditor() {
   const [destinationAirport, setDestinationToAirport] = useState("")
   const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
   const [isEditingMap, setIsEditingMap] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
   const [icaoValidation, setIcaoValidation] = useState({
     origin: false,
     destination: false,
@@ -481,6 +483,31 @@ export function FlightPlanEditor() {
     })
   }, [])
 
+  // Toggle a single waypoint's selection from the map (select mode)
+  const toggleWaypointSelection = useCallback((id: string) => {
+    setWaypoints((prevWaypoints) => prevWaypoints.map((wp) => (wp.id === id ? { ...wp, selected: !wp.selected } : wp)))
+  }, [])
+
+  // Callback for the map's marquee (rubber-band) selection: replaces the
+  // selection with the given ids, unless additive (Shift-drag), which only
+  // adds them without clearing what was already selected.
+  const handleMarqueeSelect = useCallback((ids: string[], additive: boolean) => {
+    const idSet = new Set(ids)
+    setWaypoints((prevWaypoints) =>
+      prevWaypoints.map((wp) => {
+        if (additive) {
+          return idSet.has(wp.id) ? { ...wp, selected: true } : wp
+        }
+        return { ...wp, selected: idSet.has(wp.id) }
+      }),
+    )
+  }, [])
+
+  // Clears the map's current point selection (the pill's "Clear selection")
+  const handleClearMapSelection = useCallback(() => {
+    setWaypoints((prevWaypoints) => prevWaypoints.map((wp) => (wp.selected ? { ...wp, selected: false } : wp)))
+  }, [])
+
   // Toggle map editing mode
   const toggleMapEditing = () => {
     setIsEditingMap((prev) => {
@@ -499,9 +526,23 @@ export function FlightPlanEditor() {
         )
         setWaypoints(updatedWaypoints)
         setSuccessMessage("Map editing mode disabled. Waypoint names updated according to rules.")
+        setSelectMode(false)
       }
 
       return newEditingState
+    })
+  }
+
+  // Toggle point-selection mode on the map (locks pan/zoom, click-to-select points)
+  const toggleSelectMode = () => {
+    setSelectMode((prev) => {
+      const next = !prev
+      setSuccessMessage(
+        next
+          ? "Select mode enabled. Pan and zoom are locked — tap points to select them, then drag any selected point to move the group."
+          : "Select mode disabled.",
+      )
+      return next
     })
   }
 
@@ -1215,11 +1256,11 @@ export function FlightPlanEditor() {
           }}
         >
           <DialogContent
-            className="max-w-6xl"
+            className="max-w-6xl w-[95vw] sm:w-full p-4 sm:p-6 flex flex-col"
             onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
             onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
           >
-            <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
               <div>
                 <DialogTitle>Flight Plan Preview</DialogTitle>
                 <DialogDescription>
@@ -1228,24 +1269,55 @@ export function FlightPlanEditor() {
                 </DialogDescription>
               </div>
               {waypoints.length > 0 && (
-                <Button
-                  onClick={toggleMapEditing}
-                  variant={isEditingMap ? "default" : "outline"}
-                  className="flex items-center gap-2 ml-auto mr-4"
-                >
-                  <Pencil size={16} />
-                  <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>{" "}
-                  {/* Responsive button text */}
-                  <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span> {/* Responsive button text */}
-                </Button>
+                <div className="flex items-center gap-2 ml-auto mr-8">
+                  {isEditingMap && selectMode && waypoints.some((wp) => wp.selected) && (
+                    <Button
+                      onClick={deleteSelectedWaypoints}
+                      variant="destructive"
+                      className="flex items-center gap-2"
+                    >
+                      <Trash2 size={16} />
+                      <span className="hidden sm:inline">Delete waypoint(s)</span>
+                      <span className="sm:hidden">Delete</span>
+                    </Button>
+                  )}
+                  {isEditingMap && (
+                    <Button
+                      onClick={toggleSelectMode}
+                      variant={selectMode ? "default" : "outline"}
+                      className="flex items-center gap-2"
+                    >
+                      <LassoSelect size={16} />
+                      <span className="hidden sm:inline">{selectMode ? "Done Selecting" : "Select Points"}</span>
+                      <span className="sm:hidden">{selectMode ? "Done" : "Select"}</span>
+                    </Button>
+                  )}
+                  {/* Hidden while selecting - the only way out of select mode is "Done Selecting" */}
+                  {!selectMode && (
+                    <Button
+                      onClick={toggleMapEditing}
+                      variant={isEditingMap ? "default" : "outline"}
+                      className="flex items-center gap-2"
+                    >
+                      <Pencil size={16} />
+                      <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>{" "}
+                      {/* Responsive button text */}
+                      <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span> {/* Responsive button text */}
+                    </Button>
+                  )}
+                </div>
               )}
             </DialogHeader>
-            <div className="h-[500px] w-full relative">
+            <div className="h-[70dvh] max-h-[500px] min-h-[280px] w-full relative">
               <MapPreview
                 waypoints={waypoints}
                 isEditing={isEditingMap}
                 onWaypointDragEnd={handleWaypointDragEnd}
                 onWaypointInsert={handleWaypointInsert}
+                selectMode={selectMode}
+                onToggleWaypointSelect={toggleWaypointSelection}
+                onWaypointsMarqueeSelect={handleMarqueeSelect}
+                onClearSelection={handleClearMapSelection}
               />
             </div>
             <DialogFooter>

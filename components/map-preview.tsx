@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import { Lock, X } from "lucide-react"
 
 interface Waypoint {
   id: string
@@ -18,9 +19,27 @@ interface MapPreviewProps {
   isEditing: boolean
   onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
   onWaypointInsert?: (afterIndex: number, lat: number, lng: number) => void
+  selectMode?: boolean
+  onToggleWaypointSelect?: (id: string) => void
+  onWaypointsMarqueeSelect?: (ids: string[], additive: boolean) => void
+  onClearSelection?: () => void
 }
 
-export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, onWaypointInsert }: MapPreviewProps) {
+// Muted, on-brand orange for the selection state - deliberately calmer than
+// Tailwind's default orange-500 (too flashy) while staying clearly orange
+// rather than drifting toward brown, and keeping enough contrast in both themes.
+const SELECTION_COLOR = "#ea580c"
+
+export default function MapPreview({
+  waypoints,
+  isEditing,
+  onWaypointDragEnd,
+  onWaypointInsert,
+  selectMode = false,
+  onToggleWaypointSelect,
+  onWaypointsMarqueeSelect,
+  onClearSelection,
+}: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const routeLineRef = useRef<any>(null)
@@ -35,6 +54,27 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
   const isDark = resolvedTheme === "dark"
   const [L, setL] = useState<any>(null)
   const [isMapReady, setIsMapReady] = useState(false)
+
+  // Refs mirroring latest props so marker event handlers (bound once, on marker
+  // creation) never read stale closures when select mode or selection changes.
+  const selectModeRef = useRef(selectMode)
+  useEffect(() => {
+    selectModeRef.current = selectMode
+  }, [selectMode])
+
+  const waypointsRef = useRef(waypoints)
+  useEffect(() => {
+    waypointsRef.current = waypoints
+  }, [waypoints])
+
+  // Leaflet fires a "click" right after "dragend" on the marker that was just
+  // dragged (even though the pointer moved) - without this guard that phantom
+  // click would immediately toggle the marker's selection back off.
+  const justDraggedIdRef = useRef<string | null>(null)
+
+  // Rubber-band (marquee) selection overlay, drawn with raw pointer events
+  // instead of Leaflet's own drag handling (which is disabled in select mode).
+  const selectionBoxRef = useRef<HTMLDivElement | null>(null)
 
   // Load Leaflet dynamically
   useEffect(() => {
@@ -170,7 +210,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
 
   // Handle map mousemove to find the closest segment
   const handleMapMouseMove = (e: any) => {
-    if (!isEditing || !mapInstanceRef.current || !L || waypoints.length < 2) {
+    if (!isEditing || selectMode || !mapInstanceRef.current || !L || waypoints.length < 2) {
       setHoverSegmentIndex(null)
       setHoverPoint(null)
       return
@@ -355,8 +395,8 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       }).addTo(map)
     }
 
-    // Setup hover detection ONLY for edit mode
-    if (isEditing && waypoints.length > 1) {
+    // Setup hover detection ONLY for edit mode, and not while selecting points
+    if (isEditing && !selectMode && waypoints.length > 1) {
       // Remove old hover line if it exists
       if (hoverLineRef.current) {
         map.removeLayer(hoverLineRef.current)
@@ -405,7 +445,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
       let iconSize: [number, number]
 
       if (waypoint.selected) {
-        iconUrl = getCustomIconSvg("#f97316", 28)
+        iconUrl = getCustomIconSvg(SELECTION_COLOR, 28)
         iconSize = [28, 28]
       } else if (isFirst) {
         iconUrl = getCustomIconSvg("#22c55e", 32)
@@ -445,13 +485,15 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
           marker.unbindPopup()
         }
 
-        if (isEditing) {
+        // Dragging is only for repositioning single waypoints - in select
+        // mode markers can only be selected (click / marquee), not moved.
+        if (isEditing && !selectMode) {
           marker.dragging?.enable()
         } else {
           marker.dragging?.disable()
         }
       } else {
-        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing }).addTo(map)
+        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing && !selectMode }).addTo(map)
 
         // Only bind popup when NOT in editing mode
         if (!isEditing) {
@@ -464,6 +506,20 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         }
 
         const currentWaypointIndex = index
+
+        // In select mode, clicking a marker toggles its selection instead of
+        // relying on the table checkboxes. Leaflet only fires "click" when the
+        // pointer didn't actually drag, so this coexists with dragging below.
+        marker.on("click", () => {
+          if (justDraggedIdRef.current === waypoint.id) {
+            justDraggedIdRef.current = null
+            return
+          }
+          if (selectModeRef.current && onToggleWaypointSelect) {
+            onToggleWaypointSelect(waypoint.id)
+          }
+        })
+
         marker.on("drag", (e: any) => {
           const draggedLatLng = e.latlng
           const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
@@ -482,6 +538,7 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         marker.on("dragend", (e: any) => {
           const newLatLng = e.target.getLatLng()
           onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
+          justDraggedIdRef.current = waypoint.id
         })
         markersRef.current.set(waypoint.id, marker)
       }
@@ -533,7 +590,138 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
         clearTimeout(mouseMoveTimeoutRef.current)
       }
     }
-  }, [waypoints, isDark, isEditing, onWaypointDragEnd, L, isMapReady])
+  }, [waypoints, isDark, isEditing, selectMode, onWaypointDragEnd, onToggleWaypointSelect, L, isMapReady])
+
+  // Lock panning and zooming while the user is selecting points, so a drag on
+  // the map background can't be mistaken for a pan and pinch/scroll can't
+  // zoom out from under a selection.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map) return
+
+    const interactionHandlers = [map.dragging, map.scrollWheelZoom, map.doubleClickZoom, map.touchZoom, map.boxZoom]
+
+    if (selectMode) {
+      interactionHandlers.forEach((handler) => handler?.disable())
+      map.tap?.disable()
+      map.getContainer().style.cursor = "crosshair"
+      map.zoomControl?.remove()
+    } else {
+      interactionHandlers.forEach((handler) => handler?.enable())
+      map.tap?.enable()
+      map.getContainer().style.cursor = ""
+      map.zoomControl?.addTo(map)
+    }
+  }, [selectMode, isMapReady])
+
+  // Rubber-band (marquee) selection: press-and-drag on empty map background
+  // draws a rectangle, and releasing selects every waypoint inside it - the
+  // same interaction as icon selection in Finder or the marquee tool in
+  // Photoshop. Built with raw pointer events (not Leaflet's own drag/click)
+  // since Leaflet's dragging is disabled in select mode and this needs to
+  // work uniformly for mouse and touch.
+  useEffect(() => {
+    const container = mapRef.current
+    const map = mapInstanceRef.current
+    if (!container || !map || !L || !selectMode) return
+
+    container.style.touchAction = "none"
+
+    const box = document.createElement("div")
+    box.style.position = "absolute"
+    box.style.border = `1.5px dashed ${SELECTION_COLOR}`
+    box.style.backgroundColor = "rgba(234, 88, 12, 0.15)"
+    box.style.pointerEvents = "none"
+    box.style.zIndex = "1000"
+    box.style.display = "none"
+    container.appendChild(box)
+    selectionBoxRef.current = box
+
+    const DRAG_THRESHOLD = 4
+    let state: { startX: number; startY: number; additive: boolean; pointerId: number } | null = null
+
+    const isOnMarkerOrControl = (target: EventTarget | null) =>
+      target instanceof Element && !!target.closest(".leaflet-marker-icon, .leaflet-control, .leaflet-popup")
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return
+      if (isOnMarkerOrControl(e.target)) return
+      const rect = container.getBoundingClientRect()
+      state = {
+        startX: e.clientX - rect.left,
+        startY: e.clientY - rect.top,
+        additive: e.shiftKey,
+        pointerId: e.pointerId,
+      }
+      container.setPointerCapture?.(e.pointerId)
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!state) return
+      const rect = container.getBoundingClientRect()
+      const currentX = e.clientX - rect.left
+      const currentY = e.clientY - rect.top
+
+      if (box.style.display === "none") {
+        if (Math.abs(currentX - state.startX) < DRAG_THRESHOLD && Math.abs(currentY - state.startY) < DRAG_THRESHOLD) {
+          return
+        }
+        box.style.display = "block"
+      }
+
+      const left = Math.min(state.startX, currentX)
+      const top = Math.min(state.startY, currentY)
+      box.style.left = `${left}px`
+      box.style.top = `${top}px`
+      box.style.width = `${Math.abs(currentX - state.startX)}px`
+      box.style.height = `${Math.abs(currentY - state.startY)}px`
+    }
+
+    const finishMarquee = () => {
+      if (!state) return
+      if (box.style.display === "block") {
+        const minX = Number.parseFloat(box.style.left)
+        const minY = Number.parseFloat(box.style.top)
+        const maxX = minX + Number.parseFloat(box.style.width)
+        const maxY = minY + Number.parseFloat(box.style.height)
+
+        const idsInBox = waypointsRef.current
+          .filter((wp) => {
+            const point = map.latLngToContainerPoint(L.latLng(wp.lat, wp.lng))
+            return point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+          })
+          .map((wp) => wp.id)
+
+        onWaypointsMarqueeSelect?.(idsInBox, state.additive)
+      }
+      box.style.display = "none"
+      container.releasePointerCapture?.(state.pointerId)
+      state = null
+    }
+
+    const onPointerUp = (e: PointerEvent) => finishMarquee()
+    const onPointerCancel = () => {
+      box.style.display = "none"
+      state = null
+    }
+
+    container.addEventListener("pointerdown", onPointerDown)
+    container.addEventListener("pointermove", onPointerMove)
+    container.addEventListener("pointerup", onPointerUp)
+    container.addEventListener("pointercancel", onPointerCancel)
+
+    return () => {
+      container.removeEventListener("pointerdown", onPointerDown)
+      container.removeEventListener("pointermove", onPointerMove)
+      container.removeEventListener("pointerup", onPointerUp)
+      container.removeEventListener("pointercancel", onPointerCancel)
+      container.style.touchAction = ""
+      if (selectionBoxRef.current && container.contains(selectionBoxRef.current)) {
+        container.removeChild(selectionBoxRef.current)
+      }
+      selectionBoxRef.current = null
+    }
+  }, [selectMode, isMapReady, onWaypointsMarqueeSelect, L])
 
   // Effect to handle the insert marker - ONLY in edit mode
   useEffect(() => {
@@ -590,26 +778,52 @@ export default function MapPreview({ waypoints, isEditing, onWaypointDragEnd, on
     )
   }
 
+  const selectedCount = waypoints.filter((wp) => wp.selected).length
+
   return (
     <div className="relative h-full w-full">
       <div ref={mapRef} className="h-full w-full" />
 
-      {/* Zoom Controls */}
-      {waypoints.length > 1 && (
-        <div className="absolute bottom-4 left-4 flex gap-2 z-[1000]">
+      {/* Select mode status banner - explains the locked pan/zoom and current selection */}
+      {selectMode && (
+        <div
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-lg sm:gap-2 sm:text-sm"
+          style={{ backgroundColor: SELECTION_COLOR }}
+        >
+          <Lock className="h-3.5 w-3.5 shrink-0" />
+          <span>Drag to select</span>
+          {selectedCount > 0 && (
+            <>
+              <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5">{selectedCount} selected</span>
+              <button
+                type="button"
+                onClick={onClearSelection}
+                className="flex shrink-0 items-center gap-0.5 rounded-full bg-white/20 px-2 py-0.5 hover:bg-white/30"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Zoom Controls - hidden in select mode since pan/zoom is locked */}
+      {waypoints.length > 1 && !selectMode && (
+        <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-2 z-[1000] sm:bottom-4 sm:left-4 sm:right-auto">
           <Button
             onClick={zoomToDeparture}
             size="sm"
             className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
           >
-            🛫 Departure
+            🛫 <span className="hidden sm:inline">Departure</span>
           </Button>
           <Button
             onClick={zoomToArrival}
             size="sm"
             className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
           >
-            🛬 Arrival
+            🛬 <span className="hidden sm:inline">Arrival</span>
           </Button>
         </div>
       )}

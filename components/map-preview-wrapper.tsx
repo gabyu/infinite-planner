@@ -17,6 +17,10 @@ interface MapPreviewWrapperProps {
   isEditing: boolean
   onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
   onWaypointInsert?: (afterIndex: number, lat: number, lng: number) => void
+  selectMode?: boolean
+  onToggleWaypointSelect?: (id: string) => void
+  onWaypointsMarqueeSelect?: (ids: string[], additive: boolean) => void
+  onClearSelection?: () => void
 }
 
 export default function MapPreviewWrapper(props: MapPreviewWrapperProps) {
