@@ -137,6 +137,11 @@ export async function saveFlightData(
 }
 
 // Get popular airports (both origin and destination)
+//
+// Aggregated in Postgres via the get_popular_airports() function (see
+// supabase-stats-functions.sql) instead of fetching every row and counting
+// client-side - Supabase caps unpaginated selects at 1000 rows, which used
+// to silently freeze this ranking on the first ~1000 flights ever imported.
 export async function getPopularAirports(limit = 10): Promise<AirportStats[]> {
   try {
     // Check if Supabase is properly configured
@@ -147,51 +152,17 @@ export async function getPopularAirports(limit = 10): Promise<AirportStats[]> {
 
     const supabase = getSupabaseClient()
 
-    // Get origin airports
-    const { data: originData, error: originError } = await supabase
-      .from("flight_statistics")
-      .select("origin_airport")
-      .not("origin_airport", "is", null)
+    const { data, error } = await supabase.rpc("get_popular_airports", { result_limit: limit })
 
-    // Get destination airports
-    const { data: destData, error: destError } = await supabase
-      .from("flight_statistics")
-      .select("destination_airport")
-      .not("destination_airport", "is", null)
-
-    if (originError || destError) {
-      console.error("Error fetching airport data:", originError || destError)
+    if (error) {
+      console.error("Error fetching airport data:", error)
       return []
     }
 
-    // Combine and count airports
-    const airportCounts: { [key: string]: number } = {}
-
-    // Count origin airports
-    if (originData) {
-      originData.forEach((row) => {
-        if (row.origin_airport) {
-          airportCounts[row.origin_airport] = (airportCounts[row.origin_airport] || 0) + 1
-        }
-      })
-    }
-
-    // Count destination airports
-    if (destData) {
-      destData.forEach((row) => {
-        if (row.destination_airport) {
-          airportCounts[row.destination_airport] = (airportCounts[row.destination_airport] || 0) + 1
-        }
-      })
-    }
-
-    // Convert to array and sort by count
-    const sortedAirports = Object.entries(airportCounts)
-      .map(([airport_code, count]) => ({ airport_code, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit)
-
-    return sortedAirports
+    return (data || []).map((row: { airport_code: string; count: number }) => ({
+      airport_code: row.airport_code,
+      count: Number(row.count),
+    }))
   } catch (error) {
     console.error("Error fetching popular airports:", error)
     return []
@@ -199,6 +170,9 @@ export async function getPopularAirports(limit = 10): Promise<AirportStats[]> {
 }
 
 // Get popular flights
+//
+// Aggregated in Postgres via the get_popular_flights() function (see
+// supabase-stats-functions.sql) for the same reason as getPopularAirports.
 export async function getPopularFlights(limit = 10): Promise<FlightStats[]> {
   try {
     // Check if Supabase is properly configured
@@ -209,37 +183,17 @@ export async function getPopularFlights(limit = 10): Promise<FlightStats[]> {
 
     const supabase = getSupabaseClient()
 
-    // Get flight numbers and count them
-    const { data, error } = await supabase
-      .from("flight_statistics")
-      .select("flight_number")
-      .not("flight_number", "is", null)
+    const { data, error } = await supabase.rpc("get_popular_flights", { result_limit: limit })
 
     if (error) {
       console.error("Error fetching flight data:", error)
       return []
     }
 
-    if (!data) {
-      return []
-    }
-
-    // Count flight numbers
-    const flightCounts: { [key: string]: number } = {}
-
-    data.forEach((row) => {
-      if (row.flight_number) {
-        flightCounts[row.flight_number] = (flightCounts[row.flight_number] || 0) + 1
-      }
-    })
-
-    // Convert to array and sort by count
-    const sortedFlights = Object.entries(flightCounts)
-      .map(([flight_number, count]) => ({ flight_number, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit)
-
-    return sortedFlights
+    return (data || []).map((row: { flight_number: string; count: number }) => ({
+      flight_number: row.flight_number,
+      count: Number(row.count),
+    }))
   } catch (error) {
     console.error("Error fetching popular flights:", error)
     return []
@@ -266,28 +220,19 @@ export async function getTotalStats(): Promise<{ totalFlights: number; totalAirp
       return { totalFlights: 0, totalAirports: 0 }
     }
 
-    // Get unique airports
-    const { data: airportData, error: airportError } = await supabase
-      .from("flight_statistics")
-      .select("origin_airport, destination_airport")
+    // Get unique airports - counted in Postgres via get_unique_airport_count()
+    // (see supabase-stats-functions.sql), same reasoning as getPopularAirports:
+    // fetching every row client-side used to be silently capped at 1000.
+    const { data: totalAirports, error: airportError } = await supabase.rpc("get_unique_airport_count")
 
     if (airportError) {
       console.error("Error fetching airport data:", airportError)
       return { totalFlights: totalFlights || 0, totalAirports: 0 }
     }
 
-    // Count unique airports
-    const uniqueAirports = new Set<string>()
-    if (airportData) {
-      airportData.forEach((row) => {
-        if (row.origin_airport) uniqueAirports.add(row.origin_airport)
-        if (row.destination_airport) uniqueAirports.add(row.destination_airport)
-      })
-    }
-
     return {
       totalFlights: totalFlights || 0,
-      totalAirports: uniqueAirports.size,
+      totalAirports: Number(totalAirports) || 0,
     }
   } catch (error) {
     console.error("Error fetching total stats:", error)
