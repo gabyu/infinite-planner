@@ -7,6 +7,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react"
 import { Inter, IBM_Plex_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { GoogleAnalytics } from "@/components/google-analytics"
+import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 // Load IBM Plex Mono with more weights for better flexibility
 const ibmPlexMono = IBM_Plex_Mono({
@@ -65,19 +67,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-BBLYJRGP2N"></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-
-              gtag('config', 'G-BBLYJRGP2N');
-            `,
-          }}
-        />
         {/* Preconnect to Google Fonts to improve loading performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -85,7 +74,10 @@ export default function RootLayout({
       <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
+          {/* Cookie consent banner - Google Analytics only loads after acceptance, see GoogleAnalytics */}
+          <CookieConsentBanner />
         </ThemeProvider>
+        <GoogleAnalytics />
         {/* Load Vercel Speed Insights for performance monitoring */}
         <SpeedInsights />
       </body>
