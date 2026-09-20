@@ -24,6 +24,9 @@ const inter = Inter({
   variable: "--font-inter",
 })
 
+const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
+const siteUrl = isStaging ? "https://staging830921-infiniteplanner.gabyu.com/" : "https://infiniteplanner.gabyu.com/"
+
 export const metadata: Metadata = {
   title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
   description:
@@ -32,11 +35,13 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
   },
+  // Staging must not be indexed since it has no password protection
+  ...(isStaging ? { robots: { index: false, follow: false } } : {}),
   // Add OpenGraph metadata for social media sharing
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://infiniteplanner.gabyu.com/",
+    url: siteUrl,
     title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
     description: "Turn real-world flights into Infinite Flight custom flight plans!",
     siteName: "Infinite Planner",
