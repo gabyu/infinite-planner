@@ -21,8 +21,10 @@ pnpm-debug.log*
 # local env files
 .env*.local
 
-# local-only docs with credentials, never committed
+# local-only docs (setup notes, per-feature change logs for chat context),
+# never committed
 STAGING.local.md
+STAGING_CHANGELOG.local.md
 
 # vercel
 .vercel
