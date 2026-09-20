@@ -21,6 +21,9 @@ pnpm-debug.log*
 # local env files
 .env*.local
 
+# local-only docs with credentials, never committed
+STAGING.local.md
+
 # vercel
 .vercel
 
@@ -30,3 +33,6 @@ next-env.d.ts
 
 # pnpm local build-approval config (machine-specific)
 pnpm-workspace.yaml
+
+# local Claude Code dev-server launch config (machine-specific)
+.claude/

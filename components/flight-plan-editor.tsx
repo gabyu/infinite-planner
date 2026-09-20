@@ -17,13 +17,19 @@ import {
   Layers,
   Pencil,
   ChevronRight,
+  ChevronLeft,
   HelpCircle,
   Mountain,
   LassoSelect,
+  PencilRuler,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { sampleCubicBezier } from "@/lib/bezier"
+import { WaypointTable } from "@/components/waypoint-table"
+import { DrawingBoard } from "@/components/drawing-board"
+import { useHistoryState } from "@/hooks/use-history-state"
+import { useIsTouchPrimary } from "@/hooks/use-is-touch-primary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
@@ -48,6 +54,11 @@ const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
   ),
 })
 
+interface LatLngPoint {
+  lat: number
+  lng: number
+}
+
 // Type for waypoints
 interface Waypoint {
   id: string
@@ -57,6 +68,18 @@ interface Waypoint {
   altitude: number
   selected?: boolean
   locked?: boolean
+  // Only set on waypoints placed with the pen tool that had their curve
+  // handles dragged out - undefined/null means a plain corner point.
+  handleOut?: LatLngPoint | null
+  handleIn?: LatLngPoint | null
+}
+
+// Bookkeeping for a pen-drawn curve segment between two anchor waypoints, so
+// a later handle or anchor edit can regenerate just its interior samples.
+interface CurveSegment {
+  startId: string
+  endId: string
+  sampleIds: string[]
 }
 
 interface SimplificationInfo {
@@ -66,8 +89,48 @@ interface SimplificationInfo {
   source?: string
 }
 
+const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
+const BRAND_NAMES = ["MADE", "WITH", "INFINITE", "PLANNER"]
+
+// Recomputes the interior sample waypoints of a curve segment from its
+// current anchor positions/handles, replacing them in place by id. Bails out
+// (returns the array unchanged) if either anchor is gone or the sample count
+// has drifted (e.g. the user deleted one directly) - a documented scope cut
+// rather than full path-topology repair.
+function regenerateSegmentSamples(waypoints: Waypoint[], segment: CurveSegment): Waypoint[] {
+  const start = waypoints.find((wp) => wp.id === segment.startId)
+  const end = waypoints.find((wp) => wp.id === segment.endId)
+  if (!start || !end) return waypoints
+
+  const p0 = { lat: start.lat, lng: start.lng }
+  const p1 = start.handleOut ?? p0
+  const p2 = end.handleIn ?? { lat: end.lat, lng: end.lng }
+  const p3 = { lat: end.lat, lng: end.lng }
+  const freshPoints = sampleCubicBezier(p0, p1, p2, p3).slice(0, -1)
+
+  if (freshPoints.length !== segment.sampleIds.length) return waypoints
+
+  // globalThis.Map to avoid colliding with the "Map" icon imported from lucide-react above.
+  const positionById = new globalThis.Map(segment.sampleIds.map((id, i) => [id, freshPoints[i]]))
+  return waypoints.map((wp) => {
+    const pos = positionById.get(wp.id)
+    return pos ? { ...wp, lat: pos.lat, lng: pos.lng } : wp
+  })
+}
+
 export function FlightPlanEditor() {
-  const [waypoints, setWaypoints] = useState<Waypoint[]>([])
+  const [mode, setMode] = useState<"choose" | "import" | "draw">("choose")
+  const [waypoints, setWaypoints, waypointsHistory] = useHistoryState<Waypoint[]>([])
+  const [curveSegments, setCurveSegments] = useState<CurveSegment[]>([])
+  const waypointsRef = useRef(waypoints)
+  useEffect(() => {
+    waypointsRef.current = waypoints
+  }, [waypoints])
+  const curveSegmentsRef = useRef(curveSegments)
+  useEffect(() => {
+    curveSegmentsRef.current = curveSegments
+  }, [curveSegments])
+  const isTouchPrimary = useIsTouchPrimary()
   const [simplificationInfo, setSimplificationInfo] = useState<SimplificationInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,6 +171,45 @@ export function FlightPlanEditor() {
     }
   }, [])
 
+  // Draw mode: silently restore a saved draft when entering an empty drawing
+  // board, and autosave (debounced) while drawing - local-only, MVP scope.
+  useEffect(() => {
+    if (mode !== "draw" || waypoints.length > 0) return
+    try {
+      const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+      if (!raw) return
+      const draft = JSON.parse(raw) as {
+        waypoints?: Waypoint[]
+        originAirport?: string
+        destinationAirport?: string
+      }
+      if (draft.waypoints && draft.waypoints.length > 0) {
+        setWaypoints(draft.waypoints)
+        if (draft.originAirport) handleICAOChange("origin", draft.originAirport)
+        if (draft.destinationAirport) handleICAOChange("destination", draft.destinationAirport)
+      }
+    } catch {
+      // Corrupt or unavailable draft - ignore, user just starts fresh.
+    }
+    // Only attempt this once, right when the drawing board opens empty.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
+  useEffect(() => {
+    if (mode !== "draw") return
+    const timeout = setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ waypoints, originAirport, destinationAirport }),
+        )
+      } catch {
+        // localStorage unavailable (private browsing, quota, etc.) - autosave is best-effort.
+      }
+    }, 500)
+    return () => clearTimeout(timeout)
+  }, [mode, waypoints, originAirport, destinationAirport])
+
   // Clear success message after 5 seconds
   useEffect(() => {
     if (successMessage) {
@@ -124,18 +226,23 @@ export function FlightPlanEditor() {
     setWarning(null)
   }, [waypoints])
 
-  // Apply "Made with Infinite Planner" when checkbox changes
+  // Apply naming rules (locks first/last to origin/destination, plus "Made
+  // with Infinite Planner") whenever those inputs change. Lowered from >= 6
+  // to >= 2 so the draw flow's origin/destination fields also lock the
+  // endpoint waypoint names - the >= 6 floor only ever existed to fit the
+  // 4-name "Made with" range.
   useEffect(() => {
-    if (waypoints.length >= 6) {
+    if (waypoints.length >= 2) {
       const updatedWaypoints = applyWaypointNamingRules(
         waypoints,
         originAirport,
         destinationAirport,
         useMadeWithInfinitePlanner,
+        mode === "draw",
       )
       setWaypoints(updatedWaypoints)
     }
-  }, [useMadeWithInfinitePlanner, originAirport, destinationAirport])
+  }, [useMadeWithInfinitePlanner, originAirport, destinationAirport, mode])
 
   // Handle focus event to select all text in the input field
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -398,7 +505,13 @@ export function FlightPlanEditor() {
       return
     }
 
-    const newWaypoints = waypoints.filter((wp) => !wp.selected)
+    const filtered = waypoints.filter((wp) => !wp.selected)
+    // In draw mode, re-run naming so the progressive branding reverts if
+    // this delete drops the route back under 7 waypoints.
+    const newWaypoints =
+      mode === "draw"
+        ? applyWaypointNamingRules(filtered, originAirport, destinationAirport, useMadeWithInfinitePlanner, true)
+        : filtered
 
     setWaypoints(newWaypoints)
     setSuccessMessage(`${selectedCount} waypoint${selectedCount !== 1 ? "s" : ""} removed successfully!`)
@@ -443,23 +556,59 @@ export function FlightPlanEditor() {
     setSuccessMessage(`Prefix "${waypointPrefix}" applied to unlocked waypoints!`)
   }
 
-  // Callback for when a waypoint is dragged on the map
+  // Callback for when a waypoint is dragged on the map. If the waypoint
+  // carries pen-tool curve handles, they're translated by the same delta
+  // (so the curve's shape follows the anchor), and any adjoining curve
+  // segments are resampled in place. Uses refs rather than a functional
+  // setWaypoints update so the curveSegments read stays outside the state
+  // updater (which React may invoke more than once).
   const handleWaypointDragEnd = useCallback((id: string, newLat: number, newLng: number) => {
-    setWaypoints((prevWaypoints) => {
-      const updated = prevWaypoints.map((wp) =>
-        wp.id === id
-          ? {
-              ...wp,
-              lat: newLat,
-              lng: newLng,
-              altitude: 0,
-            }
-          : wp,
-      )
-      setSuccessMessage(`Waypoint ${updated.find((wp) => wp.id === id)?.name} updated on map. Altitude cleared.`)
-      return updated
-    })
+    const prevWaypoints = waypointsRef.current
+    const target = prevWaypoints.find((wp) => wp.id === id)
+    if (!target) return
+    const deltaLat = newLat - target.lat
+    const deltaLng = newLng - target.lng
+
+    let updated = prevWaypoints.map((wp) =>
+      wp.id === id
+        ? {
+            ...wp,
+            lat: newLat,
+            lng: newLng,
+            altitude: 0,
+            handleOut: wp.handleOut ? { lat: wp.handleOut.lat + deltaLat, lng: wp.handleOut.lng + deltaLng } : wp.handleOut,
+            handleIn: wp.handleIn ? { lat: wp.handleIn.lat + deltaLat, lng: wp.handleIn.lng + deltaLng } : wp.handleIn,
+          }
+        : wp,
+    )
+
+    curveSegmentsRef.current
+      .filter((segment) => segment.startId === id || segment.endId === id)
+      .forEach((segment) => {
+        updated = regenerateSegmentSamples(updated, segment)
+      })
+
+    setWaypoints(updated)
+    setSuccessMessage(`Waypoint ${target.name} updated on map. Altitude cleared.`)
   }, [])
+
+  // Callback for when a pen-tool curve handle is dragged under the Select
+  // tool - updates the handle, then resamples the one segment it controls.
+  const handleHandleDragEnd = useCallback(
+    (anchorId: string, which: "handleOut" | "handleIn", newPoint: LatLngPoint) => {
+      const prevWaypoints = waypointsRef.current
+      let updated = prevWaypoints.map((wp) => (wp.id === anchorId ? { ...wp, [which]: newPoint } : wp))
+
+      curveSegmentsRef.current
+        .filter((segment) => (which === "handleOut" ? segment.startId === anchorId : segment.endId === anchorId))
+        .forEach((segment) => {
+          updated = regenerateSegmentSamples(updated, segment)
+        })
+
+      setWaypoints(updated)
+    },
+    [],
+  )
 
   // Callback for when a waypoint is inserted on the map
   const handleWaypointInsert = useCallback((afterIndex: number, lat: number, lng: number) => {
@@ -481,6 +630,93 @@ export function FlightPlanEditor() {
       )
       return newWaypoints
     })
+  }, [])
+
+  // Appends one or more points drawn on the drawing board (a single line-tool
+  // click, or a whole baked curve) as one atomic waypoint-list update, so a
+  // curve segment is a single undo step.
+  const handleAddDrawnPoints = useCallback((points: { lat: number; lng: number }[]) => {
+    setWaypoints((prevWaypoints) => {
+      const newWaypoints: Waypoint[] = [
+        ...prevWaypoints,
+        ...points.map((point, offset) => ({
+          id: `${Date.now()}-draw-${prevWaypoints.length + offset}`,
+          name: String(prevWaypoints.length + offset).padStart(3, "0"),
+          lat: point.lat,
+          lng: point.lng,
+          altitude: 0,
+          selected: false,
+        })),
+      ]
+      return applyWaypointNamingRules(newWaypoints, originAirport, destinationAirport, useMadeWithInfinitePlanner, true)
+    })
+  }, [originAirport, destinationAirport, useMadeWithInfinitePlanner])
+
+  // Commits a pen-tool anchor (a plain click, or a click-and-drag that pulled
+  // out curve handles). If a previous waypoint exists and either side has a
+  // handle, samples a cubic bezier between them and inserts the interior
+  // points, recording a CurveSegment so a later handle/anchor edit can
+  // regenerate them. Reads from refs (not a setWaypoints updater) so the
+  // paired setCurveSegments call never lands inside another state updater.
+  const handleCommitPenAnchor = useCallback(
+    (anchor: { lat: number; lng: number; handleOut: LatLngPoint | null; handleIn: LatLngPoint | null }) => {
+      const prevWaypoints = waypointsRef.current
+      const prevPoint = prevWaypoints[prevWaypoints.length - 1]
+      const newAnchorId = `${Date.now()}-pen-${prevWaypoints.length}`
+
+      let interiorWaypoints: Waypoint[] = []
+      const isStraight = !prevPoint?.handleOut && !anchor.handleIn
+      if (prevPoint && !isStraight) {
+        const p0 = { lat: prevPoint.lat, lng: prevPoint.lng }
+        const p1 = prevPoint.handleOut ?? p0
+        const p2 = anchor.handleIn ?? { lat: anchor.lat, lng: anchor.lng }
+        const p3 = { lat: anchor.lat, lng: anchor.lng }
+        interiorWaypoints = sampleCubicBezier(p0, p1, p2, p3)
+          .slice(0, -1)
+          .map((point, offset) => ({
+            id: `${newAnchorId}-sample-${offset}`,
+            name: "",
+            lat: point.lat,
+            lng: point.lng,
+            altitude: 0,
+            selected: false,
+          }))
+      }
+
+      const newAnchor: Waypoint = {
+        id: newAnchorId,
+        name: "",
+        lat: anchor.lat,
+        lng: anchor.lng,
+        altitude: 0,
+        selected: false,
+        handleOut: anchor.handleOut,
+        handleIn: anchor.handleIn,
+      }
+
+      const newWaypoints = applyWaypointNamingRules(
+        [...prevWaypoints, ...interiorWaypoints, newAnchor],
+        originAirport,
+        destinationAirport,
+        useMadeWithInfinitePlanner,
+        true,
+      )
+      setWaypoints(newWaypoints)
+
+      if (interiorWaypoints.length > 0 && prevPoint) {
+        setCurveSegments((prevSegments) => [
+          ...prevSegments,
+          { startId: prevPoint.id, endId: newAnchorId, sampleIds: interiorWaypoints.map((w) => w.id) },
+        ])
+      }
+    },
+    [originAirport, destinationAirport, useMadeWithInfinitePlanner],
+  )
+
+  // Clears the entire drawing board.
+  const clearDrawing = useCallback(() => {
+    setWaypoints([])
+    setCurveSegments([])
   }, [])
 
   // Toggle a single waypoint's selection from the map (select mode)
@@ -563,12 +799,21 @@ export function FlightPlanEditor() {
     }
   }
 
-  // Add helper function to apply waypoint naming rules
+  // Add helper function to apply waypoint naming rules. `autoDrawBranding`
+  // is the draw flow's progressive MADE/WITH/INFINITE/PLANNER branding: once
+  // the route has >= 7 total waypoints, the last 4 before the destination
+  // get those names (ordinary, unlocked waypoints - not the import flow's
+  // opt-in, locked "Made with Infinite Planner" checkbox feature below).
+  // Since this function fully recomputes every non-endpoint name on every
+  // call - the same as it always has for the import flow - the branding
+  // naturally reverts the moment the count drops back under 7, with no
+  // separate bookkeeping needed.
   const applyWaypointNamingRules = (
     waypoints: Waypoint[],
     origin: string,
     destination: string,
     useMadeWith = false,
+    autoDrawBranding = false,
   ) => {
     if (waypoints.length === 0) return waypoints
 
@@ -594,6 +839,14 @@ export function FlightPlanEditor() {
         }
       }
 
+      if (autoDrawBranding && waypoints.length >= 7) {
+        const isInBrandRange = index >= waypoints.length - 5 && index <= waypoints.length - 2
+        if (isInBrandRange) {
+          const brandIndex = index - (waypoints.length - 5)
+          return { ...wp, name: BRAND_NAMES[brandIndex], locked: false }
+        }
+      }
+
       return { ...wp, name: String(index).padStart(3, "0"), locked: false }
     })
 
@@ -601,7 +854,9 @@ export function FlightPlanEditor() {
   }
 
   const resetPlanner = () => {
+    setMode("choose")
     setWaypoints([])
+    setCurveSegments([])
     setSimplificationInfo(null)
     setOriginAirport("")
     setDestinationToAirport("")
@@ -628,9 +883,149 @@ export function FlightPlanEditor() {
     }
   }
 
+  const exportBlockReason =
+    waypoints.length < 2
+      ? "Add at least 2 waypoints to export."
+      : !icaoValidation.origin || !icaoValidation.destination
+        ? "Enter valid departure and arrival ICAO codes to export."
+        : null
+
   return (
     <TooltipProvider>
       <div className="container mx-auto py-8 px-4">
+        {mode === "choose" && (
+          <div className="max-w-3xl mx-auto py-8">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl font-normal text-gray-900 dark:text-gray-100 mb-3">
+                How do you want to build your flight plan?
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">
+                Import a real-world flight, or draw a brand new route from scratch.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Card
+                className="bg-background shadow-sm border-border cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
+                onClick={() => setMode("import")}
+              >
+                <CardContent className="pt-8 pb-8 text-center flex flex-col items-center">
+                  <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+                    <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Import a Flight</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                    Upload a KML file from FlightRadar24 or FlightAware and convert it into a flight plan.
+                  </p>
+                  <Button className="w-full">Import a Flight</Button>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`bg-background shadow-sm border-border transition-colors ${
+                  isTouchPrimary ? "opacity-60" : "cursor-pointer hover:border-blue-400 dark:hover:border-blue-500"
+                }`}
+                onClick={() => !isTouchPrimary && setMode("draw")}
+              >
+                <CardContent className="pt-8 pb-8 text-center flex flex-col items-center">
+                  <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+                    <PencilRuler className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Start New Flight Plan</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                    Draw a route on a blank map with line and pen tools, then export it as a flight plan.
+                  </p>
+                  <Button className="w-full" disabled={isTouchPrimary}>
+                    Start New Flight Plan
+                  </Button>
+                  {isTouchPrimary && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Flight plan drawing is currently available on desktop only.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {mode !== "choose" && (
+          <div className="mb-4">
+            <Button variant="ghost" size="sm" onClick={resetPlanner} className="gap-1 -ml-3 text-muted-foreground">
+              <ChevronLeft size={16} />
+              Back
+            </Button>
+          </div>
+        )}
+
+        {mode === "draw" && (
+          <Card className="bg-background shadow-sm border-border">
+            <CardContent className="pt-6">
+              <DrawingBoard
+                waypoints={waypoints}
+                onAddPoints={handleAddDrawnPoints}
+                onCommitPenAnchor={handleCommitPenAnchor}
+                onWaypointDragEnd={handleWaypointDragEnd}
+                onHandleDragEnd={handleHandleDragEnd}
+                onToggleWaypointSelect={toggleWaypointSelection}
+                onDeleteSelected={deleteSelectedWaypoints}
+                onClear={clearDrawing}
+                undo={waypointsHistory.undo}
+                redo={waypointsHistory.redo}
+                canUndo={waypointsHistory.canUndo}
+                canRedo={waypointsHistory.canRedo}
+                originAirport={originAirport}
+                destinationAirport={destinationAirport}
+                icaoValidation={icaoValidation}
+                onICAOChange={handleICAOChange}
+                isTouchPrimary={isTouchPrimary}
+              />
+
+              {(error || successMessage) && (
+                <div className="mt-4">
+                  {error && (
+                    <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                      <Mountain className="h-4 w-4 text-red-500 dark:text-red-400" />
+                      <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
+                      <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  {successMessage && (
+                    <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
+                      <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
+                      <AlertDescription className="text-green-600 dark:text-green-300">
+                        {successMessage}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6">
+                <WaypointTable
+                  waypoints={waypoints}
+                  isMobile={isMobile}
+                  isLoading={isLoading}
+                  onRowClick={handleRowClick}
+                  onUpdateWaypoint={updateWaypoint}
+                  onTabKeyNavigation={handleTabKeyNavigation}
+                  onInputFocus={handleInputFocus}
+                  onToggleSelectAll={toggleSelectAll}
+                  onDeleteSelected={deleteSelectedWaypoints}
+                  onClearAltitudes={clearSelectedAltitudes}
+                  onExport={handleExportFPL}
+                  exportDisabled={!!exportBlockReason}
+                  emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
+                />
+                {exportBlockReason && (
+                  <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {mode === "import" && (
         <div className={`${!isMobile && hasImported ? "flex gap-6" : ""}`}>
           {/* Main Content Area */}
           <div className={`${!isMobile && hasImported ? "flex-1" : "w-full"}`}>
@@ -790,47 +1185,25 @@ export function FlightPlanEditor() {
                     </Alert>
                   )}
 
-                  {/* Table Action Bar */}
-                  <div
-                    className="sticky z-10 bg-background pb-4 pt-2 border-b mb-4 flex items-center justify-between gap-2"
-                    style={{ top: "0px" }}
-                  >
-                    {/* Left side - Checkbox only */}
-                    <div className="flex items-center">
-                      <Checkbox id="selectAll" onCheckedChange={(checked) => toggleSelectAll(!!checked)} />
-                    </div>
-
-                    {/* Right side - Delete, Clear Alt, Options, Map and Export */}
-                    <div className="flex gap-2">
-                      {/* Delete Button */}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={deleteSelectedWaypoints}
-                        disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="h-9 w-9 p-0"
-                        title="Delete selected waypoints"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-
-                      {/* Clear Alt Button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={clearSelectedAltitudes}
-                        disabled={!waypoints.some((wp) => wp.selected) || isLoading}
-                        className="h-9 w-9 p-0"
-                        title="Clear altitudes of selected waypoints"
-                      >
-                        <Mountain size={16} />
-                      </Button>
-
-                      {/* Options Button - Mobile/Tablet only */}
+                  <WaypointTable
+                    waypoints={waypoints}
+                    isMobile={isMobile}
+                    isLoading={isLoading}
+                    onRowClick={handleRowClick}
+                    onUpdateWaypoint={updateWaypoint}
+                    onTabKeyNavigation={handleTabKeyNavigation}
+                    onInputFocus={handleInputFocus}
+                    onToggleSelectAll={toggleSelectAll}
+                    onDeleteSelected={deleteSelectedWaypoints}
+                    onClearAltitudes={clearSelectedAltitudes}
+                    onExport={handleExportFPL}
+                    exportDisabled={waypoints.length === 0}
+                    onShowMap={() => setShowMapPreview(true)}
+                    emptyStateMessage="No waypoints added. Import a KML file to get started."
+                    leftActions={
                       <Button
                         onClick={() => {
                           setShowOptions(!showOptions)
-                          // Scroll to options section
                           setTimeout(() => {
                             document
                               .getElementById("options-section")
@@ -844,139 +1217,8 @@ export function FlightPlanEditor() {
                       >
                         <Layers size={16} />
                       </Button>
-
-                      {/* Map Button */}
-                      <Button
-                        onClick={() => setShowMapPreview(true)}
-                        variant="outline"
-                        size="sm"
-                        disabled={waypoints.length === 0 || isLoading}
-                        className="h-9 w-9 p-0"
-                        title="View flight plan on map"
-                      >
-                        <Map size={16} />
-                      </Button>
-
-                      {/* Export Button */}
-                      <Button
-                        onClick={handleExportFPL}
-                        size="sm"
-                        disabled={waypoints.length === 0 || isLoading}
-                        className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1"
-                        title="Export flight plan"
-                      >
-                        <Download size={16} />
-                        <span className="text-sm">Export</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Waypoint Table */}
-                  <div className="border rounded-md overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="w-12"></TableHead>
-                          <TableHead className="w-32">Name</TableHead>
-                          <TableHead className="hidden md:table-cell w-40">Latitude</TableHead>
-                          <TableHead className="hidden md:table-cell w-40">Longitude</TableHead>
-                          <TableHead className="w-20">Alt ft.</TableHead> {/* Updated to show on mobile */}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {isLoading ? (
-                          <TableRow>
-                            <TableCell colSpan={isMobile ? 3 : 5} className="text-center py-8 text-muted-foreground">
-                              {" "}
-                              {/* Adjusted colSpan */}
-                              Loading waypoints...
-                            </TableCell>
-                          </TableRow>
-                        ) : waypoints.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={isMobile ? 3 : 5} className="text-center py-8 text-muted-foreground">
-                              {" "}
-                              {/* Adjusted colSpan */}
-                              No waypoints added. Import a KML file to get started.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          waypoints.map((waypoint, index) => (
-                            <TableRow
-                              key={waypoint.id}
-                              className="bg-card hover:bg-muted/50 h-12 cursor-pointer"
-                              onClick={(e) => handleRowClick(e, waypoint.id, index)}
-                            >
-                              <TableCell className="w-12 py-2 pl-4 pr-2">
-                                <Checkbox
-                                  id={`wp-${waypoint.id}`}
-                                  checked={waypoint.selected}
-                                  onCheckedChange={() => {}}
-                                  className="flex-shrink-0 pointer-events-none"
-                                />
-                              </TableCell>
-                              <TableCell className="py-2">
-                                <Input
-                                  id={`name-${waypoint.id}`}
-                                  value={waypoint.name}
-                                  onChange={(e) => updateWaypoint(waypoint.id, "name", e.target.value)}
-                                  onKeyDown={(e) => handleTabKeyNavigation(e, waypoint.id, "name")}
-                                  onFocus={handleInputFocus}
-                                  className={`h-8 border-input font-[var(--font-ibm-plex-mono)] w-full max-w-[12ch] ${
-                                    waypoint.locked ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""
-                                  }`}
-                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                                  disabled={waypoint.locked}
-                                  readOnly={waypoint.locked}
-                                  maxLength={12}
-                                />
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell py-2 w-40">
-                                <Input
-                                  type="number"
-                                  step="0.0001"
-                                  value={waypoint.lat}
-                                  onChange={(e) =>
-                                    updateWaypoint(waypoint.id, "lat", Number.parseFloat(e.target.value) || 0)
-                                  }
-                                  onFocus={handleInputFocus}
-                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
-                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                                />
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell py-2 w-40">
-                                <Input
-                                  type="number"
-                                  step="0.0001"
-                                  value={waypoint.lng}
-                                  onChange={(e) =>
-                                    updateWaypoint(waypoint.id, "lng", Number.parseFloat(e.target.value) || 0)
-                                  }
-                                  onFocus={handleInputFocus}
-                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full"
-                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                                />
-                              </TableCell>
-                              <TableCell className="py-2 w-20">
-                                {" "}
-                                {/* Updated to show on mobile */}
-                                <Input
-                                  type="number"
-                                  value={waypoint.altitude}
-                                  onChange={(e) =>
-                                    updateWaypoint(waypoint.id, "altitude", Number.parseInt(e.target.value) || 0)
-                                  }
-                                  onFocus={handleInputFocus}
-                                  className="h-8 border-input font-[var(--font-ibm-plex-mono)] w-full min-w-[80px]"
-                                  style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                    }
+                  />
 
                   {/* Options Section - Below table on mobile/tablet */}
                   {showOptions && waypoints.length > 0 && (
@@ -1245,6 +1487,7 @@ export function FlightPlanEditor() {
             </div>
           )}
         </div>
+        )}
 
         {/* Map Preview Dialog */}
         <Dialog
