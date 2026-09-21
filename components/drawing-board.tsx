@@ -237,7 +237,7 @@ export function DrawingBoard({
 
         {/* Empty state guidance */}
         {waypoints.length === 0 && activeTool === "select" && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[999] pointer-events-none">
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
             <div className="flex items-center gap-2 rounded-full bg-background/90 border px-4 py-2 text-sm text-muted-foreground shadow-lg">
               <MousePointer2 className="h-4 w-4" />
               Choose the Line or Pen tool and start drawing
