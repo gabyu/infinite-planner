@@ -25,6 +25,7 @@ pnpm-debug.log*
 # never committed
 STAGING.local.md
 STAGING_CHANGELOG.local.md
+RELEASE_2026-10-01.local.md
 
 # vercel
 .vercel
