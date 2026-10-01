@@ -12,15 +12,15 @@ export async function getFlightPlanCount(): Promise<number> {
 
     const supabase = getSupabaseClient()
 
-    // Query the flight_statistics table and count all rows
-    const { count, error } = await supabase.from("flight_statistics").select("*", { count: "exact", head: true })
+    // Count flight_statistics rows in Postgres (the public key can't read rows directly)
+    const { data, error } = await supabase.rpc("get_flight_count")
 
     if (error) {
       console.error("Error fetching flight count:", error)
       return 0
     }
 
-    return count || 0
+    return Number(data) || 0
   } catch (error) {
     console.error("Exception fetching flight count:", error)
     return 0

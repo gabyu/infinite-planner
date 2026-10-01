@@ -108,27 +108,25 @@ export async function saveFlightData(
     })
 
     // Insert flight data
-    const { data, error } = await supabase
-      .from("flight_statistics")
-      .insert([
-        {
-          flight_number: flightData.flight_number,
-          origin_airport: finalOriginAirport,
-          destination_airport: finalDestinationAirport,
-          flight_date: flightData.date,
-          source: flightData.source,
-          filename: flightData.filename,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
+    // No .select() here: the public key may insert rows but not read them back
+    // (row-level read access is closed, see supabase/migrations).
+    const { error } = await supabase.from("flight_statistics").insert([
+      {
+        flight_number: flightData.flight_number,
+        origin_airport: finalOriginAirport,
+        destination_airport: finalDestinationAirport,
+        flight_date: flightData.date,
+        source: flightData.source,
+        filename: flightData.filename,
+        created_at: new Date().toISOString(),
+      },
+    ])
 
     if (error) {
       console.error("Error saving flight data:", error)
       return false
     }
 
-    console.log("Flight data saved successfully:", data)
     return true
   } catch (error) {
     console.error("Exception saving flight data:", error)
@@ -211,9 +209,9 @@ export async function getTotalStats(): Promise<{ totalFlights: number; totalAirp
     const supabase = getSupabaseClient()
 
     // Get total number of flights
-    const { count: totalFlights, error: flightError } = await supabase
-      .from("flight_statistics")
-      .select("*", { count: "exact", head: true })
+    // Counted in Postgres via get_flight_count() since the public key can no
+    // longer read flight_statistics rows directly.
+    const { data: totalFlights, error: flightError } = await supabase.rpc("get_flight_count")
 
     if (flightError) {
       console.error("Error fetching total flights:", flightError)
@@ -227,11 +225,11 @@ export async function getTotalStats(): Promise<{ totalFlights: number; totalAirp
 
     if (airportError) {
       console.error("Error fetching airport data:", airportError)
-      return { totalFlights: totalFlights || 0, totalAirports: 0 }
+      return { totalFlights: Number(totalFlights) || 0, totalAirports: 0 }
     }
 
     return {
-      totalFlights: totalFlights || 0,
+      totalFlights: Number(totalFlights) || 0,
       totalAirports: Number(totalAirports) || 0,
     }
   } catch (error) {
