@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Upload, PencilRuler, RotateCcw } from "lucide-react"
+import { UserMenu } from "@/components/auth/user-menu"
 
 const navLinkClass =
   "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 items-center gap-1.5"
@@ -95,6 +96,7 @@ export function SiteHeader() {
               <span className="hidden sm:inline">Reset Planner</span>
             </Button>
           )}
+          <UserMenu />
         </nav>
       </div>
     </header>

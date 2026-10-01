@@ -2,6 +2,11 @@
 
 All notable changes to Infinite Planner are documented here.
 
+## Unreleased
+
+### Added
+- **Sign in with Discord.** A new "Sign in" button in the header lets you sign in with your Discord account, and an avatar menu lets you sign out. Accounts are optional and nothing on the site requires one yet: this is the groundwork for saving and sharing your flight plans later. See the updated [Cookie Policy](https://infiniteplanner.gabyu.com/cookies) for what signing in stores.
+
 ## 2026-10-01
 
 ### Added

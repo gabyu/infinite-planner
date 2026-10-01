@@ -26,6 +26,7 @@ pnpm-debug.log*
 STAGING.local.md
 STAGING_CHANGELOG.local.md
 RELEASE_2026-10-01.local.md
+RELEASE_accounts-admin.local.md
 
 # vercel
 .vercel
