@@ -21,10 +21,10 @@ import {
   HelpCircle,
   Mountain,
   LassoSelect,
-  PencilRuler,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL } from "@/lib/fpl-generator"
+import { saveFlightData } from "@/lib/flight-stats-service"
 import { sampleCubicBezier } from "@/lib/bezier"
 import { WaypointTable } from "@/components/waypoint-table"
 import { DrawingBoard } from "@/components/drawing-board"
@@ -45,6 +45,7 @@ import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Image from "next/image"
+import Link from "next/link"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -118,8 +119,15 @@ function regenerateSegmentSamples(waypoints: Waypoint[], segment: CurveSegment):
   })
 }
 
-export function FlightPlanEditor() {
-  const [mode, setMode] = useState<"choose" | "import" | "draw">("choose")
+interface FlightPlanEditorProps {
+  // Which dedicated route this instance backs: /convert (KML import) or
+  // /sketch (draw from scratch). The chooser between the two now lives on
+  // the homepage, not inside this component.
+  initialMode: "import" | "draw"
+}
+
+export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
+  const mode = initialMode
   const [waypoints, setWaypoints, waypointsHistory] = useHistoryState<Waypoint[]>([])
   const [curveSegments, setCurveSegments] = useState<CurveSegment[]>([])
   const waypointsRef = useRef(waypoints)
@@ -441,16 +449,30 @@ export function FlightPlanEditor() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
 
-      try {
-        await fetch("/api/counter", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-cache",
-          },
+      // The import flow already records flight_number/origin/destination via
+      // saveFlightData() at import time (lib/kml-parser.ts), which is both
+      // what feeds "Popular Airports"/"Popular Flights"/"Unique Airports" on
+      // the homepage AND what increments the total flight count (all of
+      // these read row counts/aggregates from the same flight_statistics
+      // table). Drawn plans never went through that path, so they never
+      // showed up anywhere - not the homepage stats, not the total counter -
+      // even though the export button here used to also POST to
+      // /api/counter: that route only ever inserted `{created_at}`, which
+      // violates the table's `filename NOT NULL` constraint and has been
+      // silently failing on every single export (both flows) - it just never
+      // mattered for the import flow because saveFlightData's import-time
+      // insert was already the thing incrementing the count. Removed rather
+      // than fixed in place, since a working version of it would double-count
+      // every KML import (once at import time, once again here at export).
+      if (mode === "draw") {
+        saveFlightData({
+          origin_airport: originAirport,
+          destination_airport: destinationAirport,
+          filename: fileName,
+          source: "DrawingBoard",
+        }).catch((dataError) => {
+          console.error("Error saving drawn flight data:", dataError)
         })
-      } catch (counterError) {
-        console.error("Error incrementing counter:", counterError)
       }
 
       setSuccessMessage(`Flight plan exported as ${fileName}!`)
@@ -853,36 +875,6 @@ export function FlightPlanEditor() {
     return updatedWaypoints
   }
 
-  const resetPlanner = () => {
-    setMode("choose")
-    setWaypoints([])
-    setCurveSegments([])
-    setSimplificationInfo(null)
-    setOriginAirport("")
-    setDestinationToAirport("")
-    setIcaoValidation({ origin: false, destination: false })
-    setUseMadeWithInfinitePlanner(false)
-    setHasImported(false)
-    setError(null)
-    setWarning(null)
-    setSuccessMessage(null)
-    setWaypointPrefix("")
-    setImportedFileName(null)
-    setIsEditingMap(false)
-    setShowMapPreview(false)
-    setLastSelectedIndex(null)
-    setShowOptionsPanel(false)
-    setShowOptions(false)
-
-    // Reset file inputs
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-    if (txtFileInputRef.current) {
-      txtFileInputRef.current.value = ""
-    }
-  }
-
   const exportBlockReason =
     waypoints.length < 2
       ? "Add at least 2 waypoints to export."
@@ -893,69 +885,14 @@ export function FlightPlanEditor() {
   return (
     <TooltipProvider>
       <div className="container mx-auto py-8 px-4">
-        {mode === "choose" && (
-          <div className="max-w-3xl mx-auto py-8">
-            <div className="text-center mb-10">
-              <h2 className="text-3xl font-normal text-gray-900 dark:text-gray-100 mb-3">
-                How do you want to build your flight plan?
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300 text-lg">
-                Import a real-world flight, or draw a brand new route from scratch.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <Card
-                className="bg-background shadow-sm border-border cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-                onClick={() => setMode("import")}
-              >
-                <CardContent className="pt-8 pb-8 text-center flex flex-col items-center">
-                  <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-                    <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">Import a Flight</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-                    Upload a KML file from FlightRadar24 or FlightAware and convert it into a flight plan.
-                  </p>
-                  <Button className="w-full">Import a Flight</Button>
-                </CardContent>
-              </Card>
-
-              <Card
-                className={`bg-background shadow-sm border-border transition-colors ${
-                  isTouchPrimary ? "opacity-60" : "cursor-pointer hover:border-blue-400 dark:hover:border-blue-500"
-                }`}
-                onClick={() => !isTouchPrimary && setMode("draw")}
-              >
-                <CardContent className="pt-8 pb-8 text-center flex flex-col items-center">
-                  <div className="w-14 h-14 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-                    <PencilRuler className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">Start New Flight Plan</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-                    Draw a route on a blank map with line and pen tools, then export it as a flight plan.
-                  </p>
-                  <Button className="w-full" disabled={isTouchPrimary}>
-                    Start New Flight Plan
-                  </Button>
-                  {isTouchPrimary && (
-                    <p className="text-xs text-muted-foreground mt-3">
-                      Flight plan drawing is currently available on desktop only.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-
-        {mode !== "choose" && (
-          <div className="mb-4">
-            <Button variant="ghost" size="sm" onClick={resetPlanner} className="gap-1 -ml-3 text-muted-foreground">
+        <div className="mb-4">
+          <Button variant="ghost" size="sm" asChild className="gap-1 -ml-3 text-muted-foreground">
+            <Link href="/">
               <ChevronLeft size={16} />
               Back
-            </Button>
-          </div>
-        )}
+            </Link>
+          </Button>
+        </div>
 
         {mode === "draw" && (
           <Card className="bg-background shadow-sm border-border">

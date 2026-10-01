@@ -28,9 +28,9 @@ const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
 const siteUrl = isStaging ? "https://staging830921-infiniteplanner.gabyu.com/" : "https://infiniteplanner.gabyu.com/"
 
 export const metadata: Metadata = {
-  title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
+  title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
   description:
-    "Turn real-world flights into Infinite Flight custom flight plans! Import KML files from FlightRadar24 or FlightAware and export to Infinite Flight.",
+    "The Flight Plan Hub for Infinite Flight. Import KML files from FlightRadar24 or FlightAware, or draw a route from scratch, and export it as an Infinite Flight flight plan.",
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
@@ -42,8 +42,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: siteUrl,
-    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
-    description: "Turn real-world flights into Infinite Flight custom flight plans!",
+    title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
+    description: "The Flight Plan Hub for Infinite Flight.",
     siteName: "Infinite Planner",
     images: [
       {
@@ -57,8 +57,8 @@ export const metadata: Metadata = {
   // Add Twitter card metadata
   twitter: {
     card: "summary_large_image",
-    title: "Infinite Planner - Flight Plan Converter for Infinite Flight",
-    description: "Turn real-world flights into Infinite Flight custom flight plans!",
+    title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
+    description: "The Flight Plan Hub for Infinite Flight.",
     images: ["/images/infinite-planner-og.webp"],
   },
   generator: "v0.dev",

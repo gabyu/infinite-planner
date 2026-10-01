@@ -1,64 +1,17 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Plane, Map, Download, MapPin } from "lucide-react"
+import { Plane, Map, Download } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
+import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { FlightStatistics } from "@/components/flight-statistics"
+import { FlowChooser } from "@/components/flow-chooser"
 
 export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Navigation */}
-      <header className="border-b">
-        <div className="container mx-auto py-2 sm:py-4 px-4 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 no-underline group">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-md flex items-center justify-center">
-              <Image
-                src="/ip_logo.svg"
-                alt="Infinite Planner Logo"
-                width={32}
-                height={32}
-                className="w-full h-full group-hover:opacity-80 transition-opacity"
-              />
-            </div>
-            <h1 className="text-sm sm:text-xl font-bold text-blue-600 dark:text-blue-400 group-hover:opacity-80 transition-opacity cursor-pointer whitespace-nowrap">
-              Infinite Planner
-            </h1>
-          </Link>
-          <nav className="flex items-center gap-2 sm:gap-4 md:gap-6">
-            <Link
-              href="/how-it-works"
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center"
-            >
-              Guide
-            </Link>
-            <Link
-              href="/faq"
-              className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 flex items-center"
-            >
-              FAQ
-            </Link>
-            <Link
-              href="https://discord.gg/ZdB72sjET5"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:block"
-            >
-              <Button variant="outline" className="h-10 flex items-center gap-2 px-4 bg-transparent">
-                <DiscordIcon className="w-5 h-5" />
-                <span>Join Discord</span>
-              </Button>
-            </Link>
-            <Link href="/planner">
-              <Button className="h-10 flex items-center gap-2 px-2 sm:px-4">
-                <MapPin size={16} />
-                <span className="hidden sm:inline">Open Planner Tool</span>
-              </Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero Section */}
       <section className="py-16 md:py-24 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
@@ -68,17 +21,10 @@ export default function HomePage() {
             <Image src="/ip_logo.svg" alt="Infinite Planner Logo" width={96} height={96} className="w-24 h-24" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-6">Infinite Planner</h1>
-          <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-            Turn real-world flights into Infinite Flight custom flight plans!
+          <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 mb-10 max-w-3xl mx-auto">
+            The Flight Plan Hub for Infinite Flight
           </p>
-          <div className="flex justify-center">
-            <Link href="/planner">
-              <Button size="lg" className="text-lg px-8 py-6 flex items-center gap-2">
-                <MapPin size={20} />
-                Start Planning
-              </Button>
-            </Link>
-          </div>
+          <FlowChooser />
         </div>
       </section>
 
