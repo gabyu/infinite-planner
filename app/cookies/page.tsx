@@ -23,8 +23,8 @@ export default function CookiesPage() {
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Cookie Policy</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              Short version: we don't set any cookies ourselves. The only optional one is Google Analytics, and only
-              if you say yes.
+              Short version: the only cookie we set is the one that keeps you signed in, and only if you sign in. The
+              only optional one is Google Analytics, and only if you say yes.
             </p>
           </div>
         </section>
@@ -34,11 +34,25 @@ export default function CookiesPage() {
             <section>
               <h2>What Infinite Planner itself stores</h2>
               <p>
-                Nothing, cookie-wise. Your theme (light/dark) and your cookie choice are saved with{" "}
+                Nothing, unless you sign in. Your theme (light/dark) and your cookie choice are saved with{" "}
                 <code className="rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-sm font-mono">
                   localStorage
                 </code>{" "}
                 in your own browser - not a cookie, and never sent to our servers.
+              </p>
+            </section>
+
+            <section>
+              <h2>Signing in (optional)</h2>
+              <p>
+                Accounts are optional. If you choose "Sign in" with Discord, we set a session cookie so the site
+                remembers you're signed in. It is strictly necessary for signing in to work, which is why it doesn't
+                go through the cookie banner, and it is only set after you sign in. It is removed when you sign out.
+              </p>
+              <p>
+                Signing in shares your Discord username, avatar and email address with us, through Supabase, which
+                handles authentication for us. We store your username and avatar to show your account; we don't use
+                your email for anything else and never send you messages with it.
               </p>
             </section>
 
