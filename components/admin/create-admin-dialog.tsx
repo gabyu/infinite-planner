@@ -19,6 +19,7 @@ import {
 interface Credentials {
   email: string
   password: string
+  promoted: boolean
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -53,6 +54,8 @@ export function CreateAdminDialog() {
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
+  // Set when the email belongs to a Discord account: the person must confirm the promotion.
+  const [offerPromotion, setOfferPromotion] = useState(false)
 
   const firstLoginUrl = typeof window === "undefined" ? "" : `${window.location.origin}/admin-dashboard/first-login`
 
@@ -64,29 +67,38 @@ export function CreateAdminDialog() {
       setCredentials(null)
       setEmail("")
       setError(null)
+      setOfferPromotion(false)
     }
   }
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault()
+  async function submit(promote: boolean) {
     setPending(true)
     setError(null)
     try {
       const res = await fetch("/api/admin/admins", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, promote }),
       })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(body.error ?? "Something went wrong. Try again.")
+      if (res.ok) {
+        setCredentials({ email: body.email, password: body.password, promoted: Boolean(body.promoted) })
+        setOfferPromotion(false)
+      } else if (body.code === "discord_account_exists") {
+        setOfferPromotion(true)
       } else {
-        setCredentials({ email: body.email, password: body.password })
+        setOfferPromotion(false)
+        setError(body.error ?? "Something went wrong. Try again.")
       }
     } catch {
       setError("Couldn't reach the server. Try again.")
     }
     setPending(false)
+  }
+
+  function onSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    submit(offerPromotion)
   }
 
   const message = credentials
@@ -110,8 +122,10 @@ export function CreateAdminDialog() {
         {credentials ? (
           <>
             <DialogHeader>
-              <DialogTitle>Admin created</DialogTitle>
+              <DialogTitle>{credentials.promoted ? "Account promoted to admin" : "Admin created"}</DialogTitle>
               <DialogDescription>
+                {credentials.promoted &&
+                  "This Discord account is now an admin. They can still sign in with Discord on the site. "}
                 Copy these now and send them to the new admin yourself. The password is shown only once and can't be
                 retrieved later. If it's lost, reset it from the Supabase dashboard.
               </DialogDescription>
@@ -157,9 +171,21 @@ export function CreateAdminDialog() {
                 required
                 autoComplete="off"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setOfferPromotion(false)
+                }}
               />
             </div>
+            {offerPromotion && (
+              <div role="status" className="rounded-md border bg-muted p-3 text-sm">
+                <p className="font-medium">A Discord account already uses this email.</p>
+                <p className="mt-1 text-muted-foreground">
+                  Promote it to admin instead? It gets a temporary password to pass along, and must choose its own at
+                  first login. Its Discord sign-in keeps working.
+                </p>
+              </div>
+            )}
             {error && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
                 {error}
@@ -168,7 +194,7 @@ export function CreateAdminDialog() {
             <DialogFooter>
               <Button type="submit" disabled={pending}>
                 {pending && <Loader2 className="animate-spin" />}
-                Create admin
+                {offerPromotion ? "Promote to admin" : "Create admin"}
               </Button>
             </DialogFooter>
           </form>
