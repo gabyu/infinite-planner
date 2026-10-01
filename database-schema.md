@@ -77,6 +77,11 @@ CREATE TABLE profiles (
   `admin_list_admins()` (emails come from `auth.users`) and `admin_flight_export_times(since)`
   (one timestamp per exported flight plan, for the activity heatmap, bucketed per day in the
   admin's own timezone in the browser). The public key still can't read `flight_statistics`.
+- **Promoting a Discord account**: "Create admin" detects an email that already belongs to a Discord account
+  (`admin_lookup_user(email)`, executable by the service role only, from
+  `20261002000100_admin_lookup_user.sql`) and offers to promote it. Promotion sets a temporary password
+  (`auth.admin.updateUserById`) and `role = 'admin'`, `must_change_password = true`, then follows the same
+  first-login flow. The Discord sign-in keeps working and the trigger never changes the role.
 - **`SUPABASE_SERVICE_ROLE_KEY`** (server-only, no `NEXT_PUBLIC_` prefix) is used by exactly two admin API
   routes: creating an admin and finishing the first-login password change. Set it per Vercel environment
   (production key on Production, staging key on the `staging` environment).
