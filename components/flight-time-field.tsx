@@ -38,14 +38,14 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <Input
         id={`${idPrefix}-hours`}
         inputMode="numeric"
         value={hours}
         onChange={(e) => update(clampDigits(e.target.value, 99), minutes)}
         placeholder="0"
-        className="w-16 text-center"
+        className="w-14 text-center"
         aria-label="Hours"
       />
       <span className="text-xs text-muted-foreground">h</span>
@@ -55,7 +55,7 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
         value={minutes}
         onChange={(e) => update(hours, clampDigits(e.target.value, 59))}
         placeholder="00"
-        className="w-16 text-center"
+        className="w-14 text-center"
         aria-label="Minutes"
       />
       <span className="text-xs text-muted-foreground">min</span>

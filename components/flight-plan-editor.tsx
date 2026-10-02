@@ -29,6 +29,7 @@ import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import { BRAND_NAMES, BRANDING_MIN_WAYPOINTS, type FlightPlanSource } from "@/lib/flight-plans"
 import { ShareDialog } from "@/components/share-dialog"
+import { RouteArrow } from "@/components/route-arrow"
 import { FlightTimeField } from "@/components/flight-time-field"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getBrowserSupabase } from "@/lib/supabase/client"
@@ -475,20 +476,24 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     performExport()
   }
 
+  // The flight number the KML's filename reliably carries (FlightAware: FlightAware_KLM605_EHAM_KSFO_20260526,
+  // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
+  // strict patterns, so a looser guess never counts. Shown on the page and saved with the plan.
+  const detectedFlightNumber = (() => {
+    if (mode !== "import" || !importedFileName) return null
+    const parsed = parseFlightFilename(importedFileName)
+    return parsed.source ? (parsed.flight_number?.toUpperCase() ?? null) : null
+  })()
+
   // Saves the plan to the signed-in user's history: the first export of this editing
   // session creates the entry, later ones update it. Nothing happens when signed out.
   const saveToHistory = async (finalWaypoints: Waypoint[], effectiveBranding: boolean): Promise<string | null> => {
     const source: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
     if (!source) return "This plan's source couldn't be determined."
 
-    // Only the flight number the filename reliably carries: parseFlightFilename sets `source`
-    // only for the two strict patterns, and a looser guess is stored as null instead.
-    const parsed = mode === "import" && importedFileName ? parseFlightFilename(importedFileName) : null
-    const flightNumber = parsed?.source ? (parsed.flight_number ?? null) : null
-
     const body = JSON.stringify({
       source,
-      flightNumber,
+      flightNumber: detectedFlightNumber,
       origin: originAirport,
       destination: destinationAirport,
       waypoints: finalWaypoints.map(({ name, lat, lng, altitude }) => ({ name, lat, lng, altitude })),
@@ -1029,40 +1034,60 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const brandingAvailable = waypoints.length >= BRANDING_MIN_WAYPOINTS
   const canSave = !!authUser
 
-  // Export options, directly on the page for both Convert and Sketch: the branding checkbox
-  // (ticked by default) and, when signed in, the optional flight time that is saved with the plan.
-  const exportOptions = (
-    <div className="space-y-4">
-      <div className="flex items-start gap-3">
-        <Checkbox
-          id="include-branding"
-          checked={includeBranding && brandingAvailable}
-          disabled={!brandingAvailable}
-          onCheckedChange={(checked) => handleBrandingChange(!!checked)}
-          className="mt-0.5"
-        />
-        <div className="space-y-1">
-          <Label htmlFor="include-branding" className="text-sm font-medium">
-            Include &ldquo;Made with Infinite Planner&rdquo;
+  // Export options, directly on the page for both Convert and Sketch, laid out like the other
+  // panel sections: the branding checkbox (ticked by default) and, when signed in, the optional
+  // flight time that is saved with the plan.
+  const exportSectionClass = "sm:border-b-0 sm:border-r"
+  const exportOptions = (inGrid: boolean) => (
+    <>
+      <PanelSection
+        label="Made with"
+        className={inGrid ? exportSectionClass : undefined}
+        help={
+          brandingAvailable
+            ? "Names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER. Untick it to leave them out."
+            : `Needs at least ${BRANDING_MIN_WAYPOINTS} waypoints, so it isn't applied to this plan.`
+        }
+      >
+        <div className="flex items-center gap-2.5">
+          <Checkbox
+            id="include-branding"
+            checked={includeBranding && brandingAvailable}
+            disabled={!brandingAvailable}
+            onCheckedChange={(checked) => handleBrandingChange(!!checked)}
+          />
+          <Label htmlFor="include-branding" className="whitespace-nowrap text-sm font-normal">
+            Add &ldquo;Made with Infinite Planner&rdquo;
           </Label>
-          <p className="text-xs text-muted-foreground">
-            {brandingAvailable
-              ? "Names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER."
-              : `Needs at least ${BRANDING_MIN_WAYPOINTS} waypoints, so it isn't applied to this plan.`}
-          </p>
         </div>
-      </div>
+      </PanelSection>
 
       {canSave && (
-        <div className="space-y-2">
-          <Label className="studio-label" htmlFor="flight-time-hours">
-            Flight time (optional)
-          </Label>
+        <PanelSection
+          label="Flight time"
+          className={inGrid ? exportSectionClass : undefined}
+          help="Optional. How long the flight takes: saved with the plan in your history."
+        >
           <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
-        </div>
+        </PanelSection>
       )}
-    </div>
+    </>
   )
+
+  // Where the plan came from and the flight number its filename carried (Convert only).
+  const flightSummary =
+    mode === "import" && importSource ? (
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        {detectedFlightNumber ? (
+          <span className="rounded border bg-muted/50 px-1.5 py-0.5 font-mono text-foreground">
+            {detectedFlightNumber}
+          </span>
+        ) : (
+          <span>No flight number in the file name</span>
+        )}
+        <span>{importSource}</span>
+      </div>
+    ) : null
 
   const exportButtons = (
     <div className="space-y-2">
@@ -1259,9 +1284,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}
                 </div>
 
-                <div className="mt-4 grid gap-4 rounded-md border p-4 sm:grid-cols-[1fr_auto] sm:items-end">
-                  {exportOptions}
-                  <div className="sm:w-64">{exportButtons}</div>
+                <div className="mt-4 grid overflow-hidden rounded-md border sm:grid-cols-[1fr_1fr_auto]">
+                  {exportOptions(true)}
+                  <div className="p-4 sm:w-72">{exportButtons}</div>
                 </div>
               </CardContent>
             </Card>
@@ -1405,9 +1430,18 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   />
 
                   {isMobile && waypoints.length > 0 && (
-                    <div className="mt-4 space-y-4 rounded-md border p-4">
-                      {exportOptions}
-                      {exportButtons}
+                    <div className="mt-4 overflow-hidden rounded-md border">
+                      <div className="border-b p-4">
+                        <p className="studio-label">Your flight plan</p>
+                        <p className="mt-2 font-mono text-base font-medium text-primary">
+                          {originAirport || "ORIG"}
+                          <RouteArrow />
+                          {destinationAirport || "DEST"}
+                        </p>
+                        {flightSummary}
+                      </div>
+                      {exportOptions(false)}
+                      <div className="p-4">{exportButtons}</div>
                     </div>
                   )}
 
@@ -1428,8 +1462,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   <div className="border-b p-4">
                     <p className="studio-label">Your flight plan</p>
                     <p className="mt-2 font-mono text-base font-medium text-primary">
-                      {originAirport || "ORIG"} → {destinationAirport || "DEST"}
+                      {originAirport || "ORIG"}
+                      <RouteArrow />
+                      {destinationAirport || "DEST"}
                     </p>
+                    {flightSummary}
                   </div>
 
                   <PanelSection label="Preview">
@@ -1447,10 +1484,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
                   {optionsContent}
 
-                  <div className="space-y-4 border-b p-4">
-                    <p className="studio-label">Export</p>
-                    {exportOptions}
-                  </div>
+                  {exportOptions(false)}
 
                   <div className="p-4">{exportButtons}</div>
                 </Card>
@@ -1464,7 +1498,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             open
             onOpenChange={setShowShareDialog}
             planId={savedPlanId}
-            route={`${originAirport || "ORIG"} → ${destinationAirport || "DEST"}`}
+            origin={originAirport || "ORIG"}
+            destination={destinationAirport || "DEST"}
             shareToken={planShareToken}
             onShareChange={setPlanShareToken}
           />
@@ -1546,9 +1581,19 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 }
 
 // A titled block of the options panel (desktop side panel and mobile options list).
-function PanelSection({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
+function PanelSection({
+  label,
+  help,
+  className,
+  children,
+}: {
+  label: string
+  help?: string
+  className?: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="space-y-2.5 border-b p-4">
+    <div className={cn("space-y-2.5 border-b p-4", className)}>
       <div className="flex items-center gap-1.5">
         <h4 className="studio-label">{label}</h4>
         {help && (
