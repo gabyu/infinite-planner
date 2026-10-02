@@ -11,13 +11,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RouteArrow } from "@/components/route-arrow"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 
 interface ShareDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   planId: string
-  route: string
+  origin: string
+  destination: string
   shareToken: string | null
   // Called with the new token after "Share", or null after "Stop sharing".
   onShareChange: (token: string | null) => void
@@ -27,7 +29,7 @@ interface ShareDialogProps {
 // with a copy action, and Stop sharing. Both go through database functions (share_flight_plan /
 // unshare_flight_plan) that only touch the caller's own plan, so the token is generated
 // server-side and a repeated "Share" returns the existing one instead of making a new link.
-export function ShareDialog({ open, onOpenChange, planId, route, shareToken, onShareChange }: ShareDialogProps) {
+export function ShareDialog({ open, onOpenChange, planId, origin: from, destination: to, shareToken, onShareChange }: ShareDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -89,7 +91,11 @@ export function ShareDialog({ open, onOpenChange, planId, route, shareToken, onS
       <DialogContent className="max-w-md gap-0 p-0">
         <DialogHeader className="space-y-1 border-b px-5 py-4 pr-12 text-left">
           <DialogTitle className="text-base">Share flight plan</DialogTitle>
-          <DialogDescription className="font-mono text-xs">{route}</DialogDescription>
+          <DialogDescription className="font-mono text-xs">
+            {from}
+            <RouteArrow />
+            {to}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 px-5 py-4">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { Download } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { RouteArrow } from "@/components/route-arrow"
 import { SharedPlanMap } from "@/components/shared-plan-map"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
 import { getSharedPlan } from "@/lib/shared-plans"
@@ -36,11 +37,15 @@ export default async function SharedPlanPage({ params }: { params: { token: stri
         <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4">
           <div className="min-w-0">
             <h1 className="font-mono text-xl font-semibold">
-              {plan.origin} → {plan.destination}
+              {plan.origin}
+              <RouteArrow />
+              {plan.destination}
             </h1>
             {(plan.originName || plan.destinationName) && (
               <p className="mt-1 text-sm text-muted-foreground">
-                {plan.originName ?? plan.origin} → {plan.destinationName ?? plan.destination}
+                {plan.originName ?? plan.origin}
+                <RouteArrow className="mx-1" />
+                {plan.destinationName ?? plan.destination}
               </p>
             )}
           </div>

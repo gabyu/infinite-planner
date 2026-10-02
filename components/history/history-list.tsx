@@ -25,6 +25,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
 import { FlightTimeField } from "@/components/flight-time-field"
 import { LocalTime } from "@/components/local-time"
+import { RouteArrow } from "@/components/route-arrow"
 import { ShareDialog } from "@/components/share-dialog"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 import {
@@ -184,10 +185,16 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50 md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_8.5rem]"
               >
                 <div className="min-w-0">
-                  <p className="font-mono text-sm font-medium">{routeOf(plan)}</p>
+                  <p className="font-mono text-sm font-medium">
+                    {plan.origin_airport}
+                    <RouteArrow />
+                    {plan.destination_airport}
+                  </p>
                   {(names[0] || names[1]) && (
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {names[0] ?? plan.origin_airport} → {names[1] ?? plan.destination_airport}
+                      {names[0] ?? plan.origin_airport}
+                      <RouteArrow className="mx-1" />
+                      {names[1] ?? plan.destination_airport}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground md:hidden">
@@ -278,7 +285,8 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
           open
           onOpenChange={(open) => !open && setSharing(null)}
           planId={sharing.id}
-          route={routeOf(sharing)}
+          origin={sharing.origin_airport}
+          destination={sharing.destination_airport}
           shareToken={plans.find((plan) => plan.id === sharing.id)?.share_token ?? null}
           onShareChange={(token) => patchPlan(sharing.id, { share_token: token })}
         />
