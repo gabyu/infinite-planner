@@ -143,20 +143,20 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Zaidee */}
+          {/* RaphaelXT */}
           <div className="bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-20 h-20 rounded-full mx-auto mt-4 border-4 border-white dark:border-gray-800 overflow-hidden">
                 <Image
-                  src="/images/zaidee.webp"
-                  alt="Zaidee"
+                  src="/images/raphaelxt.avif"
+                  alt="RaphaelXT"
                   width={80}
                   height={80}
                   className="w-full h-full object-cover"
                 />
               </div>
-              <h3 className="text-xl font-bold mt-4">Zaidee</h3>
-              <p className="text-gray-600 dark:text-gray-300 mt-2">Developer</p>
+              <h3 className="text-xl font-bold mt-4">RaphaelXT</h3>
+              <p className="text-gray-600 dark:text-gray-300 mt-2">QA Tester</p>
             </div>
           </div>
         </div>
