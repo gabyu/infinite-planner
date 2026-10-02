@@ -33,6 +33,14 @@
     --ring: 221.2 83.2% 53.3%;
 
     --radius: 0.5rem;
+
+    /* Control sizing. The public site keeps its roomy defaults; .studio-theme (below) tightens them. */
+    --control-h: 2.5rem;
+    --control-h-sm: 2.25rem;
+    --control-h-lg: 2.75rem;
+    --control-px: 1rem;
+    --control-px-sm: 0.75rem;
+    --header-py: 1rem;
   }
 
   .dark {
@@ -143,5 +151,76 @@
     --hm-2: 213 66% 44%;
     --hm-3: 211 75% 56%;
     --hm-4: 211 78% 74%;
+  }
+}
+
+/*
+ * Studio theme: the Supabase-Studio-style look used by Convert, Sketch, History and shared
+ * plans (same layout / density / component patterns as the admin dashboard, but the accent
+ * stays Infinite Planner's blue - the admin keeps its own green). Neutral grays, hairline
+ * borders, tighter controls, subtle gray hover backgrounds.
+ *
+ * Scoped to .studio-theme, set on the page wrapper AND on <body> by StudioThemeScope so
+ * Radix portals (dialogs, menus, tooltips, toasts) mounted on <body> pick it up too.
+ */
+@layer base {
+  .studio-theme {
+    --background: 0 0% 98.5%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89%;
+    --input: 0 0% 85%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.375rem;
+
+    --control-h: 2rem;
+    --control-h-sm: 1.75rem;
+    --control-h-lg: 2.25rem;
+    --control-px: 0.75rem;
+    --control-px-sm: 0.625rem;
+    --header-py: 0.625rem;
+  }
+
+  .dark .studio-theme,
+  .dark.studio-theme {
+    --background: 0 0% 11%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 18%;
+    --accent-foreground: 0 0% 93%;
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 20%;
+    --input: 0 0% 22%;
+    --ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer components {
+  /* Small mono uppercase caption used for section and field labels in the Studio theme. */
+  .studio-label {
+    @apply font-mono text-[11px] font-medium uppercase leading-none tracking-wider text-muted-foreground;
   }
 }
