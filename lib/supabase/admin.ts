@@ -13,5 +13,9 @@ export function getServiceRoleSupabase() {
 
   return createClient(url, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    // Next.js caches fetch() results by default, even for POSTs made from a GET route. Nothing
+    // this client does may ever be served from that cache: a revoked share link has to stop
+    // working at once, and every shared download has to be counted.
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
   })
 }

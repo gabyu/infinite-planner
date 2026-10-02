@@ -5,11 +5,21 @@ All notable changes to Infinite Planner are documented here.
 ## Unreleased
 
 ### Added
+- **Flight history.** When you're signed in with Discord, every flight plan you export from Convert or Route Sketch is now saved to your account, and a new **Flight history** page (avatar menu, or [/history](https://infiniteplanner.gabyu.com/history)) lists them newest first. Each entry shows its source, flight number (only when it can be read reliably from the KML's filename), the full origin and destination airport names, and the flight time if you entered one. From there you can download the `.fpl` again, duplicate a plan, edit its flight time or delete it. Only the generated flight plan is kept, never the KML you imported. Signed out, Convert and Route Sketch work exactly as before and nothing is saved.
+- **Share a flight plan.** A **Share** button on each history entry creates a link anyone can open, without an account, to view the plan on a map and download it. The link always shows the plan as it is now (it isn't a frozen copy), and **Stop sharing** switches it off immediately. Sharing again later creates a brand new link.
+- **Optional flight time and a Share button, right on the page.** In Convert and Route Sketch, next to Export: the "Made with Infinite Planner" checkbox, the optional flight time (signed in; typed in by hand for now), **Export FPL** and **Share**. Share saves the plan to your history and opens the link modal, so you never have to go to the history first.
 - **Sign in with Discord.** A new "Sign in" button in the header lets you sign in with your Discord account, and an avatar menu lets you sign out. Accounts are optional and nothing on the site requires one yet: this is the groundwork for saving and sharing your flight plans later. See the updated [Cookie Policy](https://infiniteplanner.gabyu.com/cookies) for what signing in stores.
 - **Terms of Service and Privacy Policy.** New [/terms](https://infiniteplanner.gabyu.com/terms) and [/privacy](https://infiniteplanner.gabyu.com/privacy) pages. Terms of Service, Privacy Policy and Cookie Policy are now linked from the footer of every page, including the admin sign-in pages and dashboard.
 
 ### Changed
+- **"Made with Infinite Planner" works the same everywhere.** One checkbox on the page, ticked by default, in both Convert and Route Sketch: it names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER (it needs at least six waypoints). Untick it to leave them out of that plan. This replaces the old behaviour where Route Sketch added them on its own once a route had seven waypoints, and Convert had it off by default. Unticking it now only changes those four waypoints and leaves every other name you set alone.
+- **A new look for Convert, Route Sketch, the flight history and shared plans**, in the same compact style as the admin dashboard: tighter spacing and controls, hairline borders, subtle gray hover states. The accent stays blue and the header is unchanged.
+- **Flight history** has its own link in the header for signed-in users, and **Reset planner** now only appears in Convert once a flight has been converted.
+- **Convert, Route Sketch, the flight history and shared plans have a new look**, in the same compact style as the admin dashboard: tighter spacing and controls, hairline borders, subtle gray hover states. The accent stays blue.
 - The Cookie Policy no longer claims there are "no accounts, no logins" now that Discord sign-in exists.
+
+### Fixed
+- Waypoint names containing characters like `&` or `<` produced an invalid `.fpl` file. They're now escaped properly.
 
 ## 2026-10-01
 

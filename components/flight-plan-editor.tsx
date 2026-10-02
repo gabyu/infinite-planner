@@ -5,9 +5,8 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Download,
   Upload,
@@ -16,15 +15,24 @@ import {
   CheckCircle2,
   Layers,
   Pencil,
-  ChevronRight,
   ChevronLeft,
   HelpCircle,
-  Mountain,
   LassoSelect,
+  AlertCircle,
+  Info,
+  History,
+  Share2,
+  RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
-import { generateFPL } from "@/lib/fpl-generator"
-import { saveFlightData } from "@/lib/flight-stats-service"
+import { generateFPL, fplFileName } from "@/lib/fpl-generator"
+import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
+import { BRAND_NAMES, BRANDING_MIN_WAYPOINTS, type FlightPlanSource } from "@/lib/flight-plans"
+import { ShareDialog } from "@/components/share-dialog"
+import { FlightTimeField } from "@/components/flight-time-field"
+import { Checkbox } from "@/components/ui/checkbox"
+import { getBrowserSupabase } from "@/lib/supabase/client"
+import { useAuthUser } from "@/hooks/use-auth-user"
 import { sampleCubicBezier } from "@/lib/bezier"
 import { WaypointTable } from "@/components/waypoint-table"
 import { DrawingBoard } from "@/components/drawing-board"
@@ -39,13 +47,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
-import Image from "next/image"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/admin/page-header"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -69,6 +77,11 @@ interface Waypoint {
   altitude: number
   selected?: boolean
   locked?: boolean
+  // Set on the four MADE/WITH/INFINITE/PLANNER waypoints, with the name each one
+  // had before so unticking the branding checkbox restores it instead of resetting
+  // every name in the plan.
+  branded?: boolean
+  unbrandedName?: string
   // Only set on waypoints placed with the pen tool that had their curve
   // handles dragged out - undefined/null means a plain corner point.
   handleOut?: LatLngPoint | null
@@ -91,7 +104,28 @@ interface SimplificationInfo {
 }
 
 const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
-const BRAND_NAMES = ["MADE", "WITH", "INFINITE", "PLANNER"]
+
+// The branding block is the four waypoints just before the destination.
+function isBrandingSlot(index: number, total: number) {
+  return total >= BRANDING_MIN_WAYPOINTS && index >= total - 5 && index <= total - 2
+}
+
+// Puts the MADE/WITH/INFINITE/PLANNER block on (or takes it off) without touching any other
+// name. Idempotent: it first restores every branded waypoint, then re-brands the current
+// last-four-before-the-destination, so it also repairs a block that edits have shifted.
+function applyBrandingOverlay(waypoints: Waypoint[], include: boolean): Waypoint[] {
+  const restored = waypoints.map((wp, index) =>
+    wp.branded
+      ? { ...wp, name: wp.unbrandedName ?? String(index).padStart(3, "0"), locked: false, branded: false, unbrandedName: undefined }
+      : wp,
+  )
+  if (!include) return restored
+  return restored.map((wp, index) =>
+    isBrandingSlot(index, restored.length)
+      ? { ...wp, unbrandedName: wp.name, name: BRAND_NAMES[index - (restored.length - 5)], locked: true, branded: true }
+      : wp,
+  )
+}
 
 // Recomputes the interior sample waypoints of a curve segment from its
 // current anchor positions/handles, replacing them in place by id. Bails out
@@ -153,7 +187,20 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [originAirport, setOriginAirport] = useState("")
   const [destinationAirport, setDestinationToAirport] = useState("")
-  const [useMadeWithInfinitePlanner, setUseMadeWithInfinitePlanner] = useState(false)
+  // One checkbox for Sketch and Convert, ticked by default: whether the MADE/WITH/INFINITE/PLANNER
+  // waypoints go into the exported (and saved) plan. Needs BRANDING_MIN_WAYPOINTS waypoints to apply.
+  const [includeBranding, setIncludeBranding] = useState(true)
+  const [flightTimeMinutes, setFlightTimeMinutes] = useState<number | null>(null)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [isPreparingShare, setIsPreparingShare] = useState(false)
+  // Share link of the plan this session saved, if it is being shared (null = not shared).
+  const [planShareToken, setPlanShareToken] = useState<string | null>(null)
+  const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
+  const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
+  // The history row this editing session has already saved to: exporting again updates it
+  // instead of piling up near-identical entries. Cleared when a new plan is started.
+  const savedPlanIdRef = useRef<string | null>(null)
+  const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
   const [icaoValidation, setIcaoValidation] = useState({
@@ -234,23 +281,16 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setWarning(null)
   }, [waypoints])
 
-  // Apply naming rules (locks first/last to origin/destination, plus "Made
-  // with Infinite Planner") whenever those inputs change. Lowered from >= 6
-  // to >= 2 so the draw flow's origin/destination fields also lock the
-  // endpoint waypoint names - the >= 6 floor only ever existed to fit the
-  // 4-name "Made with" range.
+  // Apply naming rules (locks first/last to origin/destination) whenever the
+  // airports change. Works from 2 waypoints so the draw flow's origin/destination
+  // fields also lock the endpoint names. The branding checkbox is NOT a dependency:
+  // toggling it goes through applyBrandingOverlay, which leaves every other name alone.
   useEffect(() => {
     if (waypoints.length >= 2) {
-      const updatedWaypoints = applyWaypointNamingRules(
-        waypoints,
-        originAirport,
-        destinationAirport,
-        useMadeWithInfinitePlanner,
-        mode === "draw",
-      )
+      const updatedWaypoints = applyWaypointNamingRules(waypoints, originAirport, destinationAirport, includeBranding)
       setWaypoints(updatedWaypoints)
     }
-  }, [useMadeWithInfinitePlanner, originAirport, destinationAirport, mode])
+  }, [originAirport, destinationAirport, mode])
 
   // Handle focus event to select all text in the input field
   const handleInputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -338,13 +378,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       if (result.waypoints.length === 0) {
         setError("No valid waypoints found in the KML file. Please check the file format.")
       } else {
-        const renamedWaypoints = applyWaypointNamingRules(
-          result.waypoints,
-          origin,
-          destination,
-          useMadeWithInfinitePlanner,
-        )
+        const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding)
         setWaypoints(renamedWaypoints)
+        // A new import is a new plan: it must not overwrite the one saved from the previous import.
+        savedPlanIdRef.current = null
+        setSavedPlanId(null)
+        setPlanShareToken(null)
+        setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
           simplifiedCount: result.simplifiedCount,
@@ -388,7 +428,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       const updatedWaypoints = [...waypoints]
 
       for (let i = 0; i < updatedWaypoints.length; i++) {
-        if (i < lines.length && !updatedWaypoints[i].locked) {
+        if (updatedWaypoints[i].branded) {
+          // Keeps its branding name; the imported one is what unticking the checkbox restores.
+          updatedWaypoints[i] = { ...updatedWaypoints[i], unbrandedName: i < lines.length ? lines[i].trim() : "" }
+        } else if (i < lines.length && !updatedWaypoints[i].locked) {
           updatedWaypoints[i] = {
             ...updatedWaypoints[i],
             name: lines[i].trim(),
@@ -422,26 +465,82 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
-  // Generate and download FPL file
-  const handleExportFPL = async () => {
+  // Export button (table bar and options panel): exports straight away, with the branding and
+  // flight-time options as they currently are on the page.
+  const handleExportFPL = () => {
     if (waypoints.length === 0) {
       setError("No waypoints to export")
       return
     }
+    performExport()
+  }
+
+  // Saves the plan to the signed-in user's history: the first export of this editing
+  // session creates the entry, later ones update it. Nothing happens when signed out.
+  const saveToHistory = async (finalWaypoints: Waypoint[], effectiveBranding: boolean): Promise<string | null> => {
+    const source: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
+    if (!source) return "This plan's source couldn't be determined."
+
+    // Only the flight number the filename reliably carries: parseFlightFilename sets `source`
+    // only for the two strict patterns, and a looser guess is stored as null instead.
+    const parsed = mode === "import" && importedFileName ? parseFlightFilename(importedFileName) : null
+    const flightNumber = parsed?.source ? (parsed.flight_number ?? null) : null
+
+    const body = JSON.stringify({
+      source,
+      flightNumber,
+      origin: originAirport,
+      destination: destinationAirport,
+      waypoints: finalWaypoints.map(({ name, lat, lng, altitude }) => ({ name, lat, lng, altitude })),
+      includesBranding: effectiveBranding,
+      flightTimeMinutes,
+    })
+
+    const send = (url: string, method: "POST" | "PUT") =>
+      fetch(url, { method, headers: { "Content-Type": "application/json" }, body })
 
     try {
-      const fplContent = generateFPL(waypoints)
+      let response = savedPlanIdRef.current
+        ? await send(`/api/flight-plans/${savedPlanIdRef.current}`, "PUT")
+        : await send("/api/flight-plans", "POST")
+      // The entry was deleted from the history in the meantime: save it as a new one.
+      if (response.status === 404 && savedPlanIdRef.current) {
+        savedPlanIdRef.current = null
+        setPlanShareToken(null)
+        response = await send("/api/flight-plans", "POST")
+      }
+      const result = await response.json().catch(() => null)
+      if (!response.ok) return result?.error ?? "Couldn't save the flight plan."
+      savedPlanIdRef.current = result.id
+      setSavedPlanId(result.id)
+      return null
+    } catch (saveError) {
+      console.error("Error saving flight plan to history:", saveError)
+      return "Couldn't reach the server."
+    }
+  }
+
+  // Downloads the FPL and, when signed in, saves the plan to the history.
+  const performExport = async () => {
+    setError(null)
+    setSuccessMessage(null)
+
+    // Whatever the checkbox says is what gets exported AND stored, applied to the waypoints
+    // as they are right now (this also repairs a branding block that edits had shifted).
+    const finalWaypoints = applyBrandingOverlay(waypoints, includeBranding)
+    const effectiveBranding = includeBranding && finalWaypoints.length >= BRANDING_MIN_WAYPOINTS
+    if (finalWaypoints.some((wp, i) => wp.name !== waypoints[i].name || wp.locked !== waypoints[i].locked)) {
+      setWaypoints(finalWaypoints)
+    }
+
+    try {
+      const fplContent = generateFPL(finalWaypoints)
       const blob = new Blob([fplContent], { type: "application/xml" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
 
-      const origin = originAirport || "ORIG"
-      const destination = destinationAirport || "DEST"
-      const now = new Date()
-      const timestamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").split(".")[0]
-      const fileName = `Infinite Planner - ${origin}-${destination} - ${timestamp}Z.fpl`
-
+      const fileName = fplFileName(originAirport, destinationAirport)
       a.download = fileName
 
       document.body.appendChild(a)
@@ -475,7 +574,17 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         })
       }
 
-      setSuccessMessage(`Flight plan exported as ${fileName}!`)
+      if (!authUser) {
+        setSuccessMessage(`Flight plan exported as ${fileName}!`)
+        return
+      }
+
+      const saveError = await saveToHistory(finalWaypoints, effectiveBranding)
+      if (saveError) {
+        setError(`Exported as ${fileName}, but it wasn't saved to your history: ${saveError}`)
+      } else {
+        setSuccessMessage(`Flight plan exported as ${fileName} and saved to your history.`)
+      }
     } catch (error) {
       console.error("Error exporting FPL file:", error)
       setError(`Error exporting FPL file: ${error instanceof Error ? error.message : String(error)}`)
@@ -528,12 +637,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
 
     const filtered = waypoints.filter((wp) => !wp.selected)
-    // In draw mode, re-run naming so the progressive branding reverts if
-    // this delete drops the route back under 7 waypoints.
+    // In draw mode, re-run naming so the branding block follows the new last waypoints
+    // (or drops away if the route is now too short for it).
     const newWaypoints =
-      mode === "draw"
-        ? applyWaypointNamingRules(filtered, originAirport, destinationAirport, useMadeWithInfinitePlanner, true)
-        : filtered
+      mode === "draw" ? applyWaypointNamingRules(filtered, originAirport, destinationAirport, includeBranding) : filtered
 
     setWaypoints(newWaypoints)
     setSuccessMessage(`${selectedCount} waypoint${selectedCount !== 1 ? "s" : ""} removed successfully!`)
@@ -566,11 +673,15 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
 
     const renamedWaypoints = waypoints.map((wp, index) => {
+      const prefixed = `${waypointPrefix}${String(index).padStart(3, "0")}`
+      // A branded waypoint keeps its MADE/WITH/... name, but remembers the prefixed one for
+      // when the branding checkbox is unticked.
+      if (wp.branded) return { ...wp, unbrandedName: prefixed }
       if (wp.locked) return wp
 
       return {
         ...wp,
-        name: `${waypointPrefix}${String(index).padStart(3, "0")}`,
+        name: prefixed,
       }
     })
 
@@ -670,9 +781,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           selected: false,
         })),
       ]
-      return applyWaypointNamingRules(newWaypoints, originAirport, destinationAirport, useMadeWithInfinitePlanner, true)
+      return applyWaypointNamingRules(newWaypoints, originAirport, destinationAirport, includeBranding)
     })
-  }, [originAirport, destinationAirport, useMadeWithInfinitePlanner])
+  }, [originAirport, destinationAirport, includeBranding])
 
   // Commits a pen-tool anchor (a plain click, or a click-and-drag that pulled
   // out curve handles). If a previous waypoint exists and either side has a
@@ -720,8 +831,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         [...prevWaypoints, ...interiorWaypoints, newAnchor],
         originAirport,
         destinationAirport,
-        useMadeWithInfinitePlanner,
-        true,
+        includeBranding,
       )
       setWaypoints(newWaypoints)
 
@@ -732,13 +842,16 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         ])
       }
     },
-    [originAirport, destinationAirport, useMadeWithInfinitePlanner],
+    [originAirport, destinationAirport, includeBranding],
   )
 
-  // Clears the entire drawing board.
+  // Clears the entire drawing board. What gets drawn next is a new plan.
   const clearDrawing = useCallback(() => {
     setWaypoints([])
     setCurveSegments([])
+    savedPlanIdRef.current = null
+    setSavedPlanId(null)
+    setPlanShareToken(null)
   }, [])
 
   // Toggle a single waypoint's selection from the map (select mode)
@@ -776,12 +889,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           "Map editing mode enabled. Drag waypoints to adjust their position or hover over the route to add new waypoints.",
         )
       } else {
-        const updatedWaypoints = applyWaypointNamingRules(
-          waypoints,
-          originAirport,
-          destinationAirport,
-          useMadeWithInfinitePlanner,
-        )
+        const updatedWaypoints = applyWaypointNamingRules(waypoints, originAirport, destinationAirport, includeBranding)
         setWaypoints(updatedWaypoints)
         setSuccessMessage("Map editing mode disabled. Waypoint names updated according to rules.")
         setSelectMode(false)
@@ -821,58 +929,84 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
-  // Add helper function to apply waypoint naming rules. `autoDrawBranding`
-  // is the draw flow's progressive MADE/WITH/INFINITE/PLANNER branding: once
-  // the route has >= 7 total waypoints, the last 4 before the destination
-  // get those names (ordinary, unlocked waypoints - not the import flow's
-  // opt-in, locked "Made with Infinite Planner" checkbox feature below).
-  // Since this function fully recomputes every non-endpoint name on every
-  // call - the same as it always has for the import flow - the branding
-  // naturally reverts the moment the count drops back under 7, with no
-  // separate bookkeeping needed.
-  const applyWaypointNamingRules = (
-    waypoints: Waypoint[],
-    origin: string,
-    destination: string,
-    useMadeWith = false,
-    autoDrawBranding = false,
-  ) => {
+  // Share: saves the plan to the history first (updating it if this session already saved it, so
+  // the live link serves what is on screen now), then opens the share modal.
+  const handleShare = async () => {
+    if (waypoints.length < 2) {
+      setError("Add at least 2 waypoints before sharing.")
+      return
+    }
+    if (mode === "draw" && exportBlockReason) {
+      setError(exportBlockReason)
+      return
+    }
+    setError(null)
+    setSuccessMessage(null)
+    setIsPreparingShare(true)
+
+    const finalWaypoints = applyBrandingOverlay(waypoints, includeBranding)
+    if (finalWaypoints.some((wp, i) => wp.name !== waypoints[i].name || wp.locked !== waypoints[i].locked)) {
+      setWaypoints(finalWaypoints)
+    }
+    const effectiveBranding = includeBranding && finalWaypoints.length >= BRANDING_MIN_WAYPOINTS
+
+    const saveError = await saveToHistory(finalWaypoints, effectiveBranding)
+    if (saveError || !savedPlanIdRef.current) {
+      setIsPreparingShare(false)
+      setError(`Couldn't prepare the share link: ${saveError ?? "the plan wasn't saved."}`)
+      return
+    }
+
+    // Is it already being shared (from an earlier press in this session)?
+    const supabase = getBrowserSupabase()
+    const { data } = supabase
+      ? await supabase.from("flight_plans").select("share_token").eq("id", savedPlanIdRef.current).maybeSingle()
+      : { data: null }
+    setPlanShareToken((data?.share_token as string | null | undefined) ?? null)
+    setIsPreparingShare(false)
+    setShowShareDialog(true)
+  }
+
+  // Applies the naming rules: the first/last waypoints are locked to the origin/destination,
+  // everything else is numbered by position, and - when the branding checkbox is ticked and
+  // the plan has at least BRANDING_MIN_WAYPOINTS - the four waypoints before the destination
+  // become MADE / WITH / INFINITE / PLANNER (locked, and remembered as branded so unticking
+  // the checkbox can restore them). The same rule for Convert and Sketch: no length-based
+  // "auto" branding any more, only the checkbox decides.
+  const applyWaypointNamingRules = (waypoints: Waypoint[], origin: string, destination: string, branding = false) => {
     if (waypoints.length === 0) return waypoints
 
-    const updatedWaypoints = waypoints.map((wp, index) => {
+    return waypoints.map((wp, index) => {
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
+      const numbered = String(index).padStart(3, "0")
 
       if (isFirst) {
-        return { ...wp, name: origin || "ORIG", locked: true }
+        return { ...wp, name: origin || "ORIG", locked: true, branded: false, unbrandedName: undefined }
       }
 
       if (isLast) {
-        return { ...wp, name: destination || "DEST", locked: true }
+        return { ...wp, name: destination || "DEST", locked: true, branded: false, unbrandedName: undefined }
       }
 
-      if (useMadeWith && waypoints.length >= 6) {
-        const madeWithNames = ["MADE", "WITH", "INFINITE", "PLANNER"]
-        const isInMadeWithRange = index >= waypoints.length - 5 && index <= waypoints.length - 2
-
-        if (isInMadeWithRange) {
-          const madeWithIndex = index - (waypoints.length - 5)
-          return { ...wp, name: madeWithNames[madeWithIndex], locked: true }
+      if (branding && isBrandingSlot(index, waypoints.length)) {
+        return {
+          ...wp,
+          name: BRAND_NAMES[index - (waypoints.length - 5)],
+          locked: true,
+          branded: true,
+          unbrandedName: numbered,
         }
       }
 
-      if (autoDrawBranding && waypoints.length >= 7) {
-        const isInBrandRange = index >= waypoints.length - 5 && index <= waypoints.length - 2
-        if (isInBrandRange) {
-          const brandIndex = index - (waypoints.length - 5)
-          return { ...wp, name: BRAND_NAMES[brandIndex], locked: false }
-        }
-      }
-
-      return { ...wp, name: String(index).padStart(3, "0"), locked: false }
+      return { ...wp, name: numbered, locked: false, branded: false, unbrandedName: undefined }
     })
+  }
 
-    return updatedWaypoints
+  // The checkbox in the export dialog. Only the four branding waypoints change.
+  const handleBrandingChange = (checked: boolean) => {
+    setIncludeBranding(checked)
+    setWaypoints((prev) => applyBrandingOverlay(prev, checked))
   }
 
   const exportBlockReason =
@@ -882,242 +1016,355 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         ? "Enter valid departure and arrival ICAO codes to export."
         : null
 
+  const icaoInputClass = (value: string, valid: boolean) =>
+    cn(
+      "text-center font-mono uppercase tracking-widest",
+      value && !valid
+        ? "border-destructive focus-visible:ring-destructive"
+        : valid
+          ? "border-emerald-500/70 focus-visible:ring-emerald-500"
+          : "",
+    )
+
+  const brandingAvailable = waypoints.length >= BRANDING_MIN_WAYPOINTS
+  const canSave = !!authUser
+
+  // Export options, directly on the page for both Convert and Sketch: the branding checkbox
+  // (ticked by default) and, when signed in, the optional flight time that is saved with the plan.
+  const exportOptions = (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <Checkbox
+          id="include-branding"
+          checked={includeBranding && brandingAvailable}
+          disabled={!brandingAvailable}
+          onCheckedChange={(checked) => handleBrandingChange(!!checked)}
+          className="mt-0.5"
+        />
+        <div className="space-y-1">
+          <Label htmlFor="include-branding" className="text-sm font-medium">
+            Include &ldquo;Made with Infinite Planner&rdquo;
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {brandingAvailable
+              ? "Names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER."
+              : `Needs at least ${BRANDING_MIN_WAYPOINTS} waypoints, so it isn't applied to this plan.`}
+          </p>
+        </div>
+      </div>
+
+      {canSave && (
+        <div className="space-y-2">
+          <Label className="studio-label" htmlFor="flight-time-hours">
+            Flight time (optional)
+          </Label>
+          <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
+        </div>
+      )}
+    </div>
+  )
+
+  const exportButtons = (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading}>
+          <Download />
+          Export FPL
+        </Button>
+        <span title={canSave ? undefined : "Sign in with Discord to share a flight plan"}>
+          <Button
+            variant="outline"
+            onClick={handleShare}
+            disabled={!canSave || waypoints.length === 0 || isLoading || isPreparingShare}
+          >
+            <Share2 />
+            {isPreparingShare ? "Saving..." : "Share"}
+          </Button>
+        </span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {canSave
+          ? "Exporting saves the plan to your history, where you can share it too."
+          : authAvailable && authReady
+            ? "Sign in with Discord (top right) to save plans to a history and share them."
+            : ""}
+      </p>
+    </div>
+  )
+
+  // Result banners shared by Convert and Sketch: compact, neutral surface, colour only on the icon/title.
+  const alerts = (
+    <>
+      {error && (
+        <Alert className="mb-3 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-6">
+          <AlertCircle className="h-4 w-4 text-destructive" />
+          <AlertTitle className="text-sm text-destructive">Error</AlertTitle>
+          <AlertDescription className="text-muted-foreground">{error}</AlertDescription>
+        </Alert>
+      )}
+      {successMessage && (
+        <Alert className="mb-3 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-6">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          <AlertTitle className="text-sm text-emerald-600 dark:text-emerald-400">Success</AlertTitle>
+          <AlertDescription className="text-muted-foreground">{successMessage}</AlertDescription>
+        </Alert>
+      )}
+    </>
+  )
+
+  // Shown before any work is in progress: signing in reloads the page, so it has to come first.
+  const accountHint =
+    authAvailable && authReady ? (
+      authUser ? (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <History className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            Signed in: plans you export are saved to your{" "}
+            <Link href="/history" className="underline underline-offset-2 hover:text-foreground">
+              history
+            </Link>
+            .
+          </span>
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">
+          Not signed in: plans you export aren&apos;t saved. Sign in with Discord (top right) first to keep a history and
+          share plans. Signing in reloads the page.
+        </p>
+      )
+    ) : null
+
+  // Names tools (TXT import, prefix) - the right-hand panel on desktop, below the table on mobile/tablet.
+  const optionsContent = (
+    <>
+      <PanelSection label="Import TXT to waypoints" help="Import a text file to populate waypoint names.">
+        <Button
+          onClick={() => txtFileInputRef.current?.click()}
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={waypoints.length === 0}
+        >
+          <Upload />
+          Import TXT file
+        </Button>
+        <input ref={txtFileInputRef} type="file" accept=".txt" onChange={handleTxtImport} className="hidden" />
+      </PanelSection>
+
+      <PanelSection label="Waypoint prefix" help='Add a prefix to all waypoint names (e.g., "WP").'>
+        <Input
+          id="waypointPrefix"
+          value={waypointPrefix}
+          onChange={(e) => setWaypointPrefix(e.target.value)}
+          placeholder="Prefix, e.g. WP"
+          onFocus={handleInputFocus}
+          className="font-mono"
+        />
+        <Button
+          onClick={applyWaypointPrefix}
+          variant="outline"
+          size="sm"
+          className="w-full"
+          disabled={isLoading || waypoints.length === 0}
+        >
+          Apply prefix
+        </Button>
+      </PanelSection>
+    </>
+  )
+
+  // Back link + page title. Sits above the content, inside the narrow column on the pre-import screen.
+  const intro = (
+    <>
+      <div className="mb-3">
+        <Button variant="ghost" size="sm" asChild className="-ml-2.5 gap-1 text-muted-foreground">
+          <Link href="/">
+            <ChevronLeft size={14} />
+            Back
+          </Link>
+        </Button>
+      </div>
+
+      <PageHeader
+        actions={
+          mode === "import" && hasImported ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                window.location.href = `${window.location.pathname}?reset=${Date.now()}`
+              }}
+            >
+              <RotateCcw />
+              Reset planner
+            </Button>
+          ) : undefined
+        }
+        title={mode === "draw" ? "Route Sketch" : "Convert a flight"}
+        description={
+          mode === "draw"
+            ? "Draw a route on the map, then export it as an Infinite Flight flight plan."
+            : "Turn a KML file from FlightRadar24 or FlightAware into an Infinite Flight flight plan."
+        }
+      />
+    </>
+  )
+
   return (
     <TooltipProvider>
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-4">
-          <Button variant="ghost" size="sm" asChild className="gap-1 -ml-3 text-muted-foreground">
-            <Link href="/">
-              <ChevronLeft size={16} />
-              Back
-            </Link>
-          </Button>
-        </div>
+      <div className="container mx-auto px-4 py-6">
+        {mode !== "import" || hasImported ? intro : null}
 
         {mode === "draw" && (
-          <Card className="bg-background shadow-sm border-border">
-            <CardContent className="pt-6">
-              <DrawingBoard
-                waypoints={waypoints}
-                onAddPoints={handleAddDrawnPoints}
-                onCommitPenAnchor={handleCommitPenAnchor}
-                onWaypointDragEnd={handleWaypointDragEnd}
-                onHandleDragEnd={handleHandleDragEnd}
-                onToggleWaypointSelect={toggleWaypointSelection}
-                onDeleteSelected={deleteSelectedWaypoints}
-                onClear={clearDrawing}
-                undo={waypointsHistory.undo}
-                redo={waypointsHistory.redo}
-                canUndo={waypointsHistory.canUndo}
-                canRedo={waypointsHistory.canRedo}
-                originAirport={originAirport}
-                destinationAirport={destinationAirport}
-                icaoValidation={icaoValidation}
-                onICAOChange={handleICAOChange}
-                isTouchPrimary={isTouchPrimary}
-              />
-
-              {(error || successMessage) && (
-                <div className="mt-4">
-                  {error && (
-                    <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-                      <Mountain className="h-4 w-4 text-red-500 dark:text-red-400" />
-                      <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
-                      <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  {successMessage && (
-                    <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-                      <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
-                      <AlertDescription className="text-green-600 dark:text-green-300">
-                        {successMessage}
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-6">
-                <WaypointTable
+          <>
+            <Card className="shadow-none">
+              <CardContent className="p-4">
+                <DrawingBoard
                   waypoints={waypoints}
-                  isMobile={isMobile}
-                  isLoading={isLoading}
-                  onRowClick={handleRowClick}
-                  onUpdateWaypoint={updateWaypoint}
-                  onTabKeyNavigation={handleTabKeyNavigation}
-                  onInputFocus={handleInputFocus}
-                  onToggleSelectAll={toggleSelectAll}
+                  onAddPoints={handleAddDrawnPoints}
+                  onCommitPenAnchor={handleCommitPenAnchor}
+                  onWaypointDragEnd={handleWaypointDragEnd}
+                  onHandleDragEnd={handleHandleDragEnd}
+                  onToggleWaypointSelect={toggleWaypointSelection}
                   onDeleteSelected={deleteSelectedWaypoints}
-                  onClearAltitudes={clearSelectedAltitudes}
-                  onExport={handleExportFPL}
-                  exportDisabled={!!exportBlockReason}
-                  emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
+                  onClear={clearDrawing}
+                  undo={waypointsHistory.undo}
+                  redo={waypointsHistory.redo}
+                  canUndo={waypointsHistory.canUndo}
+                  canRedo={waypointsHistory.canRedo}
+                  originAirport={originAirport}
+                  destinationAirport={destinationAirport}
+                  icaoValidation={icaoValidation}
+                  onICAOChange={handleICAOChange}
+                  isTouchPrimary={isTouchPrimary}
                 />
-                {exportBlockReason && (
-                  <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+
+                {(error || successMessage) && <div className="mt-4">{alerts}</div>}
+
+                <div className="mt-4">
+                  <WaypointTable
+                    waypoints={waypoints}
+                    isMobile={isMobile}
+                    isLoading={isLoading}
+                    onRowClick={handleRowClick}
+                    onUpdateWaypoint={updateWaypoint}
+                    onTabKeyNavigation={handleTabKeyNavigation}
+                    onInputFocus={handleInputFocus}
+                    onToggleSelectAll={toggleSelectAll}
+                    onDeleteSelected={deleteSelectedWaypoints}
+                    onClearAltitudes={clearSelectedAltitudes}
+                    onExport={handleExportFPL}
+                    exportDisabled={!!exportBlockReason}
+                    emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
+                  />
+                  {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}
+                </div>
+
+                <div className="mt-4 grid gap-4 rounded-md border p-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                  {exportOptions}
+                  <div className="sm:w-64">{exportButtons}</div>
+                </div>
+              </CardContent>
+            </Card>
+            {accountHint}
+          </>
         )}
 
-        {mode === "import" && (
-        <div className={`${!isMobile && hasImported ? "flex gap-6" : ""}`}>
-          {/* Main Content Area */}
-          <div className={`${!isMobile && hasImported ? "flex-1" : "w-full"}`}>
-            <Card className="bg-background shadow-sm border-border">
-              {/* Header - Conditional rendering based on hasImported */}
-              {!hasImported ? (
-                /* Pre-import state - Large centered form */
-                <div className="p-12">
-                  <div className="text-center max-w-2xl mx-auto">
-                    {/* Logo - hidden on mobile */}
-                    <div className="hidden sm:flex justify-center mb-6">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center p-3">
-                        <Image
-                          src="/ip_logo.svg"
-                          alt="Infinite Planner Logo"
-                          width={48}
-                          height={48}
-                          className="w-full h-full"
-                        />
-                      </div>
-                    </div>
+        {mode === "import" && !hasImported && (
+          <div className="mx-auto max-w-xl">
+            {intro}
+            {error && alerts}
+            <Card className="shadow-none">
+              <div className="border-b px-5 py-3.5">
+                <h2 className="text-sm font-medium">Flight information</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enter the origin and destination airport codes, then upload the KML file you downloaded from
+                  FlightRadar24 or FlightAware.
+                </p>
+              </div>
 
-                    {/* Title */}
-                    <h2 className="text-3xl font-normal text-gray-900 dark:text-gray-100 mb-4">Flight Information</h2>
-
-                    {/* Description */}
-                    <p className="text-gray-600 dark:text-gray-300 mb-10 text-lg">
-                      Enter your flight's origin and destination airport codes, then upload your KML file from
-                      FlightRadar24 or FlightAware.
-                    </p>
-
-                    {/* Form */}
-                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg p-8">
-                      <div className="flex flex-col gap-6">
-                        {/* ICAO inputs row */}
-                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-                          <div className="flex items-center gap-3">
-                            <Label htmlFor="origin" className="text-sm font-medium whitespace-nowrap w-24 text-right">
-                              Origin
-                            </Label>
-                            <Input
-                              id="origin"
-                              value={originAirport}
-                              onChange={(e) => handleICAOChange("origin", e.target.value)}
-                              placeholder="EHAM"
-                              autoComplete="off"
-                              className={`h-12 w-28 text-center font-mono text-lg ${
-                                originAirport && !icaoValidation.origin
-                                  ? "border-red-500 focus:border-red-500"
-                                  : icaoValidation.origin
-                                    ? "border-green-500 focus:border-green-500"
-                                    : ""
-                              }`}
-                              maxLength={4}
-                            />
-                          </div>
-
-                          {/* Chevron - hidden on mobile and tablet */}
-                          <ChevronRight className="hidden lg:block text-gray-400" size={24} />
-
-                          <div className="flex items-center gap-3">
-                            <Label
-                              htmlFor="destination"
-                              className="text-sm font-medium whitespace-nowrap w-24 text-right"
-                            >
-                              Destination
-                            </Label>
-                            <Input
-                              id="destination"
-                              value={destinationAirport}
-                              onChange={(e) => handleICAOChange("destination", e.target.value)}
-                              placeholder="KSFO"
-                              autoComplete="off"
-                              className={`h-12 w-28 text-center font-mono text-lg ${
-                                destinationAirport && !icaoValidation.destination
-                                  ? "border-red-500 focus:border-red-500"
-                                  : icaoValidation.destination
-                                    ? "border-green-500 focus:border-green-500"
-                                    : ""
-                              }`}
-                              maxLength={4}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Import button */}
-                        <div className="flex justify-center">
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            variant="default"
-                            size="lg"
-                            className="h-12 px-8 text-base"
-                            disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
-                            title={
-                              !icaoValidation.origin || !icaoValidation.destination
-                                ? "Enter valid departure and arrival ICAO codes to enable import"
-                                : undefined
-                            }
-                          >
-                            <Upload size={18} className="mr-2" />
-                            <span>{isLoading ? "Importing..." : "Import KML File"}</span>
-                          </Button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".kml"
-                            onChange={handleFileImport}
-                            className="hidden"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 gap-4 px-5 py-5">
+                <div className="space-y-2">
+                  <Label htmlFor="origin" className="studio-label">
+                    Origin
+                  </Label>
+                  <Input
+                    id="origin"
+                    value={originAirport}
+                    onChange={(e) => handleICAOChange("origin", e.target.value)}
+                    placeholder="EHAM"
+                    autoComplete="off"
+                    className={icaoInputClass(originAirport, icaoValidation.origin)}
+                    maxLength={4}
+                  />
                 </div>
-              ) : (
-                /* Post-import state - Content without header */
-                <CardContent className="pt-6">
-                  {/* Error Alert */}
-                  {error && (
-                    <Alert className="mb-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-                      <Mountain className="h-4 w-4 text-red-500 dark:text-red-400" /> {/* Updated icon */}
-                      <AlertTitle className="text-red-700 dark:text-red-400">Error</AlertTitle>
-                      <AlertDescription className="text-red-600 dark:text-red-300">{error}</AlertDescription>
-                    </Alert>
-                  )}
+                <div className="space-y-2">
+                  <Label htmlFor="destination" className="studio-label">
+                    Destination
+                  </Label>
+                  <Input
+                    id="destination"
+                    value={destinationAirport}
+                    onChange={(e) => handleICAOChange("destination", e.target.value)}
+                    placeholder="KSFO"
+                    autoComplete="off"
+                    className={icaoInputClass(destinationAirport, icaoValidation.destination)}
+                    maxLength={4}
+                  />
+                </div>
+              </div>
 
-                  {successMessage && (
-                    <Alert className="mb-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                      <CheckCircle2 className="h-4 w-4 text-green-500 dark:text-green-400" />
-                      <AlertTitle className="text-green-700 dark:text-green-400">Success</AlertTitle>
-                      <AlertDescription className="text-green-600 dark:text-green-300">
-                        {successMessage}
-                      </AlertDescription>
-                    </Alert>
-                  )}
+              <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
+                <p className="text-xs text-muted-foreground">4-letter ICAO codes</p>
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
+                  title={
+                    !icaoValidation.origin || !icaoValidation.destination
+                      ? "Enter valid departure and arrival ICAO codes to enable import"
+                      : undefined
+                  }
+                >
+                  <Upload />
+                  {isLoading ? "Importing..." : "Import KML file"}
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".kml"
+                  onChange={handleFileImport}
+                  className="hidden"
+                />
+              </div>
+            </Card>
+            {accountHint}
+          </div>
+        )}
 
-                  {/* Simplification Info Alert */}
+        {mode === "import" && hasImported && (
+          <div className={cn(!isMobile && "flex items-start gap-4")}>
+            <div className={cn(!isMobile ? "min-w-0 flex-1" : "w-full")}>
+              <Card className="shadow-none">
+                <CardContent className="p-4">
+                  {alerts}
+
                   {simplificationInfo && (
-                    <Alert className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                      <Mountain className="h-4 w-4 text-blue-500 dark:text-blue-400" /> {/* Updated icon */}
-                      <AlertTitle className="text-blue-700 dark:text-blue-400">
-                        Waypoint Simplification Applied
-                      </AlertTitle>
-                      <AlertDescription className="text-blue-600 dark:text-blue-300">
+                    <Alert className="mb-3 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-6">
+                      <Info className="h-4 w-4 text-primary" />
+                      <AlertTitle className="text-sm">Waypoint simplification applied</AlertTitle>
+                      <AlertDescription className="space-y-0.5 text-xs text-muted-foreground">
                         <p>
-                          Imported filename: <strong>{importedFileName || "Unknown"}.kml</strong>
+                          Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
+                          {simplificationInfo.source && (
+                            <>
+                              {" "}
+                              from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
+                            </>
+                          )}
                         </p>
-                        <p>Original waypoints: {simplificationInfo.originalCount}</p>
-                        <p>After simplification: {simplificationInfo.simplifiedCount}</p>
-                        {simplificationInfo.source && (
-                          <p>
-                            Source: <strong>{simplificationInfo.source}</strong>
-                          </p>
-                        )}
-                        <p className="text-xs mt-1">{simplificationInfo.reason}</p>
+                        <p>
+                          {simplificationInfo.originalCount} waypoints before simplification, {simplificationInfo.simplifiedCount} after.
+                        </p>
+                        <p>{simplificationInfo.reason}</p>
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1148,282 +1395,79 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                           }, 100)
                         }}
                         variant="outline"
-                        size="sm"
-                        className="h-9 w-9 p-0 lg:hidden"
+                        size="icon"
+                        className="lg:hidden"
                         title="Show options"
                       >
-                        <Layers size={16} />
+                        <Layers />
                       </Button>
                     }
                   />
 
-                  {/* Options Section - Below table on mobile/tablet */}
+                  {isMobile && waypoints.length > 0 && (
+                    <div className="mt-4 space-y-4 rounded-md border p-4">
+                      {exportOptions}
+                      {exportButtons}
+                    </div>
+                  )}
+
+                  {/* Options - below the table on mobile/tablet */}
                   {showOptions && waypoints.length > 0 && (
-                    <div id="options-section" className="mt-6 border-t pt-6 lg:hidden">
-                      <div className="flex items-center gap-2 mb-4">
-                        <Layers className="h-5 w-5 text-primary" />
-                        <h3 className="text-lg font-medium">Options</h3>
-                      </div>
-                      <div className="space-y-6">
-                        {/* Import TXT to Waypoints */}
-                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h4 className="font-medium">Import TXT to Waypoints</h4>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs">
-                                <p>Import a text file to populate waypoint names.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <Button
-                            onClick={() => txtFileInputRef.current?.click()}
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center gap-1 h-9 w-full"
-                            disabled={waypoints.length === 0}
-                          >
-                            <Upload size={14} />
-                            <span>Import TXT File</span>
-                          </Button>
-                          <input
-                            ref={txtFileInputRef}
-                            type="file"
-                            accept=".txt"
-                            onChange={handleTxtImport}
-                            className="hidden"
-                          />
-                        </div>
-
-                        <Separator />
-
-                        {/* Waypoint Prefix */}
-                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h4 className="font-medium">Waypoint Prefix</h4>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs">
-                                <p>Add a prefix to all waypoint names (e.g., "WP").</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="space-y-2">
-                            <Input
-                              id="waypointPrefix"
-                              value={waypointPrefix}
-                              onChange={(e) => setWaypointPrefix(e.target.value)}
-                              placeholder="Enter prefix (e.g., WP)"
-                              onFocus={handleInputFocus}
-                              className="h-9 font-[var(--font-ibm-plex-mono)]"
-                              style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                            />
-                            <Button
-                              onClick={applyWaypointPrefix}
-                              variant="outline"
-                              size="sm"
-                              className="w-full h-9 bg-transparent"
-                              disabled={isLoading || waypoints.length === 0}
-                            >
-                              Apply Prefix
-                            </Button>
-                          </div>
-                        </div>
-
-                        <Separator />
-
-                        {/* Made with Infinite Planner */}
-                        <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-md">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h4 className="font-medium">Made with Infinite Planner</h4>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-xs">
-                                <p>Replace the last 4 waypoint names to share the love!</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="madeWithInfinitePlannerMobile"
-                              checked={useMadeWithInfinitePlanner}
-                              onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
-                              disabled={waypoints.length < 6}
-                            />
-                            <Label htmlFor="madeWithInfinitePlannerMobile" className="text-sm">
-                              Use "Made with Infinite Planner"
-                            </Label>
-                          </div>
-                        </div>
-                      </div>
+                    <div id="options-section" className="mt-4 overflow-hidden rounded-md border lg:hidden">
+                      {optionsContent}
                     </div>
                   )}
-
-                  {waypoints.length > 0 && (
-                    <div className="mt-4 text-sm text-muted-foreground">
-                      <p>
-                        Total waypoints: {waypoints.length} {waypoints.length > 250 && "(Warning: Exceeds 250 limit)"}
-                      </p>
-                      <p className="mt-1">Route: {waypoints.map((wp) => wp.name).join(" → ")}</p>
-                    </div>
-                  )}
-                </CardContent>
-              )}
-            </Card>
-          </div>
-
-          {/* Options Panel - Desktop only, right side */}
-          {!isMobile && hasImported && waypoints.length > 0 && (
-            <div className="w-80 flex-shrink-0">
-              <Card className="sticky bg-background shadow-sm border-border" style={{ top: "2rem" }}>
-                <CardHeader className="pb-4 border-b">
-                  <div className="text-center">
-                    <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Your Flight Plan:</h3>
-                    <div className="text-lg font-semibold text-blue-600 dark:text-blue-400">
-                      {originAirport || "ORIG"} → {destinationAirport || "DEST"}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-6">
-                    {/* Flight Plan Map Button - First item */}
-                    <div>
-                      <Button
-                        onClick={() => setShowMapPreview(true)}
-                        variant="outline"
-                        size="sm"
-                        className="w-full flex items-center justify-center gap-2 h-10"
-                        disabled={waypoints.length === 0 || isLoading}
-                      >
-                        <Map size={16} />
-                        <span>Flight Plan Map</span>
-                      </Button>
-                    </div>
-
-                    <Separator className="my-4" />
-
-                    {/* Import TXT to Waypoints */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-medium text-sm">Import TXT to Waypoints</h4>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p>Import a text file to populate waypoint names.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Button
-                        onClick={() => txtFileInputRef.current?.click()}
-                        variant="outline"
-                        size="sm"
-                        className="w-full flex items-center gap-1 h-9"
-                        disabled={waypoints.length === 0}
-                      >
-                        <Upload size={14} />
-                        <span>Import TXT File</span>
-                      </Button>
-                      <input
-                        ref={txtFileInputRef}
-                        type="file"
-                        accept=".txt"
-                        onChange={handleTxtImport}
-                        className="hidden"
-                      />
-                    </div>
-
-                    <Separator className="my-4" />
-
-                    {/* Waypoint Prefix */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-medium text-sm">Waypoint Prefix</h4>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p>Add a prefix to all waypoint names (e.g., "WP").</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="space-y-2">
-                        <Input
-                          id="waypointPrefix"
-                          value={waypointPrefix}
-                          onChange={(e) => setWaypointPrefix(e.target.value)}
-                          placeholder="Enter prefix"
-                          onFocus={handleInputFocus}
-                          className="h-9 font-[var(--font-ibm-plex-mono)]"
-                          style={{ fontFamily: "var(--font-ibm-plex-mono), monospace" }}
-                        />
-                        <Button
-                          onClick={applyWaypointPrefix}
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 bg-transparent"
-                          disabled={isLoading || waypoints.length === 0}
-                        >
-                          Apply Prefix
-                        </Button>
-                      </div>
-                    </div>
-
-                    <Separator className="my-4" />
-
-                    {/* Made with Infinite Planner */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="font-medium text-sm">Made with Infinite Planner</h4>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p>Replace the last 4 waypoint names to share the love!</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="madeWithInfinitePlanner"
-                          checked={useMadeWithInfinitePlanner}
-                          onCheckedChange={(checked) => setUseMadeWithInfinitePlanner(!!checked)}
-                          disabled={waypoints.length < 6}
-                        />
-                        <Label htmlFor="madeWithInfinitePlanner" className="text-sm">
-                          Use "Made with Infinite Planner"
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-
-                {/* Export button at the bottom */}
-                <CardContent className="pt-0 pb-6">
-                  <Separator className="mb-4" />
-                  <Button
-                    onClick={handleExportFPL}
-                    size="lg"
-                    className="w-full flex items-center justify-center gap-2 h-12 bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={waypoints.length === 0 || isLoading}
-                  >
-                    <Download size={16} />
-                    <span>Export FPL</span>
-                  </Button>
                 </CardContent>
               </Card>
             </div>
-          )}
-        </div>
+
+            {/* Options panel - desktop only, right side */}
+            {!isMobile && waypoints.length > 0 && (
+              <aside className="w-72 flex-shrink-0">
+                <Card className="sticky top-6 overflow-hidden shadow-none">
+                  <div className="border-b p-4">
+                    <p className="studio-label">Your flight plan</p>
+                    <p className="mt-2 font-mono text-base font-medium text-primary">
+                      {originAirport || "ORIG"} → {destinationAirport || "DEST"}
+                    </p>
+                  </div>
+
+                  <PanelSection label="Preview">
+                    <Button
+                      onClick={() => setShowMapPreview(true)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={waypoints.length === 0 || isLoading}
+                    >
+                      <Map />
+                      Flight plan map
+                    </Button>
+                  </PanelSection>
+
+                  {optionsContent}
+
+                  <div className="space-y-4 border-b p-4">
+                    <p className="studio-label">Export</p>
+                    {exportOptions}
+                  </div>
+
+                  <div className="p-4">{exportButtons}</div>
+                </Card>
+              </aside>
+            )}
+          </div>
+        )}
+
+        {showShareDialog && savedPlanId && (
+          <ShareDialog
+            open
+            onOpenChange={setShowShareDialog}
+            planId={savedPlanId}
+            route={`${originAirport || "ORIG"} → ${destinationAirport || "DEST"}`}
+            shareToken={planShareToken}
+            onShareChange={setPlanShareToken}
+          />
         )}
 
         {/* Map Preview Dialog */}
@@ -1445,44 +1489,31 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 <DialogTitle>Flight Plan Preview</DialogTitle>
                 <DialogDescription>
                   <span className="hidden lg:inline">Visualize your flight plan with {waypoints.length} waypoints</span>
-                  <span className="lg:hidden">{waypoints.length} waypoints</span> {/* Responsive description */}
+                  <span className="lg:hidden">{waypoints.length} waypoints</span>
                 </DialogDescription>
               </div>
               {waypoints.length > 0 && (
                 <div className="flex items-center gap-2 ml-auto mr-8">
                   {isEditingMap && selectMode && waypoints.some((wp) => wp.selected) && (
-                    <Button
-                      onClick={deleteSelectedWaypoints}
-                      variant="destructive"
-                      className="flex items-center gap-2"
-                    >
-                      <Trash2 size={16} />
+                    <Button onClick={deleteSelectedWaypoints} variant="destructive" size="sm">
+                      <Trash2 />
                       <span className="hidden sm:inline">Delete waypoint(s)</span>
                       <span className="sm:hidden">Delete</span>
                     </Button>
                   )}
                   {isEditingMap && (
-                    <Button
-                      onClick={toggleSelectMode}
-                      variant={selectMode ? "default" : "outline"}
-                      className="flex items-center gap-2"
-                    >
-                      <LassoSelect size={16} />
+                    <Button onClick={toggleSelectMode} variant={selectMode ? "default" : "outline"} size="sm">
+                      <LassoSelect />
                       <span className="hidden sm:inline">{selectMode ? "Done Selecting" : "Select Points"}</span>
                       <span className="sm:hidden">{selectMode ? "Done" : "Select"}</span>
                     </Button>
                   )}
                   {/* Hidden while selecting - the only way out of select mode is "Done Selecting" */}
                   {!selectMode && (
-                    <Button
-                      onClick={toggleMapEditing}
-                      variant={isEditingMap ? "default" : "outline"}
-                      className="flex items-center gap-2"
-                    >
-                      <Pencil size={16} />
-                      <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>{" "}
-                      {/* Responsive button text */}
-                      <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span> {/* Responsive button text */}
+                    <Button onClick={toggleMapEditing} variant={isEditingMap ? "default" : "outline"} size="sm">
+                      <Pencil />
+                      <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>
+                      <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span>
                     </Button>
                   )}
                 </div>
@@ -1511,5 +1542,27 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         <Toaster />
       </div>
     </TooltipProvider>
+  )
+}
+
+// A titled block of the options panel (desktop side panel and mobile options list).
+function PanelSection({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2.5 border-b p-4">
+      <div className="flex items-center gap-1.5">
+        <h4 className="studio-label">{label}</h4>
+        {help && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs">
+              <p>{help}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      {children}
+    </div>
   )
 }
