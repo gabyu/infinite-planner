@@ -1,6 +1,7 @@
 import type React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { AdminFooter } from "@/components/admin/admin-footer"
 import { AdminNav } from "@/components/admin/admin-nav"
 import { ProfileMenu } from "@/components/admin/profile-menu"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +35,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="mx-auto max-w-5xl">{children}</div>
         </main>
       </div>
+
+      <AdminFooter />
     </div>
   )
 }
