@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DiscordIcon } from "@/components/discord-icon"
 import { getBrowserSupabase } from "@/lib/supabase/client"
+import { loginDestination } from "@/hooks/use-auth-user"
 
 function displayName(user: User) {
   const meta = user.user_metadata ?? {}
@@ -55,7 +56,7 @@ export function UserMenu() {
   if (!supabase || !ready) return null
 
   async function signIn() {
-    const next = window.location.pathname + window.location.search
+    const next = loginDestination()
     await supabase!.auth.signInWithOAuth({
       provider: "discord",
       options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },

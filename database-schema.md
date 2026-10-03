@@ -104,6 +104,7 @@ CREATE TABLE flight_plans (
   destination_airport TEXT NOT NULL,
   origin_airport_name TEXT,                -- resolved at save time from OurAirports (see below)
   destination_airport_name TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',    -- 'draft' | 'exported' (see "Lifecycle" below)
   waypoints JSONB NOT NULL,                -- [{ name, lat, lng, altitude(ft) }], derived data only, never the KML
   includes_branding BOOLEAN NOT NULL DEFAULT TRUE,   -- were MADE/WITH/INFINITE/PLANNER in `waypoints` when saved
   flight_time_minutes INTEGER,             -- optional, entered by hand, whole minutes
@@ -129,6 +130,20 @@ CREATE TABLE flight_plans (
   role. The download route calls `record_shared_download(token)`, executable by the service role only, which
   increments the counter and returns the plan in one statement. Links are live (the current saved state, not a
   snapshot) and never cached, so stopping sharing takes effect immediately.
+- **Lifecycle (`20261003000100_dashboard_drafts.sql`)**: a plan is a `draft` while it is edited in Convert or
+  Sketch (autosaved about once a minute by the editor, only when something changed) and becomes `exported` when
+  the FPL is downloaded. A trigger makes `exported` final: any change to an exported row's content, flight time or
+  status is refused (`flight_plan_locked`, HTTP 409 from the API); only sharing (`share_token`), the download
+  counter and deleting stay possible. To change an exported plan the user duplicates it
+  (`POST /api/flight-plans/[id]/duplicate`, exported plans only): a new `draft` row with no share token. Rows that
+  existed before the migration were all saved at export time, so they were backfilled as `exported`. For a
+  draft, `created_at` is its last save; for an exported plan it is the export time (the trigger stamps it on the
+  draft -> exported change), so the activity graphs count by `created_at` where `status = 'exported'`.
+- **Dashboard and admin graph**: the user dashboard (`/dashboard`) reads the user's own exported rows (RLS) and
+  the admin overview reads the same table unfiltered through `admin_flight_export_times(since)`, which now
+  selects from `flight_plans` where `status = 'exported'` instead of `flight_statistics`. There is no backfill:
+  the admin graph only counts plans exported by signed-in users since this phase shipped. `flight_statistics`
+  still feeds the homepage counters and rankings.
 - **`SUPABASE_SERVICE_ROLE_KEY`** is therefore also needed for shared links to resolve. Without it they fail
   closed (404).
 - **Airport names** come from [OurAirports](https://ourairports.com/data/) (released to the public domain),

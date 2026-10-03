@@ -4,6 +4,15 @@
 export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "Sketch"] as const
 export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 
+// draft: autosaved while editing in Convert or Sketch, editable. exported: the FPL was
+// downloaded, the plan is locked for good (the database refuses any change); further changes
+// start from a duplicate, which is a new draft.
+export const FLIGHT_PLAN_STATUSES = ["draft", "exported"] as const
+export type FlightPlanStatus = (typeof FLIGHT_PLAN_STATUSES)[number]
+
+// A draft is saved about once a minute while it is being edited (only when something changed).
+export const AUTOSAVE_INTERVAL_MS = 60_000
+
 // What is stored in flight_plans.waypoints: just what the FPL needs, never editor state.
 export interface StoredWaypoint {
   name: string
@@ -12,10 +21,11 @@ export interface StoredWaypoint {
   altitude: number // feet
 }
 
-// A history row as the History page reads it. `waypoints` is left out of the list query
+// A row as the dashboard list reads it. `waypoints` is left out of the list query
 // (it can be large); a plan's file is rebuilt on the server when it is exported.
 export interface FlightPlanSummary {
   id: string
+  status: FlightPlanStatus
   source: FlightPlanSource
   created_at: string
   flight_number: string | null
@@ -29,9 +39,9 @@ export interface FlightPlanSummary {
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, share_token"
+  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, share_token"
 
-// How many history rows are loaded at a time ("Load more" fetches the next page).
+// How many dashboard rows are loaded at a time ("Load more" fetches the next page).
 export const HISTORY_PAGE_SIZE = 50
 
 // Anyone can hold on to this many plans; past it, saving asks them to delete some.
@@ -56,4 +66,9 @@ export function formatFlightTime(minutes: number | null | undefined): string | n
 
 export function sourceLabel(source: FlightPlanSource): string {
   return source === "Sketch" ? "Route Sketch" : source
+}
+
+// Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.
+export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource }) {
+  return `${plan.source === "Sketch" ? "/sketch" : "/convert"}?draft=${plan.id}`
 }

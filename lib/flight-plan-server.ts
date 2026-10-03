@@ -2,7 +2,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { resolveAirportName } from "@/lib/airports"
-import { FLIGHT_PLAN_SOURCES, UUID_PATTERN } from "@/lib/flight-plans"
+import { FLIGHT_PLAN_SOURCES, FLIGHT_PLAN_STATUSES, UUID_PATTERN } from "@/lib/flight-plans"
 import { getServerSupabase } from "@/lib/supabase/server"
 
 const NO_STORE = { "Cache-Control": "no-store" }
@@ -28,6 +28,8 @@ const waypointSchema = z.object({
 
 export const flightPlanBodySchema = z.object({
   source: z.enum(FLIGHT_PLAN_SOURCES),
+  // 'draft' for an autosave, 'exported' when the FPL is downloaded (locks the plan).
+  status: z.enum(FLIGHT_PLAN_STATUSES),
   flightNumber: z
     .string()
     .trim()
@@ -47,6 +49,7 @@ export type FlightPlanBody = z.infer<typeof flightPlanBodySchema>
 // the browser). Insert adds user_id and source on top; update leaves source alone.
 export function flightPlanColumns(body: FlightPlanBody) {
   return {
+    status: body.status,
     flight_number: body.flightNumber,
     origin_airport: body.origin,
     destination_airport: body.destination,
@@ -87,6 +90,13 @@ export async function requireUser(request: Request) {
 
   return { supabase, user }
 }
+
+// The database refuses any change to an exported plan (trigger flight_plans_stamp_save).
+export function isLockedError(error: { code?: string; message?: string } | null) {
+  return error?.code === "23514" && !!error.message?.includes("flight_plan_locked")
+}
+
+export const LOCKED_MESSAGE = "This flight plan was exported and can no longer be changed. Duplicate it to make changes."
 
 export function isUuid(value: string) {
   return UUID_PATTERN.test(value)

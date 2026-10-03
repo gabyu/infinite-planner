@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, MoreHorizontal, PencilRuler, Share2, Timer, Trash2, Upload } from "lucide-react"
+import { Copy, Download, Eye, MoreHorizontal, Pencil, PencilRuler, Share2, Trash2, Upload } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,35 +24,37 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
-import { FlightTimeField } from "@/components/flight-time-field"
 import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
+import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
 import { ShareDialog } from "@/components/share-dialog"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 import {
   FLIGHT_PLAN_SUMMARY_COLUMNS,
   HISTORY_PAGE_SIZE,
+  flightPlanEditPath,
   formatFlightTime,
   sourceLabel,
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
-interface HistoryListProps {
+interface FlightsListProps {
   initialPlans: FlightPlanSummary[]
   total: number
 }
 
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
-// The signed-in user's saved flight plans, newest first. No sorting or filtering.
-export function HistoryList({ initialPlans, total: initialTotal }: HistoryListProps) {
+// The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
+// no sorting or filtering). Drafts can be viewed, edited and deleted; exported plans are locked and
+// can be viewed, downloaded, shared, duplicated (into a new draft) and deleted.
+export function FlightsList({ initialPlans, total: initialTotal }: FlightsListProps) {
   const [plans, setPlans] = useState(initialPlans)
   const [total, setTotal] = useState(initialTotal)
   const [loadingMore, setLoadingMore] = useState(false)
   const [sharing, setSharing] = useState<FlightPlanSummary | null>(null)
   const [deleting, setDeleting] = useState<FlightPlanSummary | null>(null)
-  const [editingTime, setEditingTime] = useState<FlightPlanSummary | null>(null)
-  const [timeDraft, setTimeDraft] = useState<number | null>(null)
+  const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
 
@@ -105,7 +108,7 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
       setPlans(result.rows)
       setTotal(result.total)
     }
-    toast({ title: "Flight plan duplicated", description: routeOf(plan) })
+    toast({ title: "Draft created", description: `${routeOf(plan)}: a copy you can edit, not shared.` })
   }
 
   async function confirmDelete() {
@@ -124,29 +127,13 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
     toast({ title: "Flight plan deleted", description: routeOf(deleting) })
   }
 
-  async function saveFlightTime() {
-    const supabase = getBrowserSupabase()
-    if (!supabase || !editingTime) return
-    setBusy(true)
-    const { error } = await supabase
-      .from("flight_plans")
-      .update({ flight_time_minutes: timeDraft })
-      .eq("id", editingTime.id)
-    setBusy(false)
-    if (error) {
-      console.error("Updating the flight time failed:", error.message)
-      return toast({ title: "Couldn't save the flight time", variant: "destructive" })
-    }
-    patchPlan(editingTime.id, { flight_time_minutes: timeDraft })
-    setEditingTime(null)
-  }
-
   if (plans.length === 0) {
     return (
-      <div className="flex flex-col items-center rounded-lg border bg-card px-6 py-16 text-center">
-        <h2 className="text-sm font-medium">No saved flight plans yet</h2>
+      <div className="flex max-w-xl flex-col items-start rounded-lg border bg-card px-6 py-8">
+        <h2 className="text-sm font-medium">No flight plans yet</h2>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Every flight plan you export while signed in is saved here, so you can download it again, share it or copy it.
+          While you edit in Convert or Sketch, your flight plan is saved here as a draft. Once you export it, it is
+          kept here too, ready to share or duplicate.
         </p>
         <div className="mt-5 flex gap-2">
           <Button asChild>
@@ -164,14 +151,16 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
     )
   }
 
+  const columns = "md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_11rem]"
+
   return (
     <>
       <div className="overflow-hidden rounded-lg border bg-card">
-        <div className="studio-label hidden grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_8.5rem] items-center gap-4 border-b bg-muted/40 px-4 py-2.5 md:grid">
+        <div className={cn("studio-label hidden items-center gap-4 border-b bg-muted/40 px-4 py-2.5 md:grid", columns)}>
           <span>Route</span>
           <span>Flight</span>
           <span>Flight time</span>
-          <span>Saved</span>
+          <span>Date</span>
           <span className="text-right">Actions</span>
         </div>
 
@@ -179,16 +168,27 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
           {plans.map((plan) => {
             const names = [plan.origin_airport_name, plan.destination_airport_name]
             const flightTime = formatFlightTime(plan.flight_time_minutes)
+            const isDraft = plan.status === "draft"
             return (
               <li
                 key={plan.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50 md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_8.5rem]"
+                className={cn(
+                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50",
+                  columns,
+                )}
               >
                 <div className="min-w-0">
-                  <p className="font-mono text-sm font-medium">
-                    {plan.origin_airport}
-                    <RouteArrow />
-                    {plan.destination_airport}
+                  <p className="flex flex-wrap items-center gap-x-2 font-mono text-sm font-medium">
+                    <span>
+                      {plan.origin_airport}
+                      <RouteArrow />
+                      {plan.destination_airport}
+                    </span>
+                    {isDraft && (
+                      <Badge variant="secondary" className="font-sans text-[11px] font-normal">
+                        Draft
+                      </Badge>
+                    )}
                   </p>
                   {(names[0] || names[1]) && (
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -216,25 +216,47 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
                   <LocalTime iso={plan.created_at} />
                 </span>
 
+                {/* Actions by status. Draft: view, edit, delete. Exported (locked): view, download, share, duplicate, delete. */}
                 <div className="flex items-center justify-end gap-1">
-                  <Button asChild variant="ghost" size="icon" title="Download FPL" aria-label="Download FPL">
-                    <a href={`/api/flight-plans/${plan.id}/fpl`} download>
-                      <Download />
-                    </a>
-                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSharing(plan)}
-                    title={plan.share_token ? "Shared: manage link" : "Share"}
-                    aria-label={plan.share_token ? "Manage share link" : "Share"}
-                    className="relative"
+                    onClick={() => setViewing(plan)}
+                    title="View"
+                    aria-label="View"
                   >
-                    <Share2 />
-                    {plan.share_token && (
-                      <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                    )}
+                    <Eye />
                   </Button>
+
+                  {isDraft ? (
+                    <Button asChild variant="ghost" size="icon" title="Edit draft" aria-label="Edit draft">
+                      <Link href={flightPlanEditPath(plan)}>
+                        <Pencil />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <>
+                      <Button asChild variant="ghost" size="icon" title="Download FPL" aria-label="Download FPL">
+                        <a href={`/api/flight-plans/${plan.id}/fpl`} download>
+                          <Download />
+                        </a>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSharing(plan)}
+                        title={plan.share_token ? "Shared: manage link" : "Share"}
+                        aria-label={plan.share_token ? "Manage share link" : "Share"}
+                        className="relative"
+                      >
+                        <Share2 />
+                        {plan.share_token && (
+                          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+                        )}
+                      </Button>
+                    </>
+                  )}
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label="More actions">
@@ -242,18 +264,14 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem onSelect={() => duplicate(plan)}>
-                        <Copy /> Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setTimeDraft(plan.flight_time_minutes)
-                          setEditingTime(plan)
-                        }}
-                      >
-                        <Timer /> Edit flight time
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      {!isDraft && (
+                        <>
+                          <DropdownMenuItem onSelect={() => duplicate(plan)}>
+                            <Copy /> Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
                       <DropdownMenuItem
                         onSelect={() => setDeleting(plan)}
                         className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -280,6 +298,8 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
         </div>
       </div>
 
+      {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
+
       {sharing && (
         <ShareDialog
           open
@@ -295,9 +315,9 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete this flight plan?</DialogTitle>
+            <DialogTitle>Delete this {deleting?.status === "draft" ? "draft" : "flight plan"}?</DialogTitle>
             <DialogDescription>
-              {deleting && <span className="font-mono">{routeOf(deleting)}</span>} will be removed from your history.
+              {deleting && <span className="font-mono">{routeOf(deleting)}</span>} will be removed from your dashboard.
               {deleting?.share_token && " Its share link stops working."} This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
@@ -307,31 +327,6 @@ export function HistoryList({ initialPlans, total: initialTotal }: HistoryListPr
             </Button>
             <Button variant="destructive" onClick={confirmDelete} disabled={busy}>
               Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editingTime} onOpenChange={(open) => !open && setEditingTime(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Flight time</DialogTitle>
-            <DialogDescription>
-              {editingTime && <span className="font-mono">{routeOf(editingTime)}</span>} · optional, entered by hand.
-            </DialogDescription>
-          </DialogHeader>
-          <FlightTimeField
-            idPrefix="edit-flight-time"
-            value={timeDraft}
-            onChange={setTimeDraft}
-            resetKey={editingTime?.id}
-          />
-          <DialogFooter className="gap-2 sm:space-x-0">
-            <Button variant="outline" onClick={() => setEditingTime(null)}>
-              Cancel
-            </Button>
-            <Button onClick={saveFlightTime} disabled={busy}>
-              Save
             </Button>
           </DialogFooter>
         </DialogContent>

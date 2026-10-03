@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,16 +20,26 @@ import {
   LassoSelect,
   AlertCircle,
   Info,
-  History,
   Share2,
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
-import { BRAND_NAMES, BRANDING_MIN_WAYPOINTS, type FlightPlanSource } from "@/lib/flight-plans"
+import {
+  AUTOSAVE_INTERVAL_MS,
+  BRAND_NAMES,
+  BRANDING_MIN_WAYPOINTS,
+  type FlightPlanSource,
+  type FlightPlanStatus,
+  type StoredWaypoint,
+} from "@/lib/flight-plans"
 import { ShareDialog } from "@/components/share-dialog"
 import { RouteArrow } from "@/components/route-arrow"
+import { IcaoInput } from "@/components/ds/icao-input"
+import { StartLayout } from "@/components/convert/start-layouts"
+import { AirportInput } from "@/components/ds/airport-input"
+import { PageShell } from "@/components/ds/page-shell"
 import { FlightTimeField } from "@/components/flight-time-field"
 import { Checkbox } from "@/components/ui/checkbox"
 import { getBrowserSupabase } from "@/lib/supabase/client"
@@ -54,7 +64,6 @@ import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { PageHeader } from "@/components/admin/page-header"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -198,9 +207,27 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [planShareToken, setPlanShareToken] = useState<string | null>(null)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
-  // The history row this editing session has already saved to: exporting again updates it
-  // instead of piling up near-identical entries. Cleared when a new plan is started.
+  // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
+  // near-identical entries. Cleared when a new plan is started.
   const savedPlanIdRef = useRef<string | null>(null)
+  // Lifecycle of the row above. A draft is autosaved and editable; once exported it is locked
+  // for good, so whatever is saved next (after further edits) is a NEW draft.
+  const savedStatusRef = useRef<FlightPlanStatus | null>(null)
+  const [savedStatus, setSavedStatus] = useState<FlightPlanStatus | null>(null)
+  // What the saved row contains (see currentFingerprint): the page is "dirty" when it differs.
+  const [savedFingerprint, setSavedFingerprint] = useState<string | null>(null)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  // Autosave only starts once the plan has been generated and the user closed the map (Convert),
+  // or the sketch is complete enough to save (Sketch).
+  const [draftArmed, setDraftArmed] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [autosaveError, setAutosaveError] = useState<string | null>(null)
+  const savingRef = useRef(false)
+  // Reopening a draft from the dashboard: /convert?draft=<id> or /sketch?draft=<id>.
+  const [resume, setResume] = useState<{ state: "idle" | "loading" | "error"; message?: string }>({ state: "idle" })
+  const draftLoadedRef = useRef(false)
+  const skipNamingRef = useRef(false)
+  const [flightNumberOverride, setFlightNumberOverride] = useState<string | null>(null)
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -231,6 +258,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // board, and autosave (debounced) while drawing - local-only, MVP scope.
   useEffect(() => {
     if (mode !== "draw" || waypoints.length > 0) return
+    // Opening a saved draft from the dashboard: that one wins over the browser's local draft.
+    if (new URLSearchParams(window.location.search).has("draft")) return
     try {
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
       if (!raw) return
@@ -253,6 +282,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
   useEffect(() => {
     if (mode !== "draw") return
+    // Don't overwrite the local draft with an empty board while a saved draft is still loading.
+    if (new URLSearchParams(window.location.search).has("draft") && !draftLoadedRef.current) return
     const timeout = setTimeout(() => {
       try {
         window.localStorage.setItem(
@@ -288,6 +319,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // toggling it goes through applyBrandingOverlay, which leaves every other name alone.
   useEffect(() => {
     if (waypoints.length >= 2) {
+      // Loading a saved draft sets the airports and the names together: keep its names.
+      if (skipNamingRef.current) {
+        skipNamingRef.current = false
+        return
+      }
       const updatedWaypoints = applyWaypointNamingRules(waypoints, originAirport, destinationAirport, includeBranding)
       setWaypoints(updatedWaypoints)
     }
@@ -382,9 +418,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding)
         setWaypoints(renamedWaypoints)
         // A new import is a new plan: it must not overwrite the one saved from the previous import.
-        savedPlanIdRef.current = null
-        setSavedPlanId(null)
-        setPlanShareToken(null)
+        resetSavedPlan()
+        setFlightNumberOverride(null)
         setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -478,21 +513,77 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
   // The flight number the KML's filename reliably carries (FlightAware: FlightAware_KLM605_EHAM_KSFO_20260526,
   // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
-  // strict patterns, so a looser guess never counts. Shown on the page and saved with the plan.
+  // strict patterns, so a looser guess never counts. Shown on the page and saved with the plan. A reopened
+  // draft has no file name any more: it uses the flight number that was saved with it.
   const detectedFlightNumber = (() => {
-    if (mode !== "import" || !importedFileName) return null
-    const parsed = parseFlightFilename(importedFileName)
-    return parsed.source ? (parsed.flight_number?.toUpperCase() ?? null) : null
+    if (mode !== "import") return null
+    if (importedFileName) {
+      const parsed = parseFlightFilename(importedFileName)
+      return parsed.source ? (parsed.flight_number?.toUpperCase() ?? null) : null
+    }
+    return flightNumberOverride
   })()
 
-  // Saves the plan to the signed-in user's history: the first export of this editing
-  // session creates the entry, later ones update it. Nothing happens when signed out.
-  const saveToHistory = async (finalWaypoints: Waypoint[], effectiveBranding: boolean): Promise<string | null> => {
-    const source: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
-    if (!source) return "This plan's source couldn't be determined."
+  const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
+  const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
+  const effectiveBranding = includeBranding && waypoints.length >= BRANDING_MIN_WAYPOINTS
+
+  // Everything a save would store, as a string: compared with what the saved row holds, it tells
+  // whether there is anything new to save (autosave) and whether the page still shows the exported plan (Share).
+  const currentFingerprint = useMemo(
+    () =>
+      JSON.stringify([
+        planSource,
+        detectedFlightNumber,
+        originAirport,
+        destinationAirport,
+        applyBrandingOverlay(waypoints, includeBranding).map(({ name, lat, lng, altitude }) => [
+          name,
+          lat,
+          lng,
+          Math.round(altitude),
+        ]),
+        effectiveBranding,
+        flightTimeMinutes,
+      ]),
+    [planSource, detectedFlightNumber, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
+  )
+  const isDirty = savedFingerprint !== currentFingerprint
+
+  // Forgets the row this session saved to (a new import, a cleared sketch): what comes next is a new plan.
+  const resetSavedPlan = () => {
+    savedPlanIdRef.current = null
+    savedStatusRef.current = null
+    setSavedPlanId(null)
+    setSavedStatus(null)
+    setSavedFingerprint(null)
+    setLastSavedAt(null)
+    setPlanShareToken(null)
+    setDraftArmed(false)
+    setAutosaveError(null)
+  }
+
+  // Saves the plan for the signed-in user as a draft (autosave) or as exported (the export, which locks
+  // it). The first save creates the row, later ones update it. An exported row is locked, so a save after
+  // one always creates a new row. Returns an error message, or null.
+  const savePlan = async (
+    status: FlightPlanStatus,
+    finalWaypoints: Waypoint[],
+    fingerprint: string,
+  ): Promise<string | null> => {
+    if (!planSource) return "This plan's source couldn't be determined."
+
+    if (savedStatusRef.current === "exported") {
+      savedPlanIdRef.current = null
+      savedStatusRef.current = null
+      setSavedPlanId(null)
+      setSavedStatus(null)
+      setPlanShareToken(null)
+    }
 
     const body = JSON.stringify({
-      source,
+      source: planSource,
+      status,
       flightNumber: detectedFlightNumber,
       origin: originAirport,
       destination: destinationAirport,
@@ -503,29 +594,162 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
     const send = (url: string, method: "POST" | "PUT") =>
       fetch(url, { method, headers: { "Content-Type": "application/json" }, body })
+    const startNewRow = () => {
+      savedPlanIdRef.current = null
+      setPlanShareToken(null)
+      return send("/api/flight-plans", "POST")
+    }
 
     try {
       let response = savedPlanIdRef.current
         ? await send(`/api/flight-plans/${savedPlanIdRef.current}`, "PUT")
         : await send("/api/flight-plans", "POST")
-      // The entry was deleted from the history in the meantime: save it as a new one.
-      if (response.status === 404 && savedPlanIdRef.current) {
-        savedPlanIdRef.current = null
-        setPlanShareToken(null)
-        response = await send("/api/flight-plans", "POST")
+      // The row was deleted from the dashboard in the meantime, or exported from another tab: save as a new one.
+      if ((response.status === 404 || response.status === 409) && savedPlanIdRef.current) {
+        response = await startNewRow()
       }
       const result = await response.json().catch(() => null)
       if (!response.ok) return result?.error ?? "Couldn't save the flight plan."
       savedPlanIdRef.current = result.id
+      savedStatusRef.current = result.status
       setSavedPlanId(result.id)
+      setSavedStatus(result.status)
+      setSavedFingerprint(fingerprint)
+      setLastSavedAt(new Date())
       return null
     } catch (saveError) {
-      console.error("Error saving flight plan to history:", saveError)
+      console.error("Error saving flight plan:", saveError)
       return "Couldn't reach the server."
     }
   }
 
-  // Downloads the FPL and, when signed in, saves the plan to the history.
+  // The periodic draft save. Does nothing unless there is something new to save.
+  const autosaveDraft = async () => {
+    if (!authUser || !draftArmed || savingRef.current) return
+    if (!planSource || waypoints.length < 2 || !icaoReady) return
+    if (savedFingerprint === currentFingerprint) return
+
+    savingRef.current = true
+    setIsSaving(true)
+    const saveError = await savePlan("draft", applyBrandingOverlay(waypoints, includeBranding), currentFingerprint)
+    savingRef.current = false
+    setIsSaving(false)
+    setAutosaveError(saveError)
+  }
+  // The interval below must always run the latest closure, not the one from when it started.
+  const autosaveRef = useRef(autosaveDraft)
+  autosaveRef.current = autosaveDraft
+
+  // First save as soon as autosave is armed, then once a minute (a plain interval, not on every change).
+  useEffect(() => {
+    if (!authUser || !draftArmed) return
+    autosaveRef.current()
+    const timer = setInterval(() => autosaveRef.current(), AUTOSAVE_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [authUser, draftArmed])
+
+  // Convert: the plan is generated on import and the map opens; closing it for the first time starts the draft.
+  const mapWasOpenRef = useRef(false)
+  useEffect(() => {
+    if (mapWasOpenRef.current && !showMapPreview && mode === "import" && hasImported) setDraftArmed(true)
+    mapWasOpenRef.current = showMapPreview
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMapPreview])
+
+  // Sketch has no map to close: the draft starts once there is a route and both airports are filled in.
+  useEffect(() => {
+    if (mode === "draw" && authUser && waypoints.length >= 2 && icaoReady) setDraftArmed(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, authUser, waypoints.length >= 2, icaoReady])
+
+  // Keep the address in sync so a refresh reopens the saved draft: ?draft=<id> while it is a draft,
+  // nothing once it is exported (an exported plan can't be reopened for editing).
+  useEffect(() => {
+    if (!savedPlanId || savedStatus === null) return
+    const url = new URL(window.location.href)
+    if (savedStatus === "draft") url.searchParams.set("draft", savedPlanId)
+    else url.searchParams.delete("draft")
+    window.history.replaceState(null, "", url.pathname + url.search)
+  }, [savedPlanId, savedStatus])
+
+  // Opens the draft named in the address (from the dashboard's Edit action).
+  useEffect(() => {
+    if (!authReady) return
+    const id = new URLSearchParams(window.location.search).get("draft")
+    if (!id || draftLoadedRef.current) return
+
+    if (!authUser) {
+      setResume({ state: "error", message: "Sign in with Discord to open your drafts." })
+      return
+    }
+    setResume({ state: "loading" })
+    fetch(`/api/flight-plans/${id}`)
+      .then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => null) }))
+      .then(({ ok, body }) => {
+        if (!ok || !body) {
+          setResume({ state: "error", message: body?.error ?? "This draft couldn't be opened." })
+          return
+        }
+        if (body.status !== "draft") {
+          setResume({
+            state: "error",
+            message: "This flight plan was exported, so it is locked. Duplicate it from your dashboard to change it.",
+          })
+          return
+        }
+        // Sketch drafts belong in Sketch, imported ones in Convert.
+        const rightMode = body.source === "Sketch" ? "draw" : "import"
+        if (rightMode !== mode) {
+          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}`)
+          return
+        }
+
+        const stored = body.waypoints as StoredWaypoint[]
+        const branded = !!body.includes_branding
+        const restored: Waypoint[] = stored.map((wp, index) => {
+          const base: Waypoint = {
+            id: `draft-${index}`,
+            name: wp.name,
+            lat: wp.lat,
+            lng: wp.lng,
+            altitude: wp.altitude,
+            selected: false,
+          }
+          if (index === 0 || index === stored.length - 1) return { ...base, locked: true }
+          // The branding block is remembered as such, so unticking the checkbox still restores the numbers.
+          if (branded && isBrandingSlot(index, stored.length)) {
+            return { ...base, locked: true, branded: true, unbrandedName: String(index).padStart(3, "0") }
+          }
+          return base
+        })
+
+        draftLoadedRef.current = true
+        skipNamingRef.current = true
+        setOriginAirport(body.origin_airport)
+        setDestinationToAirport(body.destination_airport)
+        setIcaoValidation({ origin: true, destination: true })
+        setIncludeBranding(branded)
+        setFlightTimeMinutes(body.flight_time_minutes ?? null)
+        setWaypoints(restored)
+        if (mode === "import") {
+          setHasImported(true)
+          setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
+          setFlightNumberOverride(body.flight_number ?? null)
+        }
+        savedPlanIdRef.current = body.id
+        savedStatusRef.current = "draft"
+        setSavedPlanId(body.id)
+        setSavedStatus("draft")
+        setPlanShareToken(null)
+        setLastSavedAt(new Date(body.created_at))
+        setDraftArmed(true)
+        setResume({ state: "idle" })
+      })
+      .catch(() => setResume({ state: "error", message: "Couldn't reach the server." }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, authUser])
+
+  // Downloads the FPL and, when signed in, saves the plan as exported (which locks it).
   const performExport = async () => {
     setError(null)
     setSuccessMessage(null)
@@ -533,7 +757,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     // Whatever the checkbox says is what gets exported AND stored, applied to the waypoints
     // as they are right now (this also repairs a branding block that edits had shifted).
     const finalWaypoints = applyBrandingOverlay(waypoints, includeBranding)
-    const effectiveBranding = includeBranding && finalWaypoints.length >= BRANDING_MIN_WAYPOINTS
     if (finalWaypoints.some((wp, i) => wp.name !== waypoints[i].name || wp.locked !== waypoints[i].locked)) {
       setWaypoints(finalWaypoints)
     }
@@ -584,11 +807,22 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         return
       }
 
-      const saveError = await saveToHistory(finalWaypoints, effectiveBranding)
+      // Exporting the very plan that is already saved as exported again: nothing new to save.
+      if (savedStatusRef.current === "exported" && savedFingerprint === currentFingerprint) {
+        setSuccessMessage(`Flight plan exported again as ${fileName}.`)
+        return
+      }
+
+      savingRef.current = true
+      setIsSaving(true)
+      const saveError = await savePlan("exported", finalWaypoints, currentFingerprint)
+      savingRef.current = false
+      setIsSaving(false)
       if (saveError) {
-        setError(`Exported as ${fileName}, but it wasn't saved to your history: ${saveError}`)
+        setError(`Exported as ${fileName}, but it wasn't saved to your dashboard: ${saveError}`)
       } else {
-        setSuccessMessage(`Flight plan exported as ${fileName} and saved to your history.`)
+        setAutosaveError(null)
+        setSuccessMessage(`Flight plan exported as ${fileName} and saved to your dashboard. It is now locked.`)
       }
     } catch (error) {
       console.error("Error exporting FPL file:", error)
@@ -854,9 +1088,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const clearDrawing = useCallback(() => {
     setWaypoints([])
     setCurveSegments([])
-    savedPlanIdRef.current = null
-    setSavedPlanId(null)
-    setPlanShareToken(null)
+    resetSavedPlan()
   }, [])
 
   // Toggle a single waypoint's selection from the map (select mode)
@@ -934,35 +1166,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
-  // Share: saves the plan to the history first (updating it if this session already saved it, so
-  // the live link serves what is on screen now), then opens the share modal.
+  // Share: only an exported plan can be shared, and only while the page still shows it as exported.
+  // Opens the share modal for that row (it may already be shared from an earlier press).
   const handleShare = async () => {
-    if (waypoints.length < 2) {
-      setError("Add at least 2 waypoints before sharing.")
-      return
-    }
-    if (mode === "draw" && exportBlockReason) {
-      setError(exportBlockReason)
-      return
-    }
+    if (!savedPlanIdRef.current || savedStatusRef.current !== "exported") return
     setError(null)
     setSuccessMessage(null)
     setIsPreparingShare(true)
 
-    const finalWaypoints = applyBrandingOverlay(waypoints, includeBranding)
-    if (finalWaypoints.some((wp, i) => wp.name !== waypoints[i].name || wp.locked !== waypoints[i].locked)) {
-      setWaypoints(finalWaypoints)
-    }
-    const effectiveBranding = includeBranding && finalWaypoints.length >= BRANDING_MIN_WAYPOINTS
-
-    const saveError = await saveToHistory(finalWaypoints, effectiveBranding)
-    if (saveError || !savedPlanIdRef.current) {
-      setIsPreparingShare(false)
-      setError(`Couldn't prepare the share link: ${saveError ?? "the plan wasn't saved."}`)
-      return
-    }
-
-    // Is it already being shared (from an earlier press in this session)?
     const supabase = getBrowserSupabase()
     const { data } = supabase
       ? await supabase.from("flight_plans").select("share_token").eq("id", savedPlanIdRef.current).maybeSingle()
@@ -1066,7 +1277,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         <PanelSection
           label="Flight time"
           className={inGrid ? exportSectionClass : undefined}
-          help="Optional. How long the flight takes: saved with the plan in your history."
+          help="Optional. How long the flight takes: saved with the plan in your dashboard."
         >
           <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
         </PanelSection>
@@ -1089,6 +1300,42 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       </div>
     ) : null
 
+  // Share needs an exported plan, and the page must still show that exact plan.
+  const canShare = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
+
+  // Where the plan stands: draft autosave, or exported (locked).
+  const saveStatusLine = (() => {
+    if (!canSave) {
+      return authAvailable && authReady ? "Sign in with Discord (top right) to save drafts, keep a dashboard and share plans." : ""
+    }
+    if (savedStatus === "exported" && !isDirty) {
+      return (
+        <>
+          Exported and saved: this plan is locked. Duplicate it from your{" "}
+          <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+            dashboard
+          </Link>{" "}
+          to change it.
+        </>
+      )
+    }
+    if (!draftArmed) {
+      return mode === "import"
+        ? "Your draft starts saving once you close the map."
+        : "Your draft starts saving once the route has two points and both airports are set."
+    }
+    if (isSaving) return "Saving..."
+    if (autosaveError) return `Draft not saved: ${autosaveError}`
+    if (isDirty) {
+      return savedStatus === "exported"
+        ? "Unsaved changes. The exported plan is locked, so they are saved as a new draft."
+        : "Unsaved changes. Your draft autosaves every minute."
+    }
+    return lastSavedAt
+      ? `Draft saved at ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`
+      : "Draft saved."
+  })()
+
   const exportButtons = (
     <div className="space-y-2">
       <div className="flex gap-2">
@@ -1096,23 +1343,23 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           <Download />
           Export FPL
         </Button>
-        <span title={canSave ? undefined : "Sign in with Discord to share a flight plan"}>
-          <Button
-            variant="outline"
-            onClick={handleShare}
-            disabled={!canSave || waypoints.length === 0 || isLoading || isPreparingShare}
-          >
+        <span
+          title={
+            !canSave
+              ? "Sign in with Discord to share a flight plan"
+              : canShare
+                ? undefined
+                : "Export the flight plan first to share it"
+          }
+        >
+          <Button variant="outline" onClick={handleShare} disabled={!canShare || isLoading || isPreparingShare}>
             <Share2 />
-            {isPreparingShare ? "Saving..." : "Share"}
+            {isPreparingShare ? "Opening..." : "Share"}
           </Button>
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {canSave
-          ? "Exporting saves the plan to your history, where you can share it too."
-          : authAvailable && authReady
-            ? "Sign in with Discord (top right) to save plans to a history and share them."
-            : ""}
+      <p className={cn("text-xs text-muted-foreground", autosaveError && canSave && "text-destructive")}>
+        {saveStatusLine}
       </p>
     </div>
   )
@@ -1141,20 +1388,19 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const accountHint =
     authAvailable && authReady ? (
       authUser ? (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <History className="h-3.5 w-3.5 shrink-0" />
+        <p className="mt-3 max-w-lg text-balance text-xs text-muted-foreground">
           <span>
-            Signed in: plans you export are saved to your{" "}
-            <Link href="/history" className="underline underline-offset-2 hover:text-foreground">
-              history
+            Signed in: your plans are saved as drafts while you edit, and kept in your{" "}
+            <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+              dashboard
             </Link>
             .
           </span>
         </p>
       ) : (
         <p className="mt-3 text-xs text-muted-foreground">
-          Not signed in: plans you export aren&apos;t saved. Sign in with Discord (top right) first to keep a history and
-          share plans. Signing in reloads the page.
+          Not signed in: plans you export aren&apos;t saved. Sign in with Discord (top right) first to save drafts, keep
+          a dashboard and share plans. Signing in reloads the page.
         </p>
       )
     ) : null
@@ -1198,48 +1444,54 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     </>
   )
 
-  // Back link + page title. Sits above the content, inside the narrow column on the pre-import screen.
-  const intro = (
-    <>
-      <div className="mb-3">
-        <Button variant="ghost" size="sm" asChild className="-ml-2.5 gap-1 text-muted-foreground">
-          <Link href="/">
-            <ChevronLeft size={14} />
-            Back
-          </Link>
-        </Button>
+  // Shown instead of the editor while a draft is being opened, or when it can't be.
+  const resumeNotice =
+    resume.state === "idle" ? null : (
+      <div>
+        <div className="flex max-w-xl flex-col items-start rounded-lg border bg-card px-6 py-8">
+          {resume.state === "loading" ? (
+            <p className="text-sm text-muted-foreground">Loading your draft...</p>
+          ) : (
+            <>
+              <h2 className="text-sm font-medium">This draft can&apos;t be opened</h2>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">{resume.message}</p>
+              <Button asChild variant="outline" className="mt-5">
+                <Link href="/dashboard" className="no-underline">
+                  Go to your dashboard
+                </Link>
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+    )
 
-      <PageHeader
-        actions={
-          mode === "import" && hasImported ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                window.location.href = `${window.location.pathname}?reset=${Date.now()}`
-              }}
-            >
-              <RotateCcw />
-              Reset planner
-            </Button>
-          ) : undefined
-        }
-        title={mode === "draw" ? "Route Sketch" : "Convert a flight"}
-        description={
-          mode === "draw"
-            ? "Draw a route on the map, then export it as an Infinite Flight flight plan."
-            : "Turn a KML file from FlightRadar24 or FlightAware into an Infinite Flight flight plan."
-        }
-      />
-    </>
-  )
+  const pageTitle = mode === "draw" ? "Route Sketch" : "Convert a flight"
+  const pageDescription =
+    mode === "draw"
+      ? "Draw a route on the map, then export it as an Infinite Flight flight plan."
+      : "Turn a KML file from FlightRadar24 or FlightAware into an Infinite Flight flight plan."
+  const resetAction =
+    mode === "import" && hasImported ? (
+      <Button
+        variant="outline"
+        onClick={() => {
+          window.location.href = `${window.location.pathname}?reset=${Date.now()}`
+        }}
+      >
+        <RotateCcw />
+        Reset planner
+      </Button>
+    ) : undefined
+  // Before the import Convert is a short form: keep it narrow, but left-aligned like every other page.
+  const narrowPage = false
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto px-4 py-6">
-        {mode !== "import" || hasImported ? intro : null}
+      <PageShell title={pageTitle} description={pageDescription} actions={resetAction} width={narrowPage ? "narrow" : "full"}>
+        {resumeNotice}
 
-        {mode === "draw" && (
+        {mode === "draw" && resume.state === "idle" && (
           <>
             <Card className="shadow-none">
               <CardContent className="p-4">
@@ -1294,74 +1546,51 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           </>
         )}
 
-        {mode === "import" && !hasImported && (
-          <div className="mx-auto max-w-xl">
-            {intro}
+        {mode === "import" && !hasImported && resume.state === "idle" && (
+          <div>
             {error && alerts}
-            <Card className="shadow-none">
-              <div className="border-b px-5 py-3.5">
-                <h2 className="text-sm font-medium">Flight information</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Enter the origin and destination airport codes, then upload the KML file you downloaded from
-                  FlightRadar24 or FlightAware.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 px-5 py-5">
-                <div className="space-y-2">
-                  <Label htmlFor="origin" className="studio-label">
-                    Origin
-                  </Label>
-                  <Input
-                    id="origin"
-                    value={originAirport}
-                    onChange={(e) => handleICAOChange("origin", e.target.value)}
-                    placeholder="EHAM"
-                    autoComplete="off"
-                    className={icaoInputClass(originAirport, icaoValidation.origin)}
-                    maxLength={4}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="destination" className="studio-label">
-                    Destination
-                  </Label>
-                  <Input
-                    id="destination"
-                    value={destinationAirport}
-                    onChange={(e) => handleICAOChange("destination", e.target.value)}
-                    placeholder="KSFO"
-                    autoComplete="off"
-                    className={icaoInputClass(destinationAirport, icaoValidation.destination)}
-                    maxLength={4}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
-                <p className="text-xs text-muted-foreground">4-letter ICAO codes</p>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
-                  title={
-                    !icaoValidation.origin || !icaoValidation.destination
-                      ? "Enter valid departure and arrival ICAO codes to enable import"
-                      : undefined
-                  }
-                >
-                  <Upload />
-                  {isLoading ? "Importing..." : "Import KML file"}
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".kml"
-                  onChange={handleFileImport}
-                  className="hidden"
+            <StartLayout
+              from={
+                <AirportInput
+                  id="origin"
+                  label="From"
+                  value={originAirport}
+                  valid={icaoValidation.origin}
+                  onChange={(value) => handleICAOChange("origin", value)}
+                  placeholder="Paris or LFPG"
                 />
-              </div>
-            </Card>
-            {accountHint}
+              }
+              to={
+                <AirportInput
+                  id="destination"
+                  label="To"
+                  value={destinationAirport}
+                  valid={icaoValidation.destination}
+                  onChange={(value) => handleICAOChange("destination", value)}
+                  placeholder="San Francisco or KSFO"
+                />
+              }
+              importButton={
+                <>
+                  <Button
+                    size="lg"
+                    className="h-14 w-full text-base"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isLoading || !icaoValidation.origin || !icaoValidation.destination}
+                    title={
+                      !icaoValidation.origin || !icaoValidation.destination
+                        ? "Enter valid departure and arrival ICAO codes to enable import"
+                        : undefined
+                    }
+                  >
+                    <Upload />
+                    {isLoading ? "Importing..." : "Import KML file"}
+                  </Button>
+                  <input ref={fileInputRef} type="file" accept=".kml" onChange={handleFileImport} className="hidden" />
+                </>
+              }
+              hint={accountHint}
+            />
           </div>
         )}
 
@@ -1575,7 +1804,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         </Dialog>
 
         <Toaster />
-      </div>
+      </PageShell>
     </TooltipProvider>
   )
 }

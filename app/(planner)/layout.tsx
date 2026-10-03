@@ -5,7 +5,7 @@ import { StudioThemeScope } from "@/components/studio-theme-scope"
 import "./planner.css"
 
 // Shared chrome for the planner tool's routes: /convert (KML import), /sketch (draw from
-// scratch), /history (saved plans) and /shared/[token] (a plan shared by link).
+// scratch), /dashboard (saved plans) and /shared/[token] (a plan shared by link).
 // /planner itself just redirects to /convert. All of them use the Studio theme.
 export default function PlannerLayout({ children }: { children: React.ReactNode }) {
   return (

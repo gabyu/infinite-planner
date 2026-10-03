@@ -8,7 +8,8 @@ const WINDOW_DAYS = 380
 
 // Fetches the raw export timestamps for the window (admin-only SQL function) and hands them
 // to the client component, which draws the day boundaries in the viewer's own timezone.
-// Revisit if flight_statistics grows to where fetching raw rows gets slow (13.5k/year now).
+// Reads flight_plans (exported plans of all users), see admin_flight_export_times. Revisit if it grows to where
+// fetching raw rows gets slow.
 export async function ActivityHeatmapSection() {
   const ctx = await getSessionContext()
   if (!ctx) return null

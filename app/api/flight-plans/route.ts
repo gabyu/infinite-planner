@@ -1,7 +1,8 @@
 import { flightPlanBodySchema, flightPlanColumns, json, requireUser } from "@/lib/flight-plan-server"
 import { MAX_FLIGHT_PLANS_PER_USER } from "@/lib/flight-plans"
 
-// Saves a new flight plan for the signed-in user. Called when they export from Convert or Sketch.
+// Creates a flight plan for the signed-in user: the first autosave of a draft, or an export of a
+// plan that was never autosaved.
 export async function POST(request: Request) {
   const auth = await requireUser(request)
   if (auth.error) return auth.error
@@ -14,13 +15,13 @@ export async function POST(request: Request) {
 
   const { count } = await supabase.from("flight_plans").select("id", { count: "exact", head: true })
   if ((count ?? 0) >= MAX_FLIGHT_PLANS_PER_USER) {
-    return json({ error: `Your history is full (${MAX_FLIGHT_PLANS_PER_USER} flight plans). Delete some to save more.` }, 409)
+    return json({ error: `Your dashboard is full (${MAX_FLIGHT_PLANS_PER_USER} flight plans). Delete some to save more.` }, 409)
   }
 
   const { data, error } = await supabase
     .from("flight_plans")
     .insert({ user_id: user.id, source: parsed.data.source, ...flightPlanColumns(parsed.data) })
-    .select("id, created_at")
+    .select("id, status, created_at")
     .single()
 
   if (error || !data) {
@@ -28,5 +29,5 @@ export async function POST(request: Request) {
     return json({ error: "Couldn't save the flight plan." }, 500)
   }
 
-  return json({ id: data.id, createdAt: data.created_at }, 201)
+  return json({ id: data.id, status: data.status, createdAt: data.created_at }, 201)
 }

@@ -53,6 +53,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Everything except static assets and the public counter endpoint.
-    "/((?!_next/static|_next/image|api/counter|favicon|images/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|json|txt|xml|woff2?)$).*)",
+    "/((?!_next/static|_next/image|api/counter|api/airports|favicon|images/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|json|txt|xml|woff2?)$).*)",
   ],
 }
