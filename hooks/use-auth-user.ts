@@ -33,11 +33,18 @@ export function useAuthUser() {
   return { user, ready, available }
 }
 
-// Starts the Discord sign-in and brings the user back to the page they were on.
+// Where a Discord sign-in lands. A cold login started from the homepage goes to the dashboard;
+// a login started anywhere else (Convert, Sketch, the nav...) brings the user back to where they were.
+export function loginDestination() {
+  const { pathname, search } = window.location
+  return pathname === "/" ? "/dashboard" : pathname + search
+}
+
+// Starts the Discord sign-in.
 export async function signInWithDiscord() {
   const supabase = getBrowserSupabase()
   if (!supabase) return
-  const next = window.location.pathname + window.location.search
+  const next = loginDestination()
   await supabase.auth.signInWithOAuth({
     provider: "discord",
     options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },

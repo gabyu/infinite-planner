@@ -3,8 +3,10 @@
 //   node scripts/build-airports.mjs path/to/airports.csv
 // Keeps only entries with a valid 4-letter ICAO code - the `ident` when it is one
 // (OurAirports uses the ICAO code as ident whenever it exists), else the separate
-// `icao_code` column - and writes a compact { "EHAM": "Amsterdam Airport Schiphol", ... }
-// map, sorted by code so diffs stay readable. Local/GPS-only identifiers are skipped.
+// `icao_code` column - and writes a compact { "EHAM": ["Amsterdam Airport Schiphol", "Amsterdam", "AMS", "NL", 0], ... }
+// map of [name, city, iata, country, rank], sorted by code so diffs stay readable. Local/GPS-only
+// identifiers are skipped. `rank` orders search results: 0 large airport, 1 medium, 2 small,
+// 3 anything else, 4 closed (kept for name lookup, left out of search).
 import { readFileSync, writeFileSync } from "node:fs"
 
 const input = process.argv[2]
@@ -51,6 +53,12 @@ const [header, ...rows] = parseCsv(readFileSync(input, "utf8"))
 const identIdx = header.indexOf("ident")
 const nameIdx = header.indexOf("name")
 const icaoIdx = header.indexOf("icao_code")
+const cityIdx = header.indexOf("municipality")
+const iataIdx = header.indexOf("iata_code")
+const countryIdx = header.indexOf("iso_country")
+const typeIdx = header.indexOf("type")
+const scheduledIdx = header.indexOf("scheduled_service")
+const RANK = { large_airport: 0, medium_airport: 1, small_airport: 2, closed: 4 }
 if (identIdx < 0 || nameIdx < 0 || icaoIdx < 0) throw new Error("Unexpected CSV header: " + header.join(","))
 
 const ICAO = /^[A-Z]{4}$/
@@ -60,7 +68,16 @@ for (const column of [identIdx, icaoIdx]) {
   for (const row of rows) {
     const code = row[column]?.trim().toUpperCase()
     const name = row[nameIdx]?.trim()
-    if (code && name && ICAO.test(code) && !(code in airports)) airports[code] = name
+    if (code && name && ICAO.test(code) && !(code in airports)) {
+      airports[code] = [
+        name,
+        row[cityIdx]?.trim() ?? "",
+        row[iataIdx]?.trim().toUpperCase() ?? "",
+        row[countryIdx]?.trim() ?? "",
+        // Airports with scheduled flights rank one step higher than their size alone.
+        (RANK[row[typeIdx]] ?? 3) - (row[typeIdx] !== "closed" && row[scheduledIdx] === "yes" ? 1 : 0),
+      ]
+    }
   }
 }
 

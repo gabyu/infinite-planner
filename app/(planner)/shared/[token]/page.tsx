@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { Download } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { PageShell } from "@/components/ds/page-shell"
 import { RouteArrow } from "@/components/route-arrow"
 import { SharedPlanMap } from "@/components/shared-plan-map"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
@@ -30,17 +31,15 @@ export default async function SharedPlanPage({ params }: { params: { token: stri
   ]
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-6">
-      <p className="studio-label mb-3">Shared flight plan</p>
-
-      <div className="overflow-hidden rounded-lg border bg-card">
+    <PageShell title="Shared flight plan" description="Someone shared this flight plan with you.">
+      <div className="max-w-3xl overflow-hidden rounded-lg border bg-card">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4">
           <div className="min-w-0">
-            <h1 className="font-mono text-xl font-semibold">
+            <h2 className="font-mono text-xl font-semibold">
               {plan.origin}
               <RouteArrow />
               {plan.destination}
-            </h1>
+            </h2>
             {(plan.originName || plan.destinationName) && (
               <p className="mt-1 text-sm text-muted-foreground">
                 {plan.originName ?? plan.origin}
@@ -79,10 +78,10 @@ export default async function SharedPlanPage({ params }: { params: { token: stri
         </div>
       </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="mt-3 max-w-3xl text-xs text-muted-foreground">
         This link always shows the plan as its author has it now. Import it into Infinite Flight from the downloaded
         .fpl file.
       </p>
-    </div>
+    </PageShell>
   )
 }

@@ -17,6 +17,12 @@ interface Props {
   timezone: string | null
   /** True when the server stopped fetching before reaching the end of the window. */
   truncated?: boolean
+  /** Heading of the card. */
+  title?: string
+  /** What one cell counts, singular ("export", "flight plan"). */
+  noun?: string
+  /** Where the viewer can change their timezone; omit for no "Change" link (the browser's is used). */
+  profileHref?: string | null
 }
 
 const pad = (n: number) => String(n).padStart(2, "0")
@@ -24,7 +30,15 @@ const utcKey = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
 // Flight plan exports per day, GitHub-contributions style. The server sends raw export
 // times; the day boundaries are drawn here, in the viewing admin's timezone.
-export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
+export function ActivityHeatmap({
+  exportTimes,
+  timezone,
+  truncated,
+  title = "Flight plan exports",
+  noun = "export",
+  profileHref = "/admin-dashboard/profile",
+}: Props) {
+  const plural = `${noun}s`
   const [tz, setTz] = useState<string | null>(null)
   const [hover, setHover] = useState<{ label: string; count: number } | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
@@ -109,15 +123,17 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
     <section aria-labelledby="heatmap-title" className="rounded-lg border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="heatmap-title" className="text-sm font-semibold">
-          Flight plan exports
+          {title}
         </h2>
         <p className="text-xs text-muted-foreground">
           {tz ? (
             <>
               Days in <span className="font-mono">{tz}</span> ({source}).{" "}
-              <Link href="/admin-dashboard/profile" className="underline underline-offset-2">
-                Change
-              </Link>
+              {profileHref && (
+                <Link href={profileHref} className="underline underline-offset-2">
+                  Change
+                </Link>
+              )}
             </>
           ) : (
             "Loading…"
@@ -130,7 +146,7 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
       ) : (
         <>
           <p className="mt-3 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{model.total.toLocaleString("en-GB")}</span> exports in the last
+            <span className="font-medium text-foreground">{model.total.toLocaleString("en-GB")}</span> {model.total === 1 ? noun : plural} in the last
             12 months across <span className="font-medium text-foreground">{model.activeDays}</span> active days
             {model.best.count > 0 && (
               <>
@@ -141,7 +157,7 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
           </p>
           {truncated && (
             <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              Very large dataset: the most recent exports may be missing from this view.
+              Very large dataset: the most recent {plural} may be missing from this view.
             </p>
           )}
 
@@ -174,8 +190,8 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
                           <div
                             key={i}
                             role="img"
-                            aria-label={`${day.count} exports on ${day.label}`}
-                            title={`${day.count} export${day.count === 1 ? "" : "s"} on ${day.label}`}
+                            aria-label={`${day.count} ${plural} on ${day.label}`}
+                            title={`${day.count} ${day.count === 1 ? noun : plural} on ${day.label}`}
                             onMouseEnter={() => setHover({ label: day.label, count: day.count })}
                             className="rounded-[2px]"
                             style={{ width: CELL, height: CELL, backgroundColor: `hsl(var(--hm-${day.level}))` }}
@@ -194,7 +210,7 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p aria-live="polite" className="min-h-4">
               {hover
-                ? `${hover.count} export${hover.count === 1 ? "" : "s"} on ${hover.label}`
+                ? `${hover.count} ${hover.count === 1 ? noun : plural} on ${hover.label}`
                 : "Hover a day for details."}
             </p>
             <div className="flex items-center gap-1" aria-hidden>
@@ -216,7 +232,7 @@ export function ActivityHeatmap({ exportTimes, timezone, truncated }: Props) {
               <thead>
                 <tr className="text-left text-xs text-muted-foreground">
                   <th className="py-1 font-medium">Month</th>
-                  <th className="py-1 text-right font-medium">Exports</th>
+                  <th className="py-1 text-right font-medium capitalize">{plural}</th>
                 </tr>
               </thead>
               <tbody>

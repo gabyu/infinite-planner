@@ -4,7 +4,7 @@ import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Upload, PencilRuler, History } from "lucide-react"
+import { Upload, PencilRuler, LayoutDashboard } from "lucide-react"
 import { UserMenu } from "@/components/auth/user-menu"
 import { useAuthUser } from "@/hooks/use-auth-user"
 
@@ -45,7 +45,7 @@ function NavLink({
   )
 }
 
-// Shared site-wide header. History is only offered to signed-in users.
+// Shared site-wide header. The dashboard is only offered to signed-in users.
 export function SiteHeader() {
   const { user } = useAuthUser()
 
@@ -81,8 +81,8 @@ export function SiteHeader() {
             <span className="hidden sm:inline">Sketch</span>
           </NavLink>
           {user && (
-            <NavLink href="/history" icon={<History size={16} />}>
-              <span className="hidden sm:inline">History</span>
+            <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />}>
+              <span className="hidden sm:inline">Dashboard</span>
             </NavLink>
           )}
           <UserMenu />

@@ -1,21 +1,2 @@
-import type React from "react"
-
-export function PageHeader({
-  title,
-  description,
-  actions,
-}: {
-  title: string
-  description?: string
-  actions?: React.ReactNode
-}) {
-  return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-      </div>
-      {actions}
-    </div>
-  )
-}
+// The page header now lives in the design system; the admin dashboard keeps importing it from here.
+export { PageHeader } from "@/components/ds/page-header"
