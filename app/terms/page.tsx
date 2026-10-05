@@ -65,14 +65,25 @@ export default function TermsPage() {
           If you sign in, you are responsible for the security of your Discord account. Authentication is handled by
           Discord; we do not manage it and only receive confirmation of your sign-in from Discord.
         </p>
+        <p>
+          Your Discord username is the name by which you are identified on the Service, including to other users. It is
+          the only element of your Discord profile that is made visible to other people. Your avatar and email address
+          are never shown to other users or visitors.
+        </p>
       </section>
 
       <section>
         <h2>5. Your content</h2>
         <p>
           You retain all rights in the flight plans you generate, import, or draw. We do not claim ownership of your
-          routes or flight plan files. If you choose to share a flight plan publicly (a feature planned for a future
-          release), you grant other users permission to view and download it, and nothing more.
+          routes or flight plan files. If you choose to share a flight plan, a link is created that anyone can open,
+          without an account, to view and download it. By doing so, you grant other people permission to view and
+          download that flight plan, and nothing more.
+        </p>
+        <p>
+          When you share a flight plan, your Discord username is displayed with it as its author, and this cannot be
+          turned off for a shared plan. If you do not wish your Discord username to be displayed, do not share the
+          flight plan. You may stop sharing at any time, after which the link no longer works.
         </p>
         <p>
           For legal reasons, imported KML files are not retained; only the flight plan data generated from them may be
