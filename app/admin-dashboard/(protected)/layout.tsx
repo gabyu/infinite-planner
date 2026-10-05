@@ -11,6 +11,9 @@ import { requireAdmin } from "@/lib/admin/auth"
 // the middleware redirects first, this re-checks on the server.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireAdmin()
+  // An admin who also signs in with Discord shows their Discord name and avatar (Supabase merges them into the user metadata).
+  const meta = user.user_metadata ?? {}
+  const discordName: string | null = meta.custom_claims?.global_name ?? meta.full_name ?? meta.user_name ?? null
   const environment = process.env.NEXT_PUBLIC_ENV === "staging" ? "staging" : null
 
   return (
@@ -24,7 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </Badge>
           {environment && <Badge variant="secondary">{environment}</Badge>}
         </Link>
-        <ProfileMenu email={user.email ?? "admin"} />
+        <ProfileMenu email={user.email ?? "admin"} name={discordName} avatarUrl={user.user_metadata?.avatar_url ?? null} />
       </header>
 
       <div className="flex flex-1 flex-col md:flex-row">
