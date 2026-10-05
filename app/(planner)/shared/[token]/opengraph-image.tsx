@@ -59,11 +59,15 @@ export default async function Image({ params }: { params: { token: string } }) {
   const plan = await getSharedPlan(params.token)
   if (!plan) return new Response(null, { status: 404 })
 
-  const [inter500, inter700, plexMono] = await Promise.all([
+  const [logoSvg, inter500, inter700, plexMono] = await Promise.all([
+    readFile(join(process.cwd(), "public", "ip_logo.svg")),
     loadFont("inter-latin-500-normal.woff"),
     loadFont("inter-latin-700-normal.woff"),
     loadFont("ibm-plex-mono-latin-600-normal.woff"),
   ])
+
+  // The logo's blue is the same as the top of the card's gradient: lightened a touch so it reads.
+  const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logoSvg.toString().replace("#3C82F6", "#6FA3F9")).toString("base64")}`
 
   // Thousands of waypoints are pointless at this size.
   const step = Math.max(1, Math.ceil(plan.waypoints.length / 150))
@@ -87,15 +91,21 @@ export default async function Image({ params }: { params: { token: string } }) {
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          padding: "40px 64px",
+          padding: "32px 64px 40px",
           color: "white",
           fontFamily: "Inter",
           backgroundImage: "linear-gradient(180deg, #3b82f6 0%, #1d6bff 55%, #0a5cff 100%)",
         }}
       >
-        <div style={{ display: "flex", fontSize: 26, fontWeight: 500, opacity: 0.85 }}>
-          {`Flight plan by ${plan.authorName}`} · Infinite Planner
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 44 }}>
+          <div style={{ display: "flex", fontSize: 26, fontWeight: 500, opacity: 0.85 }}>
+            {`Flight plan by ${plan.authorName}`} · Infinite Planner
+          </div>
         </div>
+        {/* Logo: top on the first text line, right edge on the route panel's, out of the flow so
+            it doesn't push the content down. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoDataUri} width={132} height={132} alt="" style={{ position: "absolute", top: 40, right: 64 }} />
 
         <div style={{ display: "flex", alignItems: "center", marginTop: 18 }}>
           <div style={codeStyle}>{plan.origin}</div>
