@@ -14,9 +14,33 @@ import { getSharedPlan } from "@/lib/shared-plans"
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
-export const metadata: Metadata = {
-  title: "Shared flight plan - Infinite Planner",
-  robots: { index: false, follow: false },
+const FALLBACK_TITLE = "Shared flight plan - Infinite Planner"
+
+// What a pasted link unfurls to (Discord, Slack, X...): the route in the title, the airports,
+// flight and duration in the description, and the generated route image (opengraph-image.tsx).
+// The root layout sets openGraph/twitter titles, so they have to be overridden here too.
+export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+  const plan = await getSharedPlan(params.token)
+  const robots = { index: false, follow: false }
+  if (!plan) return { title: FALLBACK_TITLE, robots }
+
+  const title = `${plan.origin} → ${plan.destination} - Flight plan by ${plan.authorName} | Infinite Planner`
+  const description = [
+    `${plan.originName ?? plan.origin} → ${plan.destinationName ?? plan.destination}`,
+    plan.flightNumber,
+    formatFlightTime(plan.flightTimeMinutes),
+    `${plan.waypoints.length} waypoints`,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
+  return {
+    title,
+    description,
+    robots,
+    openGraph: { type: "website", title, description, siteName: "Infinite Planner" },
+    twitter: { card: "summary_large_image", title, description },
+  }
 }
 
 export default async function SharedPlanPage({ params }: { params: { token: string } }) {
@@ -31,7 +55,10 @@ export default async function SharedPlanPage({ params }: { params: { token: stri
   ]
 
   return (
-    <PageShell title="Shared flight plan" description="Someone shared this flight plan with you.">
+    <PageShell
+      title="Shared flight plan"
+      description={`${plan.authorName} shared this flight plan with you.`}
+    >
       <div className="max-w-3xl overflow-hidden rounded-lg border bg-card">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b p-4">
           <div className="min-w-0">

@@ -6,9 +6,14 @@ import { getServiceRoleSupabase } from "@/lib/supabase/admin"
 // flight plan: these two functions are the only way in, they run on the server with the
 // service role, and they only ever look a row up by its (non-null) share token.
 
-// What the public page may show. No user_id and no download counter: a link doesn't reveal
-// who made the plan, and the counter isn't surfaced anywhere yet.
+// What the public page may show. A shared link always names its author (their Discord
+// username and avatar, public by design: sharing is attributed). Still no user_id, and no
+// download counter, which isn't surfaced anywhere yet.
 export interface SharedFlightPlan {
+  // Never empty: an account without a Discord username (an admin) shows as ADMIN_AUTHOR_NAME,
+  // never its e-mail.
+  authorName: string
+  authorAvatarUrl: string | null
   source: FlightPlanSource
   flightNumber: string | null
   origin: string
@@ -18,6 +23,8 @@ export interface SharedFlightPlan {
   flightTimeMinutes: number | null
   waypoints: StoredWaypoint[]
 }
+
+const ADMIN_AUTHOR_NAME = "Infinite Planner admin"
 
 export function isShareToken(value: string) {
   return UUID_PATTERN.test(value)
@@ -36,7 +43,7 @@ export async function getSharedPlan(token: string): Promise<SharedFlightPlan | n
   const { data, error } = await service
     .from("flight_plans")
     .select(
-      "source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, flight_time_minutes, waypoints",
+      "source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, flight_time_minutes, waypoints, profiles(discord_username, avatar_url)",
     )
     .eq("share_token", token)
     .maybeSingle()
@@ -44,7 +51,12 @@ export async function getSharedPlan(token: string): Promise<SharedFlightPlan | n
   if (error) console.error("Loading a shared flight plan failed:", error.message)
   if (!data) return null
 
+  // user_id is a to-one foreign key, so the embed is a single object (or null).
+  const author = data.profiles as unknown as { discord_username: string | null; avatar_url: string | null } | null
+
   return {
+    authorName: author?.discord_username || ADMIN_AUTHOR_NAME,
+    authorAvatarUrl: author?.avatar_url ?? null,
     source: data.source,
     flightNumber: data.flight_number,
     origin: data.origin_airport,
