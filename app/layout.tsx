@@ -28,6 +28,8 @@ const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
 const siteUrl = isStaging ? "https://staging830921-infiniteplanner.gabyu.com/" : "https://infiniteplanner.gabyu.com/"
 
 export const metadata: Metadata = {
+  // Makes every relative og:image / canonical URL absolute on the right domain (crawlers need that).
+  metadataBase: new URL(siteUrl),
   title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
   description:
     "The Flight Plan Hub for Infinite Flight. Import KML files from FlightRadar24 or FlightAware, or draw a route from scratch, and export it as an Infinite Flight flight plan.",

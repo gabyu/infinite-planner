@@ -102,7 +102,7 @@ export function ShareDialog({ open, onOpenChange, planId, origin: from, destinat
           {shareToken ? (
             <>
               <p className="text-sm text-muted-foreground">
-                Anyone with this link can view and download the flight plan, no account needed.
+                Anyone with this link can view and download the flight plan, no account needed. Your Discord username is shown on the link as its author.
               </p>
               <div className="flex gap-2">
                 <Input
