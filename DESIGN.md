@@ -74,7 +74,8 @@ Inter for text, IBM Plex Mono for data (airport codes, coordinates, waypoint nam
 | `RouteArrow` | `components/route-arrow.tsx` | Square-ish arrow icon for `ORIGIN > DESTINATION` (the font's arrow glyph is too wide) |
 | `PanelSection` | `components/flight-plan-editor.tsx` | Titled block of the options panel, `.studio-label` header with optional (?) hint |
 | `FlightTimeField` | `components/flight-time-field.tsx` | Hours + minutes inputs |
-| `ActivityHeatmap` | `components/admin/activity-heatmap.tsx` | Per-day contributions grid, shared by admin and dashboard |
+| `ActivityHeatmap` | `components/admin/activity-heatmap.tsx` | Rolling 12-month per-day grid, used by the admin overview |
+| `ActivityOverview` | `components/dashboard/activity-overview.tsx` | Dashboard card: four headline numbers (small-caps label, large value) over the current calendar year's grid, which stretches to the card width, with current streak and legend in the footer |
 
 ## Next candidates
 
