@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { PencilRuler, Upload } from "lucide-react"
-import { ActivityHeatmap } from "@/components/admin/activity-heatmap"
 import { PageShell } from "@/components/ds/page-shell"
 import { Button } from "@/components/ui/button"
+import { ActivityOverview } from "@/components/dashboard/activity-overview"
 import { FlightsList } from "@/components/dashboard/flights-list"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
 import { FLIGHT_PLAN_SUMMARY_COLUMNS, HISTORY_PAGE_SIZE, type FlightPlanSummary } from "@/lib/flight-plans"
@@ -95,13 +95,7 @@ export default async function DashboardPage() {
         </div>
       }
     >
-      <ActivityHeatmap
-        exportTimes={exportTimes}
-        timezone={null}
-        title="Flight plans generated"
-        noun="flight plan"
-        profileHref={null}
-      />
+      <ActivityOverview exportTimes={exportTimes} />
 
       <section className="mt-8" aria-labelledby="my-flights-title">
         <h2 id="my-flights-title" className="mb-3 text-sm font-semibold">
