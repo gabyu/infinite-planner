@@ -35,7 +35,7 @@ CREATE INDEX idx_flight_statistics_created_at ON flight_statistics(created_at);
 - Reads go through `SECURITY DEFINER` functions with a fixed `search_path`:
   `get_flight_count()`, `get_popular_airports(n)`, `get_popular_flights(n)`,
   `get_unique_airport_count()`. They return totals and rankings only.
-- The app never needs the `service_role` key. Do not put it in a `NEXT_PUBLIC_` variable.
+- The public pages never use the `service_role` key. Only server code does: the admin API routes and the shared-plan routes (see below). Never put it in a `NEXT_PUBLIC_` variable.
 
 The policies, grants and functions live in `supabase/migrations/`, applied in order:
 
@@ -46,6 +46,111 @@ The policies, grants and functions live in `supabase/migrations/`, applied in or
 
 If you add a new source value to the app, update the `source` check in the insert policy too,
 or those inserts are silently rejected.
+
+## Accounts and admin dashboard
+
+Users can sign in with Discord (Supabase Auth). Site operators use a separate email/password
+login at `/admin-dashboard`. Everything lives in `supabase/migrations/20261002000000_profiles_and_admin.sql`
+(additive, safe to run before the app code is deployed, and it does not touch `flight_statistics`).
+
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  discord_username TEXT,
+  avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'user',          -- 'user' | 'admin'
+  timezone TEXT,                              -- IANA name; NULL = browser-detected
+  must_change_password BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+```
+
+- **Row Level Security**: a signed-in user reads their own row; admins read all rows. The only
+  writable column for clients is `timezone` (column-level grant), so `role` and
+  `must_change_password` can't be changed from the browser. No client can insert or delete.
+- **Who creates rows**: a trigger on `auth.users` creates the profile for **Discord** sign-ups only
+  (role `user`). Admin accounts are created server-side (service role) by the "Create admin" action,
+  or by hand for the first one (`supabase/bootstrap-first-admin.sql`).
+- **`is_admin()`** is true only for `role = 'admin'` **and** `must_change_password = false`, so an admin
+  with a pending temporary password has no data access until they've chosen their own.
+- **Admin-only reads** are `SECURITY DEFINER` functions that check `is_admin()` themselves:
+  `admin_list_admins()` (emails come from `auth.users`) and `admin_flight_export_times(since)`
+  (one timestamp per exported flight plan, for the activity heatmap, bucketed per day in the
+  admin's own timezone in the browser). The public key still can't read `flight_statistics`.
+- **Promoting a Discord account**: "Create admin" detects an email that already belongs to a Discord account
+  (`admin_lookup_user(email)`, executable by the service role only, from
+  `20261002000100_admin_lookup_user.sql`) and offers to promote it. Promotion sets a temporary password
+  (`auth.admin.updateUserById`) and `role = 'admin'`, `must_change_password = true`, then follows the same
+  first-login flow. The Discord sign-in keeps working and the trigger never changes the role.
+- **`SUPABASE_SERVICE_ROLE_KEY`** (server-only, no `NEXT_PUBLIC_` prefix) is used by the two admin API
+  routes (creating an admin, finishing the first-login password change) and by the public shared-plan routes
+  (see "Flight history and sharing"). Set it per Vercel environment (production key on Production, staging key
+  on the `staging` environment).
+
+## Flight history and sharing
+
+Signed-in users' exported flight plans are stored in `flight_plans`
+(`supabase/migrations/20261003000000_flight_plans.sql`, additive: it doesn't touch
+`flight_statistics` or `profiles`, and is safe to run before the matching app code is deployed).
+
+```sql
+CREATE TABLE flight_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles (id) ON DELETE CASCADE,
+  source TEXT NOT NULL,                    -- 'FlightRadar24' | 'FlightAware' | 'Sketch'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),   -- last save of the content (UTC)
+  flight_number TEXT,                      -- NULL unless the KML filename carries one reliably
+  origin_airport TEXT NOT NULL,            -- ICAO
+  destination_airport TEXT NOT NULL,
+  origin_airport_name TEXT,                -- resolved at save time from OurAirports (see below)
+  destination_airport_name TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',    -- 'draft' | 'exported' (see "Lifecycle" below)
+  waypoints JSONB NOT NULL,                -- [{ name, lat, lng, altitude(ft) }], derived data only, never the KML
+  includes_branding BOOLEAN NOT NULL DEFAULT TRUE,   -- were MADE/WITH/INFINITE/PLANNER in `waypoints` when saved
+  flight_time_minutes INTEGER,             -- optional, entered by hand, whole minutes
+  thumbnail_url TEXT,                      -- reserved, always NULL for now
+  share_token UUID,                        -- NULL = not shared; unique when set
+  share_download_count INTEGER NOT NULL DEFAULT 0    -- counted on shared downloads, not shown in any UI yet
+);
+```
+
+- **Access**: the public key has no privileges on this table. A signed-in user can read and delete their own
+  rows and insert/update their own content (RLS, `auth.uid() = user_id`). Column-level grants keep the system
+  columns out of reach: `user_id` can't change after insert, `source` can't be updated, and `created_at`,
+  `thumbnail_url`, `share_token` and `share_download_count` are never writable by clients. A trigger moves
+  `created_at` forward only when the waypoints are saved again.
+- **Saving** goes through `POST /api/flight-plans` (and `PUT /api/flight-plans/[id]` when the same editing session
+  exports again). The route validates the payload, resolves the airport names on the server and writes as the
+  signed-in user, so RLS still applies. At most 500 plans per user.
+- **Sharing** is not a "readable if the token matches" policy. The owner starts/stops sharing with two
+  `SECURITY DEFINER` functions, `share_flight_plan(plan_id)` (returns the existing token, or generates one) and
+  `unshare_flight_plan(plan_id)` (sets it to NULL; sharing again makes a different token). Both only touch the
+  caller's own row. The public reads a plan only through `/api/shared/[token]` (view) and
+  `/api/shared/[token]/fpl` (download), which look the row up server-side by a non-null token with the service
+  role. The download route calls `record_shared_download(token)`, executable by the service role only, which
+  increments the counter and returns the plan in one statement. Links are live (the current saved state, not a
+  snapshot) and never cached, so stopping sharing takes effect immediately.
+- **Lifecycle (`20261003000100_dashboard_drafts.sql`)**: a plan is a `draft` while it is edited in Convert or
+  Sketch (autosaved about once a minute by the editor, only when something changed) and becomes `exported` when
+  the FPL is downloaded. A trigger makes `exported` final: any change to an exported row's content, flight time or
+  status is refused (`flight_plan_locked`, HTTP 409 from the API); only sharing (`share_token`), the download
+  counter and deleting stay possible. To change an exported plan the user duplicates it
+  (`POST /api/flight-plans/[id]/duplicate`, exported plans only): a new `draft` row with no share token. Rows that
+  existed before the migration were all saved at export time, so they were backfilled as `exported`. For a
+  draft, `created_at` is its last save; for an exported plan it is the export time (the trigger stamps it on the
+  draft -> exported change), so the activity graphs count by `created_at` where `status = 'exported'`.
+- **Dashboard and admin graph**: the user dashboard (`/dashboard`) reads the user's own exported rows (RLS) and
+  the admin overview reads the same table unfiltered through `admin_flight_export_times(since)`, which now
+  selects from `flight_plans` where `status = 'exported'` instead of `flight_statistics`. There is no backfill:
+  the admin graph only counts plans exported by signed-in users since this phase shipped. `flight_statistics`
+  still feeds the homepage counters and rankings.
+- **`SUPABASE_SERVICE_ROLE_KEY`** is therefore also needed for shared links to resolve. Without it they fail
+  closed (404).
+- **Airport names** come from [OurAirports](https://ourairports.com/data/) (released to the public domain),
+  filtered to 4-letter ICAO codes and bundled as `lib/data/airports.json` (about 20,000 entries, 650 KB). It is
+  only imported by server code (`lib/airports.ts`), so it never reaches the browser. Regenerate it with
+  `node scripts/build-airports.mjs path/to/airports.csv`. The Infinite Flight Live API is deliberately not used:
+  its terms forbid keeping API data in our own database.
 
 ## Environments
 

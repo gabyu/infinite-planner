@@ -1,6 +1,5 @@
-import Link from "next/link"
 import { CounterDisplay } from "./counter-display"
-import { CookiePreferencesButton } from "./cookie-preferences-button"
+import { LegalLinks } from "./legal-links"
 
 export async function SiteFooter() {
   // Start with 0 and let the client-side component fetch the real value
@@ -19,12 +18,8 @@ export async function SiteFooter() {
         <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">
           © {new Date().getFullYear()} Infinite Planner. All rights reserved.
         </p>
-        <div className="flex items-center justify-center gap-3 text-sm mt-2">
-          <Link href="/cookies" className="text-gray-500 dark:text-gray-500 hover:underline underline-offset-2">
-            Cookie Policy
-          </Link>
-          <span className="text-gray-300 dark:text-gray-700">·</span>
-          <CookiePreferencesButton variant="link" />
+        <div className="mt-2">
+          <LegalLinks showCookiePreferences />
         </div>
       </div>
     </footer>

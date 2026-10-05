@@ -14,12 +14,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 import { MousePointer2, Slash, PenTool, Undo2, Redo2, Trash2, Eraser, Monitor } from "lucide-react"
 
 const DrawMap = dynamic(() => import("@/components/draw-map-wrapper"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center rounded-md">
+    <div className="flex h-full w-full items-center justify-center rounded-md bg-muted text-sm text-muted-foreground">
       Loading map...
     </div>
   ),
@@ -87,12 +88,22 @@ export function DrawingBoard({
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const hasSelection = waypoints.some((wp) => wp.selected)
 
+  const icaoClass = (value: string, valid: boolean) =>
+    cn(
+      "w-24 text-center font-mono uppercase tracking-widest",
+      value && !valid
+        ? "border-destructive focus-visible:ring-destructive"
+        : valid
+          ? "border-emerald-500/70 focus-visible:ring-emerald-500"
+          : "",
+    )
+
   if (isTouchPrimary) {
     return (
-      <div className="flex flex-col items-center justify-center text-center py-16 px-6 border rounded-md bg-muted/30">
-        <Monitor className="h-10 w-10 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Desktop only, for now</h3>
-        <p className="text-sm text-muted-foreground max-w-md">
+      <div className="flex flex-col items-center justify-center rounded-md border bg-muted/30 px-6 py-16 text-center">
+        <Monitor className="mb-4 h-8 w-8 text-muted-foreground" />
+        <h3 className="mb-1.5 text-base font-medium">Desktop only, for now</h3>
+        <p className="max-w-md text-sm text-muted-foreground">
           Flight plan drawing is currently available on desktop only. Open this page on a computer to draw a route.
         </p>
       </div>
@@ -102,9 +113,9 @@ export function DrawingBoard({
   return (
     <div className="space-y-4">
       {/* ICAO metadata row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          <Label htmlFor="draw-origin" className="text-sm font-medium whitespace-nowrap">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+        <div className="flex items-center gap-2.5">
+          <Label htmlFor="draw-origin" className="studio-label">
             Departure
           </Label>
           <Input
@@ -114,17 +125,11 @@ export function DrawingBoard({
             placeholder="EHAM"
             autoComplete="off"
             maxLength={4}
-            className={`h-10 w-24 text-center font-mono ${
-              originAirport && !icaoValidation.origin
-                ? "border-red-500 focus:border-red-500"
-                : icaoValidation.origin
-                  ? "border-green-500 focus:border-green-500"
-                  : ""
-            }`}
+            className={icaoClass(originAirport, icaoValidation.origin)}
           />
         </div>
-        <div className="flex items-center gap-3">
-          <Label htmlFor="draw-destination" className="text-sm font-medium whitespace-nowrap">
+        <div className="flex items-center gap-2.5">
+          <Label htmlFor="draw-destination" className="studio-label">
             Arrival
           </Label>
           <Input
@@ -134,20 +139,14 @@ export function DrawingBoard({
             placeholder="KSFO"
             autoComplete="off"
             maxLength={4}
-            className={`h-10 w-24 text-center font-mono ${
-              destinationAirport && !icaoValidation.destination
-                ? "border-red-500 focus:border-red-500"
-                : icaoValidation.destination
-                  ? "border-green-500 focus:border-green-500"
-                  : ""
-            }`}
+            className={icaoClass(destinationAirport, icaoValidation.destination)}
           />
         </div>
-        <p className="text-xs text-muted-foreground sm:ml-2">Optional while drawing, required to export.</p>
+        <p className="text-xs text-muted-foreground">Optional while drawing, required to export.</p>
       </div>
 
       {/* Drawing canvas with floating toolbar */}
-      <div className="relative h-[75vh] min-h-[500px] max-h-[900px] w-full border rounded-md overflow-hidden">
+      <div className="relative h-[75vh] min-h-[500px] max-h-[900px] w-full overflow-hidden rounded-md border">
         <DrawMap
           waypoints={waypoints}
           activeTool={activeTool}
@@ -159,11 +158,10 @@ export function DrawingBoard({
         />
 
         {/* Toolbar */}
-        <div className="absolute top-2 left-2 z-[1000] flex items-center gap-1 rounded-md border bg-background/95 p-1 shadow-lg backdrop-blur-sm">
+        <div className="absolute left-2 top-2 z-[1000] flex items-center gap-1 rounded-md border bg-card/95 p-1 shadow-md backdrop-blur-sm">
           <Button
             variant={activeTool === "select" ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={() => setActiveTool("select")}
             title="Selection tool"
           >
@@ -171,8 +169,7 @@ export function DrawingBoard({
           </Button>
           <Button
             variant={activeTool === "line" ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={() => setActiveTool("line")}
             title="Line tool"
           >
@@ -180,20 +177,18 @@ export function DrawingBoard({
           </Button>
           <Button
             variant={activeTool === "pen" ? "default" : "outline"}
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={() => setActiveTool("pen")}
             title="Pen tool"
           >
             <PenTool size={16} />
           </Button>
 
-          <Separator orientation="vertical" className="h-6 mx-0.5" />
+          <Separator orientation="vertical" className="mx-0.5 h-5" />
 
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={undo}
             disabled={!canUndo}
             title="Undo"
@@ -202,8 +197,7 @@ export function DrawingBoard({
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={redo}
             disabled={!canRedo}
             title="Redo"
@@ -211,12 +205,11 @@ export function DrawingBoard({
             <Redo2 size={16} />
           </Button>
 
-          <Separator orientation="vertical" className="h-6 mx-0.5" />
+          <Separator orientation="vertical" className="mx-0.5 h-5" />
 
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={onDeleteSelected}
             disabled={!hasSelection}
             title="Delete selected waypoint"
@@ -225,8 +218,7 @@ export function DrawingBoard({
           </Button>
           <Button
             variant="outline"
-            size="sm"
-            className="h-9 w-9 p-0"
+            size="icon"
             onClick={() => setShowClearConfirm(true)}
             disabled={waypoints.length === 0}
             title="Clear drawing"
@@ -238,8 +230,8 @@ export function DrawingBoard({
         {/* Empty state guidance */}
         {waypoints.length === 0 && activeTool === "select" && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-            <div className="flex items-center gap-2 rounded-full bg-background/90 border px-4 py-2 text-sm text-muted-foreground shadow-lg">
-              <MousePointer2 className="h-4 w-4" />
+            <div className="flex items-center gap-2 rounded-full border bg-card/90 px-3.5 py-1.5 text-xs text-muted-foreground shadow-md">
+              <MousePointer2 className="h-3.5 w-3.5" />
               Choose the Line or Pen tool and start drawing
             </div>
           </div>
@@ -247,7 +239,7 @@ export function DrawingBoard({
 
         {activeTool === "pen" && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[999] pointer-events-none">
-            <div className="rounded-full bg-background/90 border px-3 py-1.5 text-xs text-muted-foreground shadow-lg">
+            <div className="rounded-full border bg-card/90 px-3 py-1.5 text-xs text-muted-foreground shadow-md">
               Click for a corner point &middot; click and drag to pull a curve handle &middot; Esc to cancel
             </div>
           </div>

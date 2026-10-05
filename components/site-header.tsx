@@ -4,8 +4,9 @@ import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Upload, PencilRuler, RotateCcw } from "lucide-react"
+import { Upload, PencilRuler, LayoutDashboard } from "lucide-react"
+import { UserMenu } from "@/components/auth/user-menu"
+import { useAuthUser } from "@/hooks/use-auth-user"
 
 const navLinkClass =
   "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-medium h-10 items-center gap-1.5"
@@ -44,15 +45,9 @@ function NavLink({
   )
 }
 
-// Shared site-wide header. Reset Planner only makes sense once there's
-// something to reset - the KML import flow at /convert - so it's the only
-// route that shows it.
+// Shared site-wide header. The dashboard is only offered to signed-in users.
 export function SiteHeader() {
-  const pathname = usePathname()
-
-  const handleResetClick = () => {
-    window.location.href = `${pathname}?reset=${Date.now()}`
-  }
+  const { user } = useAuthUser()
 
   return (
     <header className="border-b">
@@ -85,16 +80,12 @@ export function SiteHeader() {
           <NavLink href="/sketch" icon={<PencilRuler size={16} />}>
             <span className="hidden sm:inline">Sketch</span>
           </NavLink>
-          {pathname === "/convert" && (
-            <Button
-              onClick={handleResetClick}
-              variant="outline"
-              className="h-10 flex items-center gap-2 px-2 sm:px-4 bg-transparent"
-            >
-              <RotateCcw size={16} />
-              <span className="hidden sm:inline">Reset Planner</span>
-            </Button>
+          {user && (
+            <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />}>
+              <span className="hidden sm:inline">Dashboard</span>
+            </NavLink>
           )}
+          <UserMenu />
         </nav>
       </div>
     </header>
