@@ -47,9 +47,14 @@ export default function PrivacyPage() {
           it to contact you.
         </p>
         <p>
-          We never receive or store your Discord password. As account-based features are introduced (such as saving
-          flight plans, history, and sharing), flight plans you generate while signed in will be stored and linked to
-          your account.
+          We never receive or store your Discord password. Flight plans you generate while signed in are stored and
+          linked to your account.
+        </p>
+        <p>
+          Your Discord username is the name by which you are identified on the Service, and the only element of your
+          profile that is visible to other people. In particular, when you share a flight plan, your Discord username
+          is displayed with it as its author to anyone who opens the link, whether or not they have an account. Your
+          avatar and email address are never shown to other users or visitors.
         </p>
         <p>The core features of the Service can be used without creating an account.</p>
       </section>
@@ -78,13 +83,22 @@ export default function PrivacyPage() {
             <strong>Discord account data:</strong> your consent, given when you choose to sign in. You may delete your
             account at any time (see Section 9).
           </li>
+          <li>
+            <strong>Display of your Discord username on shared flight plans:</strong> your consent, given when you
+            choose to share a flight plan, as the sharing screen informs you.
+          </li>
         </ul>
       </section>
 
       <section>
         <h2>6. Who receives your information</h2>
-        <p>We share information only with the following service providers, and only as needed to operate the Service:</p>
+        <p>We share information only with the following recipients, and only as needed to operate the Service:</p>
         <ul>
+          <li>
+            <strong>Anyone who opens a flight plan link you share</strong>, who can view and download the flight plan
+            and sees your Discord username as its author. You can stop sharing at any time, after which the link no
+            longer works.
+          </li>
           <li>
             <strong>Discord</strong>, which handles authentication if you sign in. See{" "}
             <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">
