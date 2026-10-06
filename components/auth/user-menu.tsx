@@ -29,7 +29,8 @@ export function UserMenu() {
   const [supabase] = useState(() => getBrowserSupabase())
   const [user, setUser] = useState<User | null>(null)
   const [ready, setReady] = useState(false)
-  const [authError, setAuthError] = useState(false)
+  // null = no error; "" = failed with no detail; otherwise the reason reported by Supabase.
+  const [authError, setAuthError] = useState<string | null>(null)
   // Admins get a shortcut to the admin dashboard. Display only: the dashboard itself is guarded on the server.
   const [isAdmin, setIsAdmin] = useState(false)
 
@@ -44,10 +45,11 @@ export function UserMenu() {
       setUser(session?.user ?? null)
     })
 
-    // The OAuth callback adds ?auth_error=1 when the sign-in didn't complete.
+    // The OAuth callback adds ?auth_error=<reason> (or =1 without detail) when the sign-in didn't complete.
     const url = new URL(window.location.href)
     if (url.searchParams.has("auth_error")) {
-      setAuthError(true)
+      const reason = url.searchParams.get("auth_error")
+      setAuthError(reason && reason !== "1" ? reason : "")
       url.searchParams.delete("auth_error")
       window.history.replaceState(null, "", url.pathname + url.search + url.hash)
     }
@@ -116,13 +118,16 @@ export function UserMenu() {
         </Button>
       )}
 
-      {authError && (
+      {authError !== null && (
         <div
           role="alert"
           className="fixed right-4 top-16 z-50 flex max-w-xs items-start gap-3 rounded-md border bg-background p-3 text-sm shadow-lg"
         >
-          <p>Sign-in didn't complete. Please try again.</p>
-          <button type="button" onClick={() => setAuthError(false)} className="text-muted-foreground underline">
+          <p>
+            Sign-in didn't complete. Please try again.
+            {authError && <span className="mt-1 block break-words text-muted-foreground">{authError}</span>}
+          </p>
+          <button type="button" onClick={() => setAuthError(null)} className="text-muted-foreground underline">
             Dismiss
           </button>
         </div>
