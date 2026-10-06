@@ -28,6 +28,8 @@ STAGING_CHANGELOG.local.md
 RELEASE_2026-10-01.local.md
 RELEASE_accounts-admin.local.md
 RELEASE_history-share.local.md
+PROD_ROLLOUT.local.md
+PROD_MIGRATIONS.local.sql
 
 # vercel
 .vercel
