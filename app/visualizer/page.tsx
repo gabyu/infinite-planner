@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { Visualizer } from "@/components/visualizer/visualizer"
 import { getRecentFlights } from "@/lib/recent-flights"
 
-// Same freshness as the homepage globe.
-export const revalidate = 300
+// Same freshness as the homepage globe (one hour).
+export const revalidate = 3600
 
 // A hidden screensaver page: not linked anywhere and kept out of search results.
 export const metadata: Metadata = {
