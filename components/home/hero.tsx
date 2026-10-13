@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { useIsTouchPrimary } from "@/hooks/use-is-touch-primary"
 import { cn } from "@/lib/utils"
 import type { GlobeFlight } from "@/lib/recent-flights"
-import { ALTITUDE_RAMP } from "./altitude-ramp"
 import { ARC_DELAY_MS, ARC_DRAW_MS, type GlobeHandle } from "./globe-scene"
 
 // How long each flight stays in the spotlight: the globe turns, the route draws, then it rests a moment.
@@ -40,7 +39,6 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
   const [destOn, setDestOn] = useState(false)
   const [inView, setInView] = useState(true)
   const [reduced, setReduced] = useState(false)
-  const [dark, setDark] = useState(false)
 
   // Create the scene once, after paint: three.js is loaded on demand so the page text never waits for it.
   useEffect(() => {
@@ -51,7 +49,6 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     setReduced(reducedMotion)
     const root = document.documentElement
-    setDark(root.classList.contains("dark"))
 
     import("./globe-scene")
       .then(({ createGlobe }) => {
@@ -69,11 +66,7 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
         // No WebGL: the headline and buttons stand on their own.
       })
 
-    const themeObserver = new MutationObserver(() => {
-      const isDark = root.classList.contains("dark")
-      setDark(isDark)
-      handle?.setDark(isDark)
-    })
+    const themeObserver = new MutationObserver(() => handle?.setDark(root.classList.contains("dark")))
     themeObserver.observe(root, { attributes: true, attributeFilter: ["class"] })
 
     return () => {
@@ -150,7 +143,7 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
 
   return (
     <section className="relative overflow-hidden">
-      <div className="container mx-auto grid items-center gap-x-12 gap-y-10 px-4 pb-16 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,620px)] lg:pb-24 lg:pt-20">
+      <div className="container mx-auto grid items-center gap-x-12 gap-y-10 px-4 pb-16 pt-12 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,680px)] lg:pb-24 lg:pt-20">
         <div>
           <h1 className="font-display text-[2.75rem] font-semibold leading-[1.02] tracking-[-0.028em] sm:text-6xl lg:text-6xl xl:text-7xl">
             The flight plan hub for Infinite&nbsp;Flight
@@ -180,7 +173,7 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
           </div>
         </div>
 
-        <div ref={stageRef} className="relative mx-auto aspect-square w-full max-w-[620px]">
+        <div ref={stageRef} className="relative mx-auto aspect-square w-full max-w-[680px]">
           <canvas
             ref={canvasRef}
             aria-hidden
@@ -206,20 +199,6 @@ export function Hero({ flights }: { flights: GlobeFlight[] }) {
                 <AirportLabel code={current.destination} visible={destOn} />
               </div>
             </>
-          )}
-          {/* Legend: what the route colours mean. */}
-          {current && (
-            <div
-              aria-hidden
-              className="absolute bottom-[6%] left-1/2 flex -translate-x-1/2 items-center gap-2 font-mono text-[10px] tabular-nums text-muted-foreground"
-            >
-              <span>0</span>
-              <span
-                className="h-1 w-24 rounded-full"
-                style={{ background: `linear-gradient(to right, ${(dark ? ALTITUDE_RAMP.dark : ALTITUDE_RAMP.light).join(", ")})` }}
-              />
-              <span>40,000 ft</span>
-            </div>
           )}
           {/* Screen readers get the text, the canvas is decoration. */}
           {current && (

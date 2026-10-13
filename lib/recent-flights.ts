@@ -58,14 +58,16 @@ async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
       const path = (Array.isArray(row.waypoints) ? row.waypoints : [])
         .filter((w) => Number.isFinite(w?.lat) && Number.isFinite(w?.lng))
         .map((w) => [Math.round(w.lat * 100) / 100, Math.round(w.lng * 100) / 100, Math.round(w.altitude) || 0] as [number, number, number])
-      if (path.length < 2) continue
+      // Drop stationary repeats (taxi/hold points) before thinning, so the 90 points go to actual route.
+      const moving = path.filter((p, i) => i === 0 || Math.abs(p[0] - path[i - 1][0]) > 0.005 || Math.abs(p[1] - path[i - 1][1]) > 0.005)
+      if (moving.length < 2) continue
       flights.push({
         origin: row.origin_airport,
         destination: row.destination_airport,
         originName: row.origin_airport_name,
         destinationName: row.destination_airport_name,
         createdAt: row.created_at,
-        path: thin(path),
+        path: thin(moving),
       })
       if (flights.length === limit) break
     }

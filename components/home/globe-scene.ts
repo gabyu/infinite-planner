@@ -75,6 +75,21 @@ function landPoints(count: number) {
 
 // The route as it was generated: every waypoint on the sphere, lifted by its altitude so the climb,
 // cruise and descent show.
+// Consecutive waypoints on the same spot (taxi and holding points, rounding) would make the spline divide by
+// zero and turn part of the route into NaN, which stops the line from drawing. Keep one of each.
+function dedupe(path: [number, number, number][]) {
+  const out: [number, number, number][] = []
+  for (const p of path) {
+    const last = out[out.length - 1]
+    if (last && Math.abs(p[0] - last[0]) < 0.005 && Math.abs(p[1] - last[1]) < 0.005) {
+      last[2] = Math.max(last[2], p[2])
+      continue
+    }
+    out.push([p[0], p[1], p[2]])
+  }
+  return out
+}
+
 function pathCurve(path: [number, number, number][]) {
   const points = path.map(([lat, lng, alt]) =>
     latLngToVec(lat, lng, 1.004 + Math.min(Math.max(alt, 0), 45000) / 45000 * 0.035),
@@ -175,7 +190,7 @@ export function createGlobe(
   const reduced = opts.reducedMotion
   const small = canvas.clientWidth < 480
   const dotCount = small ? 10000 : 24000
-  const dotWorld = 0.0078 * Math.sqrt(24000 / dotCount)
+  const dotWorld = 0.0092 * Math.sqrt(24000 / dotCount)
 
   // Invisible: writes depth only, so a route on the far side of the Earth is hidden. The planet itself
   // is just its dots.
@@ -211,7 +226,8 @@ export function createGlobe(
   const arcMats: THREE.ShaderMaterial[] = []
   const zAxis = new THREE.Vector3(0, 0, 1)
 
-  const objs: FlightObjects[] = flights.map((f) => {
+  const objs: FlightObjects[] = flights.map((raw) => {
+    const f = { path: dedupe(raw.path) }
     const curve = pathCurve(f.path)
     const arcMat = new THREE.ShaderMaterial({
       vertexShader: ARC_VERT,
@@ -234,7 +250,7 @@ export function createGlobe(
     const altitudes = new Float32Array(tube.attributes.position.count)
     const ringSize = 7 // radial segments + 1
     for (let i = 0; i <= TUBE_SEGMENTS; i++) {
-      const t = curve.getUtoTmapping(i / TUBE_SEGMENTS) * (f.path.length - 1)
+      const t = curve.getUtoTmapping(i / TUBE_SEGMENTS, 0) * (f.path.length - 1)
       const lo = Math.min(f.path.length - 2, Math.floor(t))
       const alt = f.path[lo][2] + (f.path[lo + 1][2] - f.path[lo][2]) * (t - lo)
       for (let j = 0; j < ringSize; j++) altitudes[i * ringSize + j] = Math.max(0, Math.min(1, alt / RAMP_MAX_FT))
