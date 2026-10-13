@@ -24,7 +24,7 @@ export function LegalPage({
             <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
               {icon}
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">{title}</h1>
+            <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-[-0.03em] mb-6">{title}</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">{intro}</p>
           </div>
         </section>
