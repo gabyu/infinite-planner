@@ -51,10 +51,11 @@ export default function PrivacyPage() {
           linked to your account.
         </p>
         <p>
-          When a signed-in user exports a flight plan, its route (the departure and arrival airports, the waypoints and
-          the date) may be displayed anonymously on the Service's home page, for example on its globe of recent
-          flights. This display never includes your Discord username, avatar, email address or any other information
-          that identifies you.
+          Every flight plan that a signed-in user exports may be displayed anonymously on the Service: its route (the
+          departure and arrival airports, the waypoints, the altitudes and the date) can appear on the home page,
+          for example on its globe of recent flights, and on a full-screen visualization page showing the latest
+          flights. This applies to the flight plans of all users alike. The display never includes your Discord
+          username, avatar, email address or any other information that identifies you.
         </p>
         <p>
           Your Discord username is the name by which you are identified on the Service, and the only element of your
