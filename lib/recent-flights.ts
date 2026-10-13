@@ -50,17 +50,23 @@ async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
       .select("origin_airport, destination_airport, origin_airport_name, destination_airport_name, created_at, waypoints")
       .eq("status", "exported")
       .order("created_at", { ascending: false })
-      .limit(limit * 2)
+      .limit(Math.min(limit * 6, 120))
     if (error || !Array.isArray(data)) return []
 
     const flights: GlobeFlight[] = []
+    // People regenerate the same flight several times: rows come newest first, so keeping the first
+    // plan seen for each origin -> destination keeps the latest, and the most accurate, one.
+    const seen = new Set<string>()
     for (const row of data as unknown as Row[]) {
       const path = (Array.isArray(row.waypoints) ? row.waypoints : [])
         .filter((w) => Number.isFinite(w?.lat) && Number.isFinite(w?.lng))
         .map((w) => [Math.round(w.lat * 100) / 100, Math.round(w.lng * 100) / 100, Math.round(w.altitude) || 0] as [number, number, number])
+      const pair = `${row.origin_airport}>${row.destination_airport}`
+      if (seen.has(pair)) continue
       // Drop stationary repeats (taxi/hold points) before thinning, so the 90 points go to actual route.
       const moving = path.filter((p, i) => i === 0 || Math.abs(p[0] - path[i - 1][0]) > 0.005 || Math.abs(p[1] - path[i - 1][1]) > 0.005)
       if (moving.length < 2) continue
+      seen.add(pair)
       flights.push({
         origin: row.origin_airport,
         destination: row.destination_airport,
