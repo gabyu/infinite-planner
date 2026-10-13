@@ -38,7 +38,7 @@ function thin(points: [number, number, number][]) {
 async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
   try {
     // Not getServiceRoleSupabase(): that client forces no-store fetches, which Next refuses while the
-    // homepage is prerendered. This result is cached for an hour on purpose, and only anonymous
+    // homepage is prerendered. This result is cached on purpose, and only anonymous
     // route data leaves this function.
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -77,6 +77,9 @@ async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
   }
 }
 
-// The latest flight plans, newest first, refreshed at most every hour. [] on any failure: the
+// The latest flight plans, newest first, refreshed at most every hour (homepage). [] on any failure: the
 // globe then just turns without routes.
 export const getRecentFlights = unstable_cache(loadRecentFlights, ["home-recent-flights"], { revalidate: 3600 })
+
+// Same, refreshed at most every 5 minutes: for the full-screen visualizer, which people leave open.
+export const getRecentFlightsLive = unstable_cache(loadRecentFlights, ["visualizer-recent-flights"], { revalidate: 300 })
