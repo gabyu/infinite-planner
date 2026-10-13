@@ -8,8 +8,8 @@ import { FlightStatistics } from "@/components/flight-statistics"
 import { Hero } from "@/components/home/hero"
 import { getRecentFlights } from "@/lib/recent-flights"
 
-// The globe shows the latest flight plans: rebuild the page in the background at most every 5 minutes.
-export const revalidate = 300
+// The globe shows the latest flight plans: rebuild the page in the background at most every hour.
+export const revalidate = 3600
 
 const STEPS = [
   {
