@@ -1,9 +1,9 @@
 import type { Metadata } from "next"
 import { Visualizer } from "@/components/visualizer/visualizer"
-import { getRecentFlights } from "@/lib/recent-flights"
+import { getRecentFlightsLive } from "@/lib/recent-flights"
 
-// Same freshness as the homepage globe (one hour).
-export const revalidate = 3600
+// Fresher than the homepage (5 minutes): this page is made to be left open.
+export const revalidate = 300
 
 // A hidden screensaver page: not linked anywhere and kept out of search results.
 export const metadata: Metadata = {
@@ -12,6 +12,6 @@ export const metadata: Metadata = {
 }
 
 export default async function VisualizerPage() {
-  const flights = await getRecentFlights(20)
+  const flights = await getRecentFlightsLive(20)
   return <Visualizer flights={flights} />
 }
