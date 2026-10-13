@@ -1,6 +1,6 @@
 import "server-only"
 import { unstable_cache } from "next/cache"
-import { getServiceRoleSupabase } from "@/lib/supabase/admin"
+import { createClient } from "@supabase/supabase-js"
 import type { StoredWaypoint } from "@/lib/flight-plans"
 
 // One flight plan on the homepage globe: the generated route itself, waypoint by waypoint.
@@ -37,8 +37,13 @@ function thin(points: [number, number, number][]) {
 
 async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
   try {
-    const supabase = getServiceRoleSupabase()
-    if (!supabase) return []
+    // Not getServiceRoleSupabase(): that client forces no-store fetches, which Next refuses while the
+    // homepage is prerendered. This result is cached for 5 minutes on purpose, and only anonymous
+    // route data leaves this function.
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) return []
+    const supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
     // Only plans whose FPL was downloaded ("exported"): finished work, not drafts.
     const { data, error } = await supabase
       .from("flight_plans")
