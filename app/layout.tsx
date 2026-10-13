@@ -4,24 +4,30 @@ import type { Metadata } from "next"
 // Load Vercel Speed Insights for performance monitoring - using stable version
 import { SpeedInsights } from "@vercel/speed-insights/react"
 
-import { Inter, IBM_Plex_Mono } from "next/font/google"
+import { IBM_Plex_Mono } from "next/font/google"
+import localFont from "next/font/local"
+import { GeistSans } from "geist/font/sans"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { GoogleAnalytics } from "@/components/google-analytics"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
-// Load IBM Plex Mono with more weights for better flexibility
-const ibmPlexMono = IBM_Plex_Mono({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  display: "optional", // Changed from "swap" to "optional"
-  variable: "--font-ibm-plex-mono",
+// Type system. Text: Geist (light, clean; ships with the geist package, served from our own domain).
+// Headlines: Funnel Display, self-hosted from app/fonts (SIL OFL; not in Next's Google list).
+// Digits and codes: IBM Plex Mono (Maison Mono is a paid font). next/font downloads it at build time
+// and serves it from our domain, so the browser never calls Google.
+const funnelDisplay = localFont({
+  src: "./fonts/FunnelDisplay-Variable.woff2",
+  weight: "300 800",
+  display: "swap",
+  variable: "--font-funnel-display",
 })
 
-const inter = Inter({
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ["400", "500", "600"],
   subsets: ["latin"],
-  display: "optional", // Changed from "swap" to "optional"
-  variable: "--font-inter",
+  display: "swap",
+  variable: "--font-ibm-plex-mono",
 })
 
 const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
@@ -73,12 +79,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        {/* Preconnect to Google Fonts to improve loading performance */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      </head>
-      <body className={`${ibmPlexMono.variable} ${inter.variable} font-sans`}>
+      <body className={`${ibmPlexMono.variable} ${GeistSans.variable} ${funnelDisplay.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
           {/* Cookie consent banner - Google Analytics only loads after acceptance, see GoogleAnalytics */}

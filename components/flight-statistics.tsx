@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plane, MapPin, TrendingUp } from "lucide-react"
+import { cn } from "@/lib/utils"
 import {
   getPopularAirports,
   getPopularFlights,
@@ -15,6 +14,7 @@ export function FlightStatistics() {
   const [popularAirports, setPopularAirports] = useState<AirportStats[]>([])
   const [popularFlights, setPopularFlights] = useState<FlightStats[]>([])
   const [totalStats, setTotalStats] = useState({ totalFlights: 0, totalAirports: 0 })
+  const [airportNames, setAirportNames] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -30,6 +30,11 @@ export function FlightStatistics() {
         ])
 
         setPopularAirports(airports)
+        // Names are looked up on the server (the airport dataset never ships to the browser).
+        fetch(`/api/airports?codes=${airports.map((a) => a.airport_code).join(",")}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => data?.names && setAirportNames(data.names))
+          .catch(() => {})
         setPopularFlights(flights)
         setTotalStats(totals)
       } catch (error) {
@@ -48,120 +53,96 @@ export function FlightStatistics() {
   }
 
   return (
-    <section className="py-16 bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-4">Infinite Planner Statistics</h2>
-          <div className="flex justify-center items-center gap-2 mb-8">
-            <div className="h-[2px] w-12 bg-gray-300"></div>
-            <div className="h-[2px] w-24 bg-primary"></div>
-            <div className="h-[2px] w-12 bg-gray-300"></div>
+    <section className="border-t">
+      <div className="container mx-auto px-4 py-20 md:py-28">
+        <h2 className="font-display text-3xl font-semibold tracking-[-0.025em] sm:text-4xl md:text-5xl">
+          Infinite Planner Statistics
+        </h2>
+        <p className="mt-4 text-lg font-light text-muted-foreground md:text-xl">
+          Real flight data from our community of virtual pilots
+        </p>
+
+        {/* Totals */}
+        <dl className="mt-12 grid gap-4 md:grid-cols-2">
+          <div className="rounded-3xl bg-muted/60 p-7 md:p-8">
+            <dt className="text-sm text-muted-foreground">Total flights analyzed</dt>
+            <dd className="mt-3 font-mono text-5xl font-medium tabular-nums tracking-tight md:text-6xl">
+              {isLoading ? "…" : totalStats.totalFlights.toLocaleString("en-US")}
+            </dd>
+            <p className="mt-3 text-sm font-light text-muted-foreground">From FlightRadar24 and FlightAware</p>
           </div>
-          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-            Real flight data from our community of virtual pilots
-          </p>
-        </div>
+          <div className="rounded-3xl bg-muted/60 p-7 md:p-8">
+            <dt className="text-sm text-muted-foreground">Unique airports</dt>
+            <dd className="mt-3 font-mono text-5xl font-medium tabular-nums tracking-tight md:text-6xl">
+              {isLoading ? "…" : totalStats.totalAirports.toLocaleString("en-US")}
+            </dd>
+            <p className="mt-3 text-sm font-light text-muted-foreground">Origins and destinations</p>
+          </div>
+        </dl>
 
-        {/* Total Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Flights Analyzed</CardTitle>
-              <Plane className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? "..." : totalStats.totalFlights.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">From FlightRadar24 and FlightAware</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Unique Airports</CardTitle>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isLoading ? "..." : totalStats.totalAirports.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Origins and destinations</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Popular Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Popular Airports */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Popular Airports
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : popularAirports.length > 0 ? (
-                <div className="space-y-3">
-                  {popularAirports.map((airport, index) => (
-                    <div key={airport.airport_code} className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted-foreground w-6">{index + 1}.</span>
-                        <span className="font-mono font-semibold text-primary">{airport.airport_code}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{airport.count} flights</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No airport data available yet</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Popular Flights */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Popular Flights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="flex justify-between items-center">
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-8"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : popularFlights.length > 0 ? (
-                <div className="space-y-3">
-                  {popularFlights.map((flight, index) => (
-                    <div key={flight.flight_number} className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted-foreground w-6">{index + 1}.</span>
-                        <span className="font-mono font-semibold text-primary">{flight.flight_number}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{flight.count} times</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No flight data available yet</p>
-              )}
-            </CardContent>
-          </Card>
+        {/* Rankings */}
+        <div className="mt-12 grid gap-x-16 gap-y-12 md:grid-cols-2">
+          <RankList
+            title="Popular airports"
+            empty="No airport data available yet"
+            isLoading={isLoading}
+            rows={popularAirports.map((a) => ({
+              key: a.airport_code,
+              label: airportNames[a.airport_code] ?? a.airport_code,
+              title: a.airport_code,
+              value: `${a.count} flights`,
+            }))}
+          />
+          <RankList
+            title="Popular flights"
+            empty="No flight data available yet"
+            isLoading={isLoading}
+            rows={popularFlights.map((f) => ({ key: f.flight_number, label: f.flight_number, value: `${f.count} times` }))}
+          />
         </div>
       </div>
     </section>
+  )
+}
+
+function RankList({
+  title,
+  empty,
+  isLoading,
+  rows,
+}: {
+  title: string
+  empty: string
+  isLoading: boolean
+  rows: { key: string; label: string; title?: string; value: string }[]
+}) {
+  return (
+    <div>
+      <h3 className="font-display text-2xl font-semibold tracking-tight">{title}</h3>
+      {isLoading ? (
+        <div className="mt-4 divide-y border-y">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between py-3">
+              <div className="h-4 w-20 rounded bg-muted" />
+              <div className="h-4 w-12 rounded bg-muted" />
+            </div>
+          ))}
+        </div>
+      ) : rows.length > 0 ? (
+        <ol className="mt-4 divide-y border-y">
+          {rows.map((row, index) => (
+            <li key={row.key} className="grid grid-cols-[2rem_1fr_auto] items-center gap-2 py-3">
+              <span className="font-mono text-sm tabular-nums text-muted-foreground">{index + 1}</span>
+              <span title={row.title} className={cn("min-w-0 truncate", row.title ? "font-medium" : "font-mono font-medium tabular-nums")}>
+                {row.label}
+              </span>
+              <span className="font-mono text-sm tabular-nums text-muted-foreground">{row.value}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-4 text-sm text-muted-foreground">{empty}</p>
+      )}
+    </div>
   )
 }

@@ -15,7 +15,7 @@ export default function HowItWorksPage() {
         {/* Hero Section */}
         <section className="py-12 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
           <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">How Infinite Planner Works</h1>
+            <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-[-0.03em] mb-6">How Infinite Planner Works</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
               Learn how to convert real-world flights into Infinite Flight custom flight plans in just a few simple
               steps
@@ -27,7 +27,7 @@ export default function HowItWorksPage() {
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto prose prose-lg prose-gray dark:prose-invert">
             {/* Overview Section */}
-            <h2 className="text-3xl font-bold mb-6">Overview</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.02em] mb-6">Overview</h2>
             <p className="text-lg mb-8">
               Infinite Planner bridges the gap between real-world aviation data and the Infinite Flight simulator. Our
               tool takes actual flight paths from services like FlightRadar24 and FlightAware and converts them into
@@ -35,11 +35,11 @@ export default function HowItWorksPage() {
             </p>
 
             {/* Video Tutorials */}
-            <h2 className="text-3xl font-bold mb-6">Video Tutorials</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.02em] mb-6">Video Tutorials</h2>
             <VideoSelector />
 
             {/* Step by Step Process */}
-            <h2 className="text-3xl font-bold mb-6 mt-12">Step-by-Step Process</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.02em] mb-6 mt-12">Step-by-Step Process</h2>
 
             <h3 className="text-2xl font-semibold mb-4">1. Obtaining Your KML File</h3>
             <p className="mb-4">
@@ -144,7 +144,7 @@ export default function HowItWorksPage() {
             </ol>
 
             {/* Technical Details */}
-            <h2 className="text-3xl font-bold mb-6">Technical Details</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.02em] mb-6">Technical Details</h2>
 
             <h3 className="text-2xl font-semibold mb-4">Supported File Formats</h3>
             <ul className="mb-6">
@@ -179,7 +179,7 @@ export default function HowItWorksPage() {
             </ul>
 
             {/* Tips and Best Practices */}
-            <h2 className="text-3xl font-bold mb-6">Tips and Best Practices</h2>
+            <h2 className="font-display text-3xl font-semibold tracking-[-0.02em] mb-6">Tips and Best Practices</h2>
 
             <h3 className="text-2xl font-semibold mb-4">Choosing the Right Flight</h3>
             <ul className="mb-6">

@@ -269,7 +269,7 @@ export default function FAQPage() {
         {/* Hero Section */}
         <section className="py-12 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
           <div className="container mx-auto px-4 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">Frequently Asked Questions</h1>
+            <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-[-0.03em] mb-6">Frequently Asked Questions</h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
               Find answers to common questions about using Infinite Planner
             </p>

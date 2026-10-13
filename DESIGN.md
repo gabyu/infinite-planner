@@ -1,7 +1,7 @@
 # Infinite Planner design system ("Studio")
 
 The look of the tool pages: Convert, Sketch, Dashboard, shared plans. Compact, neutral, one blue accent.
-The homepage, guide, FAQ and the site header keep the original look; the admin dashboard has its own green accent.
+The homepage has its own, more spacious look (Funnel Display headlines, soft rounded tiles, the flight globe in `components/home/`); the guide, FAQ and the site header keep the original layout; the admin dashboard has its own green accent.
 Scope: everything below applies inside `.studio-theme` (set by the planner layout and, for portals, on `<body>`).
 
 ## Grid and alignment
@@ -51,7 +51,11 @@ Control sizes are tokens too, so a page can be roomy or compact without touching
 
 ## Type
 
-Inter for text, IBM Plex Mono for data (airport codes, coordinates, waypoint names, flight numbers).
+Three families, all served from our own domain (no runtime call to Google):
+
+- **Geist** (`font-sans`, the default for all text): light and clean; weight 300 for large lead text.
+- **Funnel Display** (`font-display`, self-hosted in `app/fonts/`, SIL OFL): big headlines only (homepage, page titles, guide, FAQ, legal).
+- **IBM Plex Mono** (`font-mono`): anything that must align or be read as a code: airport and flight codes, dates, counters, coordinates. Maison Mono is the preferred face but is commercial; swap it in `app/layout.tsx` if a licence is ever bought. Numbers use tabular figures.
 
 | Use | Class |
 |---|---|

@@ -81,6 +81,11 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Numbers that line up: tables, and every mono run (flight codes, coordinates, counters). */
+  table,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* Added high-contrast dark mode filter for map tiles */
@@ -236,5 +241,15 @@
   /* Small mono uppercase caption used for section and field labels in the Studio theme. */
   .studio-label {
     @apply font-mono text-[11px] font-medium uppercase leading-none tracking-wider text-muted-foreground;
+  }
+}
+
+/* Homepage hero: the active flight's timer line grows over the time it stays in the spotlight. */
+@keyframes hero-row-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
   }
 }
