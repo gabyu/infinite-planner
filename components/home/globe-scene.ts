@@ -91,10 +91,30 @@ function dedupe(path: [number, number, number][]) {
 }
 
 function pathCurve(path: [number, number, number][]) {
-  const points = path.map(([lat, lng, alt]) =>
-    latLngToVec(lat, lng, 1.004 + Math.min(Math.max(alt, 0), 45000) / 45000 * 0.035),
-  )
-  return new THREE.CatmullRomCurve3(points, false, "centripetal")
+  // Between two waypoints that are far apart, a straight line cuts through the planet and the Earth hides
+  // it: the route seems to vanish mid-flight. So follow the surface instead: add a point about every 1 degree
+  // along the great circle between consecutive waypoints, with the altitude blended in.
+  const MAX_STEP = 0.0175
+  const units = path.map(([lat, lng, alt]) => ({ v: latLngToVec(lat, lng), alt }))
+  const points: THREE.Vector3[] = []
+  const alts: number[] = []
+  const lift = (alt: number) => 1.004 + (Math.min(Math.max(alt, 0), 45000) / 45000) * 0.035
+  units.forEach((p, i) => {
+    if (i === 0) {
+      points.push(p.v.clone().multiplyScalar(lift(p.alt)))
+      alts.push(p.alt)
+      return
+    }
+    const prev = units[i - 1]
+    const steps = Math.max(1, Math.ceil(prev.v.angleTo(p.v) / MAX_STEP))
+    for (let k = 1; k <= steps; k++) {
+      const t = k / steps
+      const alt = prev.alt + (p.alt - prev.alt) * t
+      points.push(prev.v.clone().lerp(p.v, t).normalize().multiplyScalar(lift(alt)))
+      alts.push(alt)
+    }
+  })
+  return { curve: new THREE.CatmullRomCurve3(points, false, "centripetal"), alts }
 }
 
 const DOT_VERT = /* glsl */ `
@@ -228,7 +248,7 @@ export function createGlobe(
 
   const objs: FlightObjects[] = flights.map((raw) => {
     const f = { path: dedupe(raw.path) }
-    const curve = pathCurve(f.path)
+    const { curve, alts } = pathCurve(f.path)
     const arcMat = new THREE.ShaderMaterial({
       vertexShader: ARC_VERT,
       fragmentShader: ARC_FRAG,
@@ -250,9 +270,9 @@ export function createGlobe(
     const altitudes = new Float32Array(tube.attributes.position.count)
     const ringSize = 7 // radial segments + 1
     for (let i = 0; i <= TUBE_SEGMENTS; i++) {
-      const t = curve.getUtoTmapping(i / TUBE_SEGMENTS, 0) * (f.path.length - 1)
-      const lo = Math.min(f.path.length - 2, Math.floor(t))
-      const alt = f.path[lo][2] + (f.path[lo + 1][2] - f.path[lo][2]) * (t - lo)
+      const t = curve.getUtoTmapping(i / TUBE_SEGMENTS, 0) * (alts.length - 1)
+      const lo = Math.min(alts.length - 2, Math.floor(t))
+      const alt = alts[lo] + (alts[lo + 1] - alts[lo]) * (t - lo)
       for (let j = 0; j < ringSize; j++) altitudes[i * ringSize + j] = Math.max(0, Math.min(1, alt / RAMP_MAX_FT))
     }
     tube.setAttribute("alt", new THREE.BufferAttribute(altitudes, 1))
