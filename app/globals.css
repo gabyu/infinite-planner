@@ -295,3 +295,37 @@
 .dark .alt-15 { stroke: #c27bfa; }
 .alt-swatch { background: linear-gradient(90deg, #06b6d4, #0ca5d9, #1295dd, #1984e2, #1f74e6, #2563eb, #335cea, #4155e9, #4e4de8, #5c46e7, #6a3fe6, #753ce5, #8039e4, #8c35e2, #9732e1, #a22fe0); }
 .dark .alt-swatch { background: linear-gradient(90deg, #22d3ee, #2ecaf0, #3bc1f3, #47b7f5, #54aef8, #60a5fa, #6b9ff9, #7598f8, #8092f8, #8a8bf7, #9585f6, #9e83f7, #a781f8, #b07ff8, #b97df9, #c27bfa); }
+
+/* The same ramp as stop colours, for the altitude graph's gradient (stop i = i / 15 of 40,000 ft). */
+.alt-stop-0 { stop-color: #06b6d4; }
+.dark .alt-stop-0 { stop-color: #22d3ee; }
+.alt-stop-1 { stop-color: #0ca5d9; }
+.dark .alt-stop-1 { stop-color: #2ecaf0; }
+.alt-stop-2 { stop-color: #1295dd; }
+.dark .alt-stop-2 { stop-color: #3bc1f3; }
+.alt-stop-3 { stop-color: #1984e2; }
+.dark .alt-stop-3 { stop-color: #47b7f5; }
+.alt-stop-4 { stop-color: #1f74e6; }
+.dark .alt-stop-4 { stop-color: #54aef8; }
+.alt-stop-5 { stop-color: #2563eb; }
+.dark .alt-stop-5 { stop-color: #60a5fa; }
+.alt-stop-6 { stop-color: #335cea; }
+.dark .alt-stop-6 { stop-color: #6b9ff9; }
+.alt-stop-7 { stop-color: #4155e9; }
+.dark .alt-stop-7 { stop-color: #7598f8; }
+.alt-stop-8 { stop-color: #4e4de8; }
+.dark .alt-stop-8 { stop-color: #8092f8; }
+.alt-stop-9 { stop-color: #5c46e7; }
+.dark .alt-stop-9 { stop-color: #8a8bf7; }
+.alt-stop-10 { stop-color: #6a3fe6; }
+.dark .alt-stop-10 { stop-color: #9585f6; }
+.alt-stop-11 { stop-color: #753ce5; }
+.dark .alt-stop-11 { stop-color: #9e83f7; }
+.alt-stop-12 { stop-color: #8039e4; }
+.dark .alt-stop-12 { stop-color: #a781f8; }
+.alt-stop-13 { stop-color: #8c35e2; }
+.dark .alt-stop-13 { stop-color: #b07ff8; }
+.alt-stop-14 { stop-color: #9732e1; }
+.dark .alt-stop-14 { stop-color: #b97df9; }
+.alt-stop-15 { stop-color: #a22fe0; }
+.dark .alt-stop-15 { stop-color: #c27bfa; }
