@@ -1,30 +1,40 @@
 import Link from "next/link"
-import { Download } from "lucide-react"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
 import { AuthorLink } from "@/components/plans/author-link"
 import { PlanActions } from "@/components/plans/plan-actions"
-import { Button } from "@/components/ui/button"
 import { RouteArrow } from "@/components/route-arrow"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
-import { describeEnd } from "@/lib/plan-meta"
+import { describeEnd, type PlanEnd } from "@/lib/plan-meta"
 import { PlanGrid } from "@/components/explore/plan-card"
 import type { PlanCardData } from "@/lib/library-listing"
-import { planPath, routeHubPath } from "@/lib/plan-slug"
+import { flightNumberPath, locationPath, planPath, routeHubPath } from "@/lib/plan-slug"
 import type { PublicPlan } from "@/lib/public-plans"
-import { formatAltitude, formatDistanceNm } from "@/lib/route-render"
+import { formatAltitude, formatDistanceNm, hasAltitudeData } from "@/lib/route-render"
 
 // The server-rendered content of a plan page: the same for everyone (it is cached), with no
 // per-viewer state. The actions that depend on who is looking (like, import, sign-up block) are a
 // client island added in step 2.
+// "(KPHX/PHX)" at half the size of the city name, linking to everything that departs from or arrives at the airport.
+function AirportCodes({ end }: { end: PlanEnd }) {
+  return (
+    <Link
+      href={locationPath(end.icao)}
+      title={`Flight plans from and to ${end.name ?? end.icao}`}
+      className="font-mono text-[0.5em] font-medium text-muted-foreground no-underline transition-colors hover:text-primary motion-reduce:transition-none"
+    >
+      ({end.icao}
+      {end.iata ? `/${end.iata}` : ""})
+    </Link>
+  )
+}
+
 export function PlanView({
   plan,
-  community,
   sameRoute = [],
   sameAuthor = [],
 }: {
   plan: PublicPlan
-  community: boolean
   sameRoute?: PlanCardData[]
   sameAuthor?: PlanCardData[]
 }) {
@@ -38,9 +48,11 @@ export function PlanView({
     day: "numeric",
   })
 
+  // A plan with no altitude at all has no altitude figure and no altitude graph.
+  const hasAltitude = hasAltitudeData(plan.waypoints)
   const figures: { label: string; value: string | null }[] = [
     { label: "Distance", value: plan.distanceNm > 0 ? formatDistanceNm(plan.distanceNm) : null },
-    { label: "Max altitude", value: plan.maxAltitudeFt > 0 ? formatAltitude(plan.maxAltitudeFt) : null },
+    ...(hasAltitude ? [{ label: "Max altitude", value: formatAltitude(plan.maxAltitudeFt) }] : []),
     { label: "Waypoints", value: String(plan.waypoints.length) },
     { label: "Flight time", value: flightTime },
   ]
@@ -49,12 +61,18 @@ export function PlanView({
     <article className="container mx-auto max-w-5xl px-4 pb-24 pt-10 sm:pt-16">
       <header>
         <p className="font-mono text-sm uppercase tracking-wide text-muted-foreground">
-          {plan.flightNumber ? `Flight ${plan.flightNumber}` : "Flight plan"}
+          {plan.flightNumber ? (
+            <Link href={flightNumberPath(plan.flightNumber)} className="no-underline hover:text-primary" title={`All flight plans of ${plan.flightNumber}`}>
+              Flight {plan.flightNumber}
+            </Link>
+          ) : (
+            "Flight plan"
+          )}
         </p>
         <h1 className="mt-3 font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
-          {from.label}
+          {from.city ?? from.name ?? from.icao} <AirportCodes end={from} />
           <RouteArrow className="mx-[0.25em] text-primary" />
-          {to.label}
+          {to.city ?? to.name ?? to.icao} <AirportCodes end={to} />
         </h1>
         {(from.name || to.name) && (
           <p className="mt-4 text-[17px] text-muted-foreground">
@@ -82,30 +100,19 @@ export function PlanView({
           <span>Generated on {generated}</span>
           {plan.includesBranding && <span>Made with Infinite Planner</span>}
         </div>
-        {community ? (
-          <PlanActions
-            publicId={plan.publicId}
-            path={planPath(plan)}
-            initial={{ likeCount: plan.likeCount, importCount: plan.importCount, downloadCount: plan.downloadCount }}
-            origin={plan.origin}
-            destination={plan.destination}
-            flightNumber={plan.flightNumber}
-            visibility={plan.visibility}
-          />
-        ) : (
-          // Before the launch: the old shared-link experience, an anonymous download and nothing else.
-          <div className="mt-8">
-            <Button asChild size="lg" className="rounded-full px-6">
-              <a href={`/api/plans/${plan.publicId}/fpl`} download>
-                <Download />
-                Download .fpl
-              </a>
-            </Button>
-          </div>
-        )}
+        <PlanActions
+          publicId={plan.publicId}
+          path={planPath(plan)}
+          initial={{ likeCount: plan.likeCount, importCount: plan.importCount, downloadCount: plan.downloadCount }}
+          origin={plan.origin}
+          destination={plan.destination}
+          flightNumber={plan.flightNumber}
+        />
       </header>
 
-      <dl className="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-3xl bg-border ring-1 ring-border sm:grid-cols-4">
+      <dl
+        className={`mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-3xl bg-border ring-1 ring-border ${figures.length === 4 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}
+      >
         {figures.map(({ label, value }) => (
           <div key={label} className="bg-card px-5 py-5">
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
@@ -120,9 +127,11 @@ export function PlanView({
           label={`Route from ${from.label} to ${to.label}, ${plan.waypoints.length} waypoints`}
         />
       </section>
-      <section className="mt-6" aria-label="Altitude profile">
-        <AltitudeGraph waypoints={plan.waypoints} />
-      </section>
+      {hasAltitude && (
+        <section className="mt-6" aria-label="Altitude profile">
+          <AltitudeGraph waypoints={plan.waypoints} />
+        </section>
+      )}
 
 
       {sameRoute.length > 0 && (

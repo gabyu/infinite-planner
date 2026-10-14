@@ -10,9 +10,9 @@ export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 export const FLIGHT_PLAN_STATUSES = ["draft", "exported"] as const
 export type FlightPlanStatus = (typeof FLIGHT_PLAN_STATUSES)[number]
 
-// Who can open a plan: private (only the author), unlisted (anyone with the link, not indexed) or
-// public (listed in the library and indexed). Only an exported plan can leave private.
-export const PLAN_VISIBILITIES = ["private", "unlisted", "public"] as const
+// Who can open a plan: private (only the author) or public (listed in the library, indexed, and reachable by its
+// link). Only an exported plan can leave private.
+export const PLAN_VISIBILITIES = ["private", "public"] as const
 export type PlanVisibility = (typeof PLAN_VISIBILITIES)[number]
 
 export interface PlanShare {

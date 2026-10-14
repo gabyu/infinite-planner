@@ -1,7 +1,7 @@
 import "server-only"
 import { unstable_cache } from "next/cache"
 import { findAirportByCode, searchAirports } from "@/lib/airports"
-import { FLIGHT_PLAN_SOURCES, type FlightPlanSource } from "@/lib/flight-plans"
+import type { FlightPlanSource } from "@/lib/flight-plans"
 import { getCachedServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // The library's listing: what /explore, the route and airport hubs and a plan's "more like this" show.
@@ -36,9 +36,11 @@ export interface PlanCardData {
   authorName: string
   authorAvatarUrl: string | null
   authorPublicId: string
-  route: { lat: number; lng: number }[]
+  route: { lat: number; lng: number; altitude: number }[]
   sortValue: number
   featured: boolean
+  // When the flight plan was created (exported).
+  createdAt: string
 }
 
 export interface ListFilters {
@@ -80,9 +82,10 @@ interface Row {
   author_name: string | null
   author_avatar_url: string | null
   author_public_id: string
-  route: { lat: number; lng: number }[] | null
+  route: { lat: number; lng: number; alt: number }[] | null
   sort_value: number
   featured: boolean
+  created_at: string
 }
 
 const ADMIN_AUTHOR_NAME = "Infinite Planner admin"
@@ -136,9 +139,10 @@ async function load(args: {
       authorName: row.author_name || ADMIN_AUTHOR_NAME,
       authorAvatarUrl: row.author_avatar_url,
       authorPublicId: row.author_public_id,
-      route: row.route ?? [],
+      route: (row.route ?? []).map((p) => ({ lat: p.lat, lng: p.lng, altitude: p.alt })),
       sortValue: row.sort_value,
       featured: row.featured,
+      createdAt: row.created_at,
     })),
     next: rows.length > limit && last ? { v: last.sort_value, id: last.id, asOf } : null,
   }
@@ -195,7 +199,6 @@ export interface ExploreParams {
   from?: string
   to?: string
   flight?: string
-  source?: string
   sort?: string
   cursor?: string
 }
@@ -249,9 +252,6 @@ export function filtersFromParams(params: ExploreParams): ListFilters {
   if (params.to) filters.destinations = [to?.icao ?? "ZZZZ"]
   const flight = params.flight?.trim().toUpperCase()
   if (flight && /^[A-Z0-9]{1,12}$/.test(flight)) filters.flight = flight
-  if (params.source && (FLIGHT_PLAN_SOURCES as readonly string[]).includes(params.source)) {
-    filters.source = params.source as FlightPlanSource
-  }
   return filters
 }
 

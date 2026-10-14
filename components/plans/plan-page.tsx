@@ -11,15 +11,14 @@ import { planPath, planSlug, publicIdFromSlug, routeHubPath } from "@/lib/plan-s
 import { getPublicPlan, type PublicPlan } from "@/lib/public-plans"
 
 // One plan page, two ways to reach it:
-//   "public"  /explore/plans/{slug}          cached for everyone (ISR). While the library isn't launched it
-//                                    shows an unlisted plan the legacy way and 404s a public one.
+//   "public"  /explore/plans/{slug}          cached for everyone (ISR). While the library isn't launched it 404s.
 //   "preview" /preview/explore/plans/{slug}  per request, admins only: the middleware sends signed-in admins
 //                                    here while the library isn't launched, so they see everything.
 export type PlanPageMode = "public" | "preview"
 
 interface Resolved {
   plan: PublicPlan
-  // Whether this view may be indexed: public plans, once the library is launched.
+  // Whether this view may be indexed: once the library is launched.
   indexable: boolean
   prelaunch: boolean
 }
@@ -31,13 +30,10 @@ async function resolve(slug: string, mode: PlanPageMode): Promise<Resolved | nul
   if (!plan) return null
 
   const launched = await getLibraryLaunched()
-  if (mode === "public" && !launched && plan.visibility === "public") return null
+  // Every plan the library knows is public; before the launch only the admins' preview shows them.
+  if (mode === "public" && !launched) return null
 
-  return {
-    plan,
-    indexable: mode === "public" && launched && plan.visibility === "public",
-    prelaunch: !launched,
-  }
+  return { plan, indexable: mode === "public" && launched, prelaunch: !launched }
 }
 
 export async function planPageMetadata(slug: string, mode: PlanPageMode): Promise<Metadata> {
@@ -55,18 +51,14 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
   // A slug that differs from the canonical one (renamed flight number, wrong airports typed by hand...) redirects.
   if (slug !== planSlug(plan)) permanentRedirect(planPath(plan))
 
-  const community = mode === "preview" || !prelaunch
-  // More from the same route and from the same author: public plans only, a few each. Only part of the
-  // community view (before the launch the page is the old shared link and nothing more).
-  const [sameRoute, sameAuthor] = community
-    ? await Promise.all([
-        listPlans({
-          filters: { origins: [plan.origin], destinations: [plan.destination], excludePublicId: plan.publicId },
-          limit: 4,
-        }),
-        listPlans({ filters: { authorPublicId: plan.authorPublicId, excludePublicId: plan.publicId }, limit: 4 }),
-      ])
-    : [null, null]
+  // More from the same route and from the same author: a few each.
+  const [sameRoute, sameAuthor] = await Promise.all([
+    listPlans({
+      filters: { origins: [plan.origin], destinations: [plan.destination], excludePublicId: plan.publicId },
+      limit: 4,
+    }),
+    listPlans({ filters: { authorPublicId: plan.authorPublicId, excludePublicId: plan.publicId }, limit: 4 }),
+  ])
 
   return (
     <>
@@ -84,12 +76,7 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
           Pre-launch — visible to admins only
         </div>
       )}
-      <PlanView
-        plan={plan}
-        community={community}
-        sameRoute={sameRoute?.plans ?? []}
-        sameAuthor={sameAuthor?.plans ?? []}
-      />
+      <PlanView plan={plan} sameRoute={sameRoute.plans} sameAuthor={sameAuthor.plans} />
     </>
   )
 }

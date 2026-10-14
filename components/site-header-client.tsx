@@ -61,11 +61,8 @@ export function SiteHeaderClient({ showExplore }: { showExplore: boolean }) {
       <div className="container mx-auto flex items-center justify-between px-4 py-2 sm:py-4">
         <BrandLogo href="/" />
         <nav className="flex items-center gap-1 sm:gap-2 md:gap-4">
-          <NavLink href="/how-it-works" hideOnMobile>
-            Guide
-          </NavLink>
-          <NavLink href="/faq" hideOnMobile>
-            FAQ
+          <NavLink href="/help" hideOnMobile>
+            Help
           </NavLink>
           <NavLink href="/convert" icon={<Upload size={16} />}>
             <span className="hidden sm:inline">Convert</span>

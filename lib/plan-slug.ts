@@ -39,6 +39,12 @@ export function routeHubPath(origin: string, destination: string) {
   return `/explore/routes/${origin.toLowerCase()}-${destination.toLowerCase()}`
 }
 
-export function airportHubPath(icao: string) {
-  return `/explore/airports/${icao.toLowerCase()}`
+// Every plan that departs from or arrives at an airport, and every plan of one flight number. The codes are
+// written the way pilots write them: KPHX, AF69.
+export function locationPath(icao: string) {
+  return `/explore/location/${icao.toUpperCase()}`
+}
+
+export function flightNumberPath(flightNumber: string) {
+  return `/explore/flight_number/${flightNumber.toUpperCase()}`
 }

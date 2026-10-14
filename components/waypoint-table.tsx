@@ -95,7 +95,7 @@ export function WaypointTable({
               variant="outline"
               size="icon"
               disabled={waypoints.length === 0 || isLoading}
-              title="View flight plan on map"
+              title="Open the flight plan editor"
             >
               <Map />
             </Button>

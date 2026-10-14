@@ -59,7 +59,7 @@ export default function TermsPage() {
         <h2>4. Accounts</h2>
         <p>
           The Service offers optional sign-in through Discord, which may be used to access features such as saving,
-          re-exporting, or sharing flight plans. An account is never required to use the core features of the Service.
+          re-exporting, or publishing flight plans. An account is never required to use the core features of the Service.
         </p>
         <p>
           If you sign in, you are responsible for the security of your Discord account. Authentication is handled by
@@ -67,7 +67,7 @@ export default function TermsPage() {
         </p>
         <p>
           Your Discord username is the name by which you are identified on the Service, including to other users. When
-          you share or publish a flight plan (Section 5), your Discord username and your avatar are shown with it. Your
+          you make a flight plan public (Section 5), your Discord username and your avatar are shown with it. Your
           email address is never shown to other users or visitors.
         </p>
       </section>
@@ -76,27 +76,29 @@ export default function TermsPage() {
         <h2>5. Your content</h2>
         <p>
           You retain all rights in the flight plans you generate, import, or draw. We do not claim ownership of your
-          routes or flight plan files. If you choose to share a flight plan, a link is created that anyone can open,
-          without an account, to view and download it. By doing so, you grant other people permission to view and
-          download that flight plan, and nothing more.
+          routes or flight plan files. If you choose to make a flight plan public, anyone can open it and, once signed
+          in, download it, as set out below. By doing so, you grant other people permission to view and download that
+          flight plan, and nothing more.
         </p>
         <p>
           Each exported flight plan has a visibility that you choose, and that is <strong>private</strong> until you
-          change it. <strong>Unlisted</strong> means anyone with the link can open it; it is not listed on the Service
-          and search engines are asked not to index it. <strong>Public</strong> means it is listed in the public
-          library of the Service (Explore), can be found by search, and is indexed by search engines. Nothing is made
-          public without an explicit action from you.
+          change it. <strong>Public</strong> means it is listed in the public library of the Service (Explore), can be
+          found by search, is indexed by search engines, and can be opened by anyone who has its link. There is nothing
+          in between: a flight plan is either private or public. Nothing is made public without an explicit action from
+          you.
         </p>
         <p>
-          When you share or publish a flight plan, your Discord username and avatar are displayed with it as its
-          author, and this cannot be turned off for that plan. If you do not wish them to be displayed, do not share the
-          flight plan. By publishing a flight plan you grant the Service a non-exclusive, worldwide, royalty-free
+          When you make a flight plan public, your Discord username and avatar are displayed with it as its
+          author, and this cannot be turned off for that plan. If you do not wish them to be displayed, keep the flight
+          plan private. By publishing a flight plan you grant the Service a non-exclusive, worldwide, royalty-free
           licence to host, display, and distribute it, and to let signed-in users download it, like it, and import a
           copy of it, for as long as it remains published. You confirm that you are entitled to publish it, and that it
           does not infringe the rights of anyone else, including the providers of the flight data it was derived from.
         </p>
         <p>
-          You may change a flight plan back to private at any time, after which its page and link stop working.
+          You may change a flight plan back to private at any time, after which its page and link stop working. The
+          links created by the earlier sharing feature of the Service were withdrawn when it was replaced by this
+          visibility setting and no longer work.
           Search engines and other caches may keep showing a page for some time after it was withdrawn, which we do not
           control. A copy that another user imported while your plan was published belongs to that user: it stays in
           their account and is not affected when you unpublish or delete the original. Downloading a flight plan from

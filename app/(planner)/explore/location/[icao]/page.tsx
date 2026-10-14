@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { BreadcrumbJsonLd } from "@/components/explore/breadcrumb-json-ld"
 import { PlanGrid } from "@/components/explore/plan-card"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
@@ -11,15 +11,15 @@ import { requireLibraryAccess } from "@/lib/library-access"
 import { getLibraryLaunched } from "@/lib/library"
 import { listPlans } from "@/lib/library-listing"
 import { describeEnd } from "@/lib/plan-meta"
-import { airportHubPath } from "@/lib/plan-slug"
+import { flightNumberPath, locationPath } from "@/lib/plan-slug"
 
-// /explore/airports/lfpg: the departures and arrivals of one airport. Same indexing rule as the route hubs.
+// /explore/location/KPHX: the departures and arrivals of one airport. Same indexing rule as the route hubs.
 export const dynamic = "force-dynamic"
 
 const HUB_SIZE = 12
 
 function parse(icao: string) {
-  if (!/^[a-z0-9]{4}$/.test(icao)) return null
+  if (!/^[a-z0-9]{4}$/i.test(icao)) return null
   return getAirportInfo(icao.toUpperCase())
 }
 
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: { icao: string } })
   return {
     title: { absolute: title },
     description,
-    alternates: { canonical: airportHubPath(airport.icao) },
+    alternates: { canonical: locationPath(airport.icao) },
     robots: launched && plans.length > 0 ? { index: true, follow: true } : { index: false, follow: true },
     openGraph: { type: "website", title, description, siteName: BRAND_NAME },
   }
@@ -45,6 +45,8 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
   const { prelaunch } = await requireLibraryAccess()
   const airport = parse(params.icao)
   if (!airport) notFound()
+  // One spelling per airport: KPHX.
+  if (params.icao !== airport.icao) permanentRedirect(locationPath(airport.icao))
 
   const [departures, arrivals] = await Promise.all([
     listPlans({ filters: { origins: [airport.icao] }, limit: HUB_SIZE }),
@@ -53,7 +55,7 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
   if (departures.plans.length === 0 && arrivals.plans.length === 0) notFound()
 
   const end = describeEnd(airport.icao, airport.name)
-  const path = airportHubPath(airport.icao)
+  const path = locationPath(airport.icao)
 
   return (
     <>

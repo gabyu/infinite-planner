@@ -144,3 +144,68 @@ export function formatAltitude(feet: number): string {
 export function formatDistanceNm(nm: number): string {
   return `${Math.round(nm).toLocaleString("en-US")} NM`
 }
+
+// --- Altitude colours -----------------------------------------------------------------------------------------
+// The route is coloured by altitude with the same ramp as the homepage globe (components/home/altitude-ramp.ts),
+// in 16 steps from 0 to 40,000 ft. The colours themselves are the CSS classes `.alt-0` ... `.alt-15`
+// (app/globals.css), so they follow the light / dark theme.
+export const ALTITUDE_BUCKETS = 16
+const RAMP_TOP_FT = 40000
+
+export function altitudeBucket(feet: number): number {
+  const t = Math.max(0, Math.min(1, feet / RAMP_TOP_FT))
+  return Math.round(t * (ALTITUDE_BUCKETS - 1))
+}
+
+// Consecutive segments of the same colour are drawn as one path. A segment takes the mean altitude of its ends.
+export function colorSegments(points: Point[], altitudes: number[]): { bucket: number; d: string }[] {
+  const out: { bucket: number; d: string }[] = []
+  for (let i = 1; i < points.length; i++) {
+    const bucket = altitudeBucket(((altitudes[i - 1] ?? 0) + (altitudes[i] ?? 0)) / 2)
+    const a = points[i - 1]
+    const b = points[i]
+    const last = out[out.length - 1]
+    if (last && last.bucket === bucket) last.d += ` L${b.x.toFixed(1)} ${b.y.toFixed(1)}`
+    else out.push({ bucket, d: `M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${b.x.toFixed(1)} ${b.y.toFixed(1)}` })
+  }
+  return out
+}
+
+// A flight plan with no altitude at all (every waypoint at 0) has nothing to colour or to graph.
+export function hasAltitudeData(waypoints: { altitude?: number }[]): boolean {
+  return waypoints.some((w) => (w.altitude ?? 0) > 0)
+}
+
+// --- Terrain -----------------------------------------------------------------------------------------------------
+// The land as a field of dots (the homepage globe's coastlines), as the `d` of one path of zero-length segments
+// to stroke with round caps. `unproject` maps a pixel of the frame back to a position.
+export function terrainDots(
+  frame: { width: number; height: number },
+  unproject: (x: number, y: number) => { lat: number; lng: number },
+  isLandAt: (lat: number, lng: number) => boolean,
+  step: number,
+): string {
+  let d = ""
+  for (let y = step / 2; y < frame.height; y += step) {
+    for (let x = step / 2; x < frame.width; x += step) {
+      const { lat, lng } = unproject(x, y)
+      if (isLandAt(lat, lng)) d += `M${Math.round(x)} ${Math.round(y)}h0`
+    }
+  }
+  return d
+}
+
+// The same ramp as hex colours, for pictures drawn outside the page's CSS (the preview image of a link). The dark
+// variant, which reads on the blue card.
+const RAMP_DARK = ["#22d3ee", "#60a5fa", "#9585f6", "#c27bfa"]
+
+export function altitudeHex(feet: number): string {
+  const t = Math.max(0, Math.min(1, feet / RAMP_TOP_FT))
+  const position = t * (RAMP_DARK.length - 1)
+  const index = Math.min(Math.floor(position), RAMP_DARK.length - 2)
+  const mix = position - index
+  const channel = (hex: string, i: number) => parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16)
+  const from = RAMP_DARK[index]
+  const to = RAMP_DARK[index + 1]
+  return `#${[0, 1, 2].map((i) => Math.round(channel(from, i) + (channel(to, i) - channel(from, i)) * mix).toString(16).padStart(2, "0")).join("")}`
+}
