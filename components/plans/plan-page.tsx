@@ -1,11 +1,13 @@
 import "server-only"
 import type { Metadata } from "next"
 import { notFound, permanentRedirect } from "next/navigation"
+import { BreadcrumbJsonLd } from "@/components/explore/breadcrumb-json-ld"
 import { PlanView } from "@/components/plans/plan-view"
-import { BRAND_NAME } from "@/lib/brand"
+import { listPlans } from "@/lib/library-listing"
+import { BRAND_NAME, LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
 import { getLibraryLaunched } from "@/lib/library"
 import { planMetadata } from "@/lib/plan-meta"
-import { planPath, planSlug, publicIdFromSlug } from "@/lib/plan-slug"
+import { planPath, planSlug, publicIdFromSlug, routeHubPath } from "@/lib/plan-slug"
 import { getPublicPlan, type PublicPlan } from "@/lib/public-plans"
 
 // One plan page, two ways to reach it:
@@ -53,14 +55,41 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
   // A slug that differs from the canonical one (renamed flight number, wrong airports typed by hand...) redirects.
   if (slug !== planSlug(plan)) permanentRedirect(planPath(plan))
 
+  const community = mode === "preview" || !prelaunch
+  // More from the same route and from the same author: public plans only, a few each. Only part of the
+  // community view (before the launch the page is the old shared link and nothing more).
+  const [sameRoute, sameAuthor] = community
+    ? await Promise.all([
+        listPlans({
+          filters: { origins: [plan.origin], destinations: [plan.destination], excludePublicId: plan.publicId },
+          limit: 4,
+        }),
+        listPlans({ filters: { authorPublicId: plan.authorPublicId, excludePublicId: plan.publicId }, limit: 4 }),
+      ])
+    : [null, null]
+
   return (
     <>
+      {resolved.indexable && (
+        <BreadcrumbJsonLd
+          items={[
+            { name: LIBRARY_NAME, path: LIBRARY_PATH },
+            { name: `${plan.origin} to ${plan.destination}`, path: routeHubPath(plan.origin, plan.destination) },
+            { name: plan.flightNumber ? `${plan.flightNumber}` : "Flight plan", path: planPath(plan) },
+          ]}
+        />
+      )}
       {mode === "preview" && prelaunch && (
         <div className="border-b bg-primary/10 px-4 py-1.5 text-center text-xs text-primary">
           Pre-launch — visible to admins only
         </div>
       )}
-      <PlanView plan={plan} community={mode === "preview" || !prelaunch} />
+      <PlanView
+        plan={plan}
+        community={community}
+        sameRoute={sameRoute?.plans ?? []}
+        sameAuthor={sameAuthor?.plans ?? []}
+      />
     </>
   )
 }

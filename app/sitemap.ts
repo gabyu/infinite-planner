@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next"
 import { unstable_cache } from "next/cache"
 import { getLibraryLaunched } from "@/lib/library"
-import { planPath } from "@/lib/plan-slug"
+import { LIBRARY_PATH } from "@/lib/brand"
+import { airportHubPath, planPath } from "@/lib/plan-slug"
 import { SITE_URL } from "@/lib/site-url"
 import { getCachedServiceRoleSupabase } from "@/lib/supabase/admin"
 
@@ -33,7 +34,18 @@ const loadStubs = unstable_cache(
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!(await getLibraryLaunched())) return []
   const stubs = await loadStubs()
-  return stubs.map((stub) => ({
+  if (stubs.length === 0) return []
+
+  // The library's front page and the hubs that have at least one public plan.
+  const routes = new Set(stubs.map((stub) => `${stub.origin_airport}-${stub.destination_airport}`))
+  const airports = new Set(stubs.flatMap((stub) => [stub.origin_airport, stub.destination_airport]))
+  const hubs: MetadataRoute.Sitemap = [
+    { url: `${SITE_URL}${LIBRARY_PATH}` },
+    ...[...routes].map((route) => ({ url: `${SITE_URL}/explore/routes/${route.toLowerCase()}` })),
+    ...[...airports].map((icao) => ({ url: `${SITE_URL}${airportHubPath(icao)}` })),
+  ]
+
+  return [...hubs, ...stubs.map((stub) => ({
     url: `${SITE_URL}${planPath({
       origin: stub.origin_airport,
       destination: stub.destination_airport,
@@ -41,5 +53,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       publicId: stub.public_id,
     })}`,
     lastModified: stub.published_at ?? undefined,
-  }))
+  }))]
 }

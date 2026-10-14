@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Download } from "lucide-react"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
@@ -6,14 +7,26 @@ import { Button } from "@/components/ui/button"
 import { RouteArrow } from "@/components/route-arrow"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
 import { describeEnd } from "@/lib/plan-meta"
-import { planPath } from "@/lib/plan-slug"
+import { PlanGrid } from "@/components/explore/plan-card"
+import type { PlanCardData } from "@/lib/library-listing"
+import { planPath, routeHubPath } from "@/lib/plan-slug"
 import type { PublicPlan } from "@/lib/public-plans"
 import { formatAltitude, formatDistanceNm } from "@/lib/route-render"
 
 // The server-rendered content of a plan page: the same for everyone (it is cached), with no
 // per-viewer state. The actions that depend on who is looking (like, import, sign-up block) are a
 // client island added in step 2.
-export function PlanView({ plan, community }: { plan: PublicPlan; community: boolean }) {
+export function PlanView({
+  plan,
+  community,
+  sameRoute = [],
+  sameAuthor = [],
+}: {
+  plan: PublicPlan
+  community: boolean
+  sameRoute?: PlanCardData[]
+  sameAuthor?: PlanCardData[]
+}) {
   const from = describeEnd(plan.origin, plan.originName)
   const to = describeEnd(plan.destination, plan.destinationName)
   const flightTime = formatFlightTime(plan.flightTimeMinutes)
@@ -110,6 +123,28 @@ export function PlanView({ plan, community }: { plan: PublicPlan; community: boo
         <AltitudeGraph waypoints={plan.waypoints} />
       </section>
 
+
+      {sameRoute.length > 0 && (
+        <section className="mt-16" aria-labelledby="more-route">
+          <div className="mb-4 flex items-baseline justify-between gap-4">
+            <h2 id="more-route" className="font-display text-2xl font-semibold tracking-tight">
+              More from {plan.origin} to {plan.destination}
+            </h2>
+            <Link href={routeHubPath(plan.origin, plan.destination)} className="text-sm text-muted-foreground underline underline-offset-2">
+              See all
+            </Link>
+          </div>
+          <PlanGrid plans={sameRoute} />
+        </section>
+      )}
+      {sameAuthor.length > 0 && (
+        <section className="mt-16" aria-labelledby="more-author">
+          <h2 id="more-author" className="mb-4 font-display text-2xl font-semibold tracking-tight">
+            More by {plan.authorName}
+          </h2>
+          <PlanGrid plans={sameAuthor} />
+        </section>
+      )}
     </article>
   )
 }
