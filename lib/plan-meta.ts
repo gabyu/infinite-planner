@@ -22,7 +22,8 @@ export interface PlanEnd {
 export function describeEnd(icao: string, storedName: string | null): PlanEnd {
   const info = getAirportInfo(icao)
   const iata = info?.iata || null
-  const city = info?.city || null
+  // OurAirports cities can carry a region ("Roissy-en-France, Val-d'Oise"): keep the place name.
+  const city = info?.city?.split(",")[0].trim() || null
   const codes = iata ? `${icao}/${iata}` : icao
   return {
     icao,

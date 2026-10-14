@@ -3,7 +3,7 @@ import { unstable_cache } from "next/cache"
 import { getLibraryLaunched } from "@/lib/library"
 import { planPath } from "@/lib/plan-slug"
 import { SITE_URL } from "@/lib/site-url"
-import { getServiceRoleSupabase } from "@/lib/supabase/admin"
+import { getCachedServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // The library's public pages. Refreshed hourly and whenever a plan is published or unpublished
 // (tag `library-index`) or the library is launched (tag `library`). Before the launch it is empty:
@@ -20,10 +20,10 @@ interface Stub {
 
 const loadStubs = unstable_cache(
   async (): Promise<Stub[]> => {
-    const service = getServiceRoleSupabase()
+    const service = getCachedServiceRoleSupabase(["library-index", "library"])
     if (!service) return []
     const { data, error } = await service.rpc("list_public_plan_stubs")
-    if (error) console.error("Listing public plans for the sitemap failed:", error.message)
+    if (error) throw new Error(`Listing public plans for the sitemap failed: ${error.message}`)
     return (data as Stub[] | null) ?? []
   },
   ["sitemap-plan-stubs"],

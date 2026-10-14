@@ -2,7 +2,7 @@ import "server-only"
 import { unstable_cache } from "next/cache"
 import { isPublicId } from "@/lib/plan-slug"
 import { UUID_PATTERN, type FlightPlanSource, type StoredWaypoint } from "@/lib/flight-plans"
-import { getServiceRoleSupabase } from "@/lib/supabase/admin"
+import { getCachedServiceRoleSupabase, getServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // The public side of the library: one plan by its public id. No RLS policy lets anyone read a
 // flight plan; get_public_plan (service role only) is the way in, and it never returns user_id.
@@ -87,17 +87,14 @@ function fromRow(row: PlanRow): PublicPlan {
   }
 }
 
-async function loadPublicPlan(publicId: string): Promise<PublicPlan | null> {
-  const service = getServiceRoleSupabase()
+async function loadPublicPlan(publicId: string, service: ReturnType<typeof getServiceRoleSupabase>): Promise<PublicPlan | null> {
   if (!service) {
     console.error("SUPABASE_SERVICE_ROLE_KEY is not set: flight plan pages can't be served.")
     return null
   }
   const { data, error } = await service.rpc("get_public_plan", { p_public_id: publicId })
-  if (error) {
-    console.error("Loading a public flight plan failed:", error.message)
-    return null
-  }
+  // Thrown, not turned into "not found": a failed lookup must never be cached as a 404.
+  if (error) throw new Error(`Loading a public flight plan failed: ${error.message}`)
   const row = (data as PlanRow[] | null)?.[0]
   return row ? fromRow(row) : null
 }
@@ -108,16 +105,20 @@ async function loadPublicPlan(publicId: string): Promise<PublicPlan | null> {
 // ids doesn't reach the database every time.
 export function getPublicPlan(publicId: string): Promise<PublicPlan | null> {
   if (!isPublicId(publicId)) return Promise.resolve(null)
-  return unstable_cache(() => loadPublicPlan(publicId), ["public-plan", publicId], {
-    tags: [`plan:${publicId}`, "library"],
-    revalidate: 300,
-  })()
+  return unstable_cache(
+    () => loadPublicPlan(publicId, getCachedServiceRoleSupabase([`plan:${publicId}`, "library"])),
+    ["public-plan", publicId],
+    {
+      tags: [`plan:${publicId}`, "library"],
+      revalidate: 300,
+    },
+  )()
 }
 
 // Same lookup, never cached: for the download route, which must see an unpublish at once.
 export function getPublicPlanLive(publicId: string): Promise<PublicPlan | null> {
   if (!isPublicId(publicId)) return Promise.resolve(null)
-  return loadPublicPlan(publicId)
+  return loadPublicPlan(publicId, getServiceRoleSupabase())
 }
 
 // Legacy /shared/{token} link -> the plan's public id. null when the token doesn't exist or was

@@ -35,7 +35,7 @@ export async function isLibraryOpenFor(viewer: Viewer): Promise<boolean> {
 // The launch flag as a cached page input: tagged `library`, so flipping the switch (which revalidates
 // that tag) refreshes every cached library page at once. Pages use this one; the middleware
 // reads the flag directly.
-export const getLibraryLaunched = unstable_cache(fetchLibraryLaunched, ["library-launched"], {
+export const getLibraryLaunched = unstable_cache(() => fetchLibraryLaunched(true), ["library-launched"], {
   tags: ["library"],
   revalidate: 300,
 })
