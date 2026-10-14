@@ -1,5 +1,7 @@
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { json } from "@/lib/flight-plan-server"
+import { fetchLibraryLaunched } from "@/lib/library-state"
+import { getViewer } from "@/lib/library"
 import { takeSharedDownload } from "@/lib/shared-plans"
 
 // Never cached: a cached response would outlive "Stop sharing".
@@ -9,6 +11,10 @@ export const fetchCache = "force-no-store"
 // Public (no sign-in): downloads the shared plan as an .fpl and counts the download
 // (share_download_count, stored but not shown anywhere yet).
 export async function GET(_request: Request, { params }: { params: { token: string } }) {
+  // Once the library is launched, every download needs a Discord sign-in, old links included.
+  if ((await fetchLibraryLaunched()) && !(await getViewer()).userId) {
+    return json({ error: "Sign in with Discord to download flight plans." }, 401)
+  }
   const plan = await takeSharedDownload(params.token)
   if (!plan) return json({ error: "This link isn't available." }, 404)
 

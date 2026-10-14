@@ -1,17 +1,19 @@
 import { Download } from "lucide-react"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
+import { PlanActions } from "@/components/plans/plan-actions"
 import { Button } from "@/components/ui/button"
 import { RouteArrow } from "@/components/route-arrow"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
 import { describeEnd } from "@/lib/plan-meta"
+import { planPath } from "@/lib/plan-slug"
 import type { PublicPlan } from "@/lib/public-plans"
 import { formatAltitude, formatDistanceNm } from "@/lib/route-render"
 
 // The server-rendered content of a plan page: the same for everyone (it is cached), with no
 // per-viewer state. The actions that depend on who is looking (like, import, sign-up block) are a
 // client island added in step 2.
-export function PlanView({ plan }: { plan: PublicPlan }) {
+export function PlanView({ plan, community }: { plan: PublicPlan; community: boolean }) {
   const from = describeEnd(plan.origin, plan.originName)
   const to = describeEnd(plan.destination, plan.destinationName)
   const flightTime = formatFlightTime(plan.flightTimeMinutes)
@@ -66,14 +68,27 @@ export function PlanView({ plan }: { plan: PublicPlan }) {
           <span>Generated on {generated}</span>
           {plan.includesBranding && <span>Made with Infinite Planner</span>}
         </div>
-        <div className="mt-8">
-          <Button asChild size="lg" className="rounded-full px-6">
-            <a href={`/api/plans/${plan.publicId}/fpl`} download>
-              <Download />
-              Download .fpl
-            </a>
-          </Button>
-        </div>
+        {community ? (
+          <PlanActions
+            publicId={plan.publicId}
+            path={planPath(plan)}
+            initial={{ likeCount: plan.likeCount, importCount: plan.importCount, downloadCount: plan.downloadCount }}
+            origin={plan.origin}
+            destination={plan.destination}
+            flightNumber={plan.flightNumber}
+            visibility={plan.visibility}
+          />
+        ) : (
+          // Before the launch: the old shared-link experience, an anonymous download and nothing else.
+          <div className="mt-8">
+            <Button asChild size="lg" className="rounded-full px-6">
+              <a href={`/api/plans/${plan.publicId}/fpl`} download>
+                <Download />
+                Download .fpl
+              </a>
+            </Button>
+          </div>
+        )}
       </header>
 
       <dl className="mt-12 grid grid-cols-2 gap-px overflow-hidden rounded-3xl bg-border ring-1 ring-border sm:grid-cols-4">

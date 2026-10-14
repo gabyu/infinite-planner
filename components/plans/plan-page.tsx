@@ -60,7 +60,7 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
           Pre-launch — visible to admins only
         </div>
       )}
-      <PlanView plan={plan} />
+      <PlanView plan={plan} community={mode === "preview" || !prelaunch} />
     </>
   )
 }

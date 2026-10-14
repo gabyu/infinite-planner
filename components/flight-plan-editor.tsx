@@ -701,9 +701,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           return
         }
         // Sketch drafts belong in Sketch, imported ones in Convert.
-        const rightMode = body.source === "Sketch" ? "draw" : "import"
+        // A copy of someone else's plan (an import from the library) always opens in Convert's map view, whatever
+        // its source: it is edited as waypoints, not on the Sketch board.
+        const rightMode = body.source === "Sketch" && !body.is_fork ? "draw" : "import"
         if (rightMode !== mode) {
-          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}`)
+          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}${body.is_fork ? "&fork=1" : ""}`)
           return
         }
 
@@ -738,6 +740,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
+          // Straight from the library: map first, editing tools at hand (the same view a fresh conversion opens).
+          if (new URLSearchParams(window.location.search).get("fork") === "1") setShowMapPreview(true)
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"

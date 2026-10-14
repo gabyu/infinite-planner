@@ -101,3 +101,18 @@ export const LOCKED_MESSAGE = "This flight plan was exported and can no longer b
 export function isUuid(value: string) {
   return UUID_PATTERN.test(value)
 }
+
+// The signed-in user for one of the library's actions: like, import. Also checks that the library
+// is open to them (launched, or they are an admin) and applies the per-user rate limit.
+export async function requireLibraryUser(request: Request) {
+  const auth = await requireUser(request)
+  if (auth.error) return auth
+
+  const { getViewer, isLibraryOpenFor } = await import("@/lib/library")
+  if (!(await isLibraryOpenFor(await getViewer()))) return { error: json({ error: "Not found." }, 404) }
+
+  const { allowAction } = await import("@/lib/rate-limit")
+  if (!allowAction(auth.user.id)) return { error: json({ error: "Too many actions. Try again in a minute." }, 429) }
+
+  return auth
+}

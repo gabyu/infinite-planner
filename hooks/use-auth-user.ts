@@ -50,3 +50,14 @@ export async function signInWithDiscord() {
     options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
   })
 }
+
+// Starts the Discord sign-in and brings the user back to `next` (a same-site path, e.g. a plan page with
+// ?intent=like so the action they were after is carried out once they are signed in).
+export async function signInWithDiscordTo(next: string) {
+  const supabase = getBrowserSupabase()
+  if (!supabase) return
+  await supabase.auth.signInWithOAuth({
+    provider: "discord",
+    options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+  })
+}

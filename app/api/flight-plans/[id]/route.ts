@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const { data } = await auth.supabase
     .from("flight_plans")
     .select(
-      "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes, visibility, public_id",
+      "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes, visibility, public_id, is_fork",
     )
     .eq("id", params.id)
     .maybeSingle()

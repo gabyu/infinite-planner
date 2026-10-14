@@ -47,12 +47,14 @@ export interface FlightPlanSummary {
   includes_branding: boolean
   flight_time_minutes: number | null
   visibility: PlanVisibility
+  // A copy of someone else's plan (imported from the library).
+  is_fork: boolean
   // Set once the plan has been shared; the plan page lives at /explore/plans/{...}-{public_id}.
   public_id: string | null
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id"
+  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork"
 
 // How many dashboard rows are loaded at a time ("Load more" fetches the next page).
 export const HISTORY_PAGE_SIZE = 50
@@ -82,6 +84,7 @@ export function sourceLabel(source: FlightPlanSource): string {
 }
 
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.
-export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource }) {
+export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource; is_fork?: boolean }) {
+  if (plan.is_fork) return `/convert?draft=${plan.id}&fork=1`
   return `${plan.source === "Sketch" ? "/sketch" : "/convert"}?draft=${plan.id}`
 }

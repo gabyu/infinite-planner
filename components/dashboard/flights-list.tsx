@@ -28,6 +28,7 @@ import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
 import { ShareDialog } from "@/components/share-dialog"
+import { planPath } from "@/lib/plan-slug"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 import {
   FLIGHT_PLAN_SUMMARY_COLUMNS,
@@ -41,6 +42,17 @@ import {
 interface FlightsListProps {
   initialPlans: FlightPlanSummary[]
   total: number
+}
+
+// What the database says about a copy's original (get_plan_lineage): a link back to it, or nothing
+// when it is gone, private or hidden (never who wrote it then).
+interface Lineage {
+  orphan: boolean
+  original_public_id: string | null
+  original_origin: string | null
+  original_destination: string | null
+  original_flight_number: string | null
+  original_author: string | null
 }
 
 const shareOf = (plan: FlightPlanSummary) => ({ visibility: plan.visibility, publicId: plan.public_id })
@@ -59,6 +71,18 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
+  const [lineage, setLineage] = useState<Record<string, Lineage>>({})
+
+  // Copies imported from the library: where they come from.
+  const forkIds = plans.filter((plan) => plan.is_fork).map((plan) => plan.id).join(",")
+  useEffect(() => {
+    const supabase = getBrowserSupabase()
+    if (!supabase || !forkIds) return
+    supabase.rpc("get_plan_lineage", { p_plan_ids: forkIds.split(",") }).then(({ data }) => {
+      const rows = (data ?? []) as (Lineage & { plan_id: string })[]
+      setLineage(Object.fromEntries(rows.map((row) => [row.plan_id, row])))
+    })
+  }, [forkIds])
 
   // Signing out from the header menu: re-render on the server so the list doesn't linger.
   useEffect(() => {
@@ -197,6 +221,30 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
                       {names[0] ?? plan.origin_airport}
                       <RouteArrow className="mx-1" />
                       {names[1] ?? plan.destination_airport}
+                    </p>
+                  )}
+                  {plan.is_fork && lineage[plan.id] && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {lineage[plan.id].orphan || !lineage[plan.id].original_public_id ? (
+                        "Original no longer available"
+                      ) : (
+                        <>
+                          Based on{" "}
+                          <Link
+                            href={planPath({
+                              origin: lineage[plan.id].original_origin ?? "",
+                              destination: lineage[plan.id].original_destination ?? "",
+                              flightNumber: lineage[plan.id].original_flight_number,
+                              publicId: lineage[plan.id].original_public_id!,
+                            })}
+                            className="underline underline-offset-2"
+                          >
+                            {lineage[plan.id].original_origin} → {lineage[plan.id].original_destination}
+                            {lineage[plan.id].original_flight_number ? ` ${lineage[plan.id].original_flight_number}` : ""}
+                          </Link>
+                          {lineage[plan.id].original_author ? ` by ${lineage[plan.id].original_author}` : ""}
+                        </>
+                      )}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground md:hidden">
