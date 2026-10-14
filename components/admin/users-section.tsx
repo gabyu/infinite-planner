@@ -46,7 +46,7 @@ function usersHref(params: { page?: number; q: string; sort: SortKey; dir: SortD
   }
   if (params.page && params.page > 1) query.set("page", String(params.page))
   const qs = query.toString()
-  return `${ADMIN_BASE}/users${qs ? `?${qs}` : ""}`
+  return `${ADMIN_BASE}${qs ? `?${qs}` : ""}#members`
 }
 
 // Discord accounts with their flight activity. Search, sorting and paging all happen in the
@@ -111,7 +111,7 @@ export async function UsersSection({
 
   return (
     <div className="space-y-3">
-      <form action={`${ADMIN_BASE}/users`} method="get" className="flex items-center gap-2">
+      <form action={`${ADMIN_BASE}#members`} method="get" className="flex items-center gap-2">
         <div className="relative w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input

@@ -1,43 +1,27 @@
 import type React from "react"
-import Image from "next/image"
-import Link from "next/link"
 import { AdminFooter } from "@/components/admin/admin-footer"
-import { AdminNav } from "@/components/admin/admin-nav"
-import { ProfileMenu } from "@/components/admin/profile-menu"
+import { AdminTabs } from "@/components/admin/admin-tabs"
+import { SiteHeader } from "@/components/site-header"
 import { Badge } from "@/components/ui/badge"
 import { requireAdmin } from "@/lib/admin/auth"
 
-// Dashboard shell: top bar + section nav. Every route in this group needs an active admin;
-// the middleware redirects first, this re-checks on the server.
+// Dashboard shell: the same site header as every other page, then the section tabs.
+// Every route in this group needs an active admin; the middleware redirects first, this
+// re-checks on the server.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await requireAdmin()
-  // An admin who also signs in with Discord shows their Discord name and avatar (Supabase merges them into the user metadata).
-  const meta = user.user_metadata ?? {}
-  const discordName: string | null = meta.custom_claims?.global_name ?? meta.full_name ?? meta.user_name ?? null
+  await requireAdmin()
   const environment = process.env.NEXT_PUBLIC_ENV === "staging" ? "staging" : null
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b bg-background/95 px-4 backdrop-blur">
-        <Link href="/admin-dashboard" className="flex items-center gap-2 no-underline">
-          <Image src="/ip_logo.svg" alt="" width={22} height={22} />
-          <span className="text-sm font-semibold tracking-tight">Infinite Planner</span>
-          <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Admin
-          </Badge>
-          {environment && <Badge variant="secondary">{environment}</Badge>}
-        </Link>
-        <ProfileMenu email={user.email ?? "admin"} name={discordName} avatarUrl={user.user_metadata?.avatar_url ?? null} />
-      </header>
+      <SiteHeader />
 
-      <div className="flex flex-1 flex-col md:flex-row">
-        <aside className="border-b p-2 md:w-56 md:shrink-0 md:border-b-0 md:border-r md:p-3">
-          <AdminNav />
-        </aside>
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto max-w-5xl">{children}</div>
-        </main>
+      <div className="container mx-auto flex items-center justify-between gap-3 px-4 pt-4">
+        <AdminTabs />
+        {environment && <Badge variant="secondary">{environment}</Badge>}
       </div>
+
+      <main className="container mx-auto min-w-0 flex-1 px-4 py-6">{children}</main>
 
       <AdminFooter />
     </div>

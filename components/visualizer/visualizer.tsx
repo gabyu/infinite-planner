@@ -1,6 +1,6 @@
 "use client"
 
-import Image from "next/image"
+import { BrandLogo } from "@/components/brand-logo"
 import { useEffect, useState } from "react"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -124,12 +124,7 @@ export function Visualizer({ flights }: { flights: GlobeFlight[] }) {
       </main>
 
       <footer className="flex flex-col items-center gap-1 px-4 pb-5 pt-2 text-center sm:pb-6">
-        <div className="flex items-center gap-2">
-          <Image src="/ip_logo.svg" alt="" width={28} height={28} className="size-6 sm:size-7" />
-          <span className="font-display text-base font-semibold tracking-tight text-blue-600 dark:text-blue-400 sm:text-lg">
-            Infinite Planner
-          </span>
-        </div>
+        <BrandLogo />
         <p className="text-xs font-light text-muted-foreground sm:text-sm">The flight plan hub for Infinite Flight</p>
       </footer>
     </div>

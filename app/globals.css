@@ -78,6 +78,11 @@
   * {
     @apply border-border;
   }
+  /* Always reserve the scrollbar's width: the header, logo and content keep the same x position
+     whether or not the page is tall enough to scroll. */
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-background text-foreground;
   }
