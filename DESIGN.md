@@ -71,6 +71,8 @@ Three families, all served from our own domain (no runtime call to Google):
 |---|---|---|
 | `Button`, `Input`, `Checkbox`, `Dialog`, `Table`... | `components/ui/*` | shadcn primitives; sizes read the `--control-*` tokens |
 | `PageShell` | `components/ds/page-shell.tsx` | The frame of every tool page: container, Back link, title block, content width |
+| `BrandLogo` | `components/brand-logo.tsx` | The one logo (mark + wordmark): site header, admin sign-in card, visualizer |
+| `SiteHeader` | `components/site-header.tsx` | The one header, also used by the admin dashboard. Nothing in it depends on the session, so links never move |
 | `PageHeader` | `components/ds/page-header.tsx` | Title + one line + actions (the admin imports it through `components/admin/page-header.tsx`) |
 | `AirportInput` | `components/ds/airport-input.tsx` | Airport field taking an ICAO code, IATA code, name or city, with keyboard-navigable suggestions (`/api/airports`); the form only receives the ICAO code. 56px, same height as the primary button next to it |
 | `IcaoInput` | `components/ds/icao-input.tsx` | Plain 4-letter code field (Sketch will move to `AirportInput`) |

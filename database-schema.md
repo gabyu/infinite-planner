@@ -75,6 +75,7 @@ CREATE TABLE profiles (
   with a pending temporary password has no data access until they've chosen their own.
 - **Admin-only reads** are `SECURITY DEFINER` functions that check `is_admin()` themselves:
   `admin_list_admins()` (emails come from `auth.users`) and `admin_flight_export_times(since)`
+  `admin_recent_activity(limit)` (latest exported plans with the author's Discord name, for the Activity feed; `20261014000000_admin_recent_activity.sql`) and `admin_flight_export_times(since)`
   (one timestamp per exported flight plan, for the activity heatmap, bucketed per day in the
   admin's own timezone in the browser). The public key still can't read `flight_statistics`.
 - **Promoting a Discord account**: "Create admin" detects an email that already belongs to a Discord account

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { LogOut, ShieldCheck } from "lucide-react"
+import { useTheme } from "next-themes"
+import { LogOut, Moon, ShieldCheck, Sun, UserRound } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -33,6 +34,10 @@ export function UserMenu() {
   const [authError, setAuthError] = useState<string | null>(null)
   // Admins get a shortcut to the admin dashboard. Display only: the dashboard itself is guarded on the server.
   const [isAdmin, setIsAdmin] = useState(false)
+  const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const isDark = mounted && resolvedTheme === "dark"
 
   useEffect(() => {
     if (!supabase) return
@@ -70,6 +75,12 @@ export function UserMenu() {
   // Not configured (e.g. missing env vars): the rest of the site works without accounts.
   if (!supabase || !ready) return null
 
+  async function signOut() {
+    await supabase!.auth.signOut()
+    // The admin area is closed to signed-out visitors: land on its sign-in page instead of a redirect bounce.
+    if (window.location.pathname.startsWith("/admin-dashboard")) window.location.assign("/admin-dashboard/login")
+  }
+
   async function signIn() {
     const next = loginDestination()
     await supabase!.auth.signInWithOAuth({
@@ -100,13 +111,25 @@ export function UserMenu() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {isAdmin && (
-              <DropdownMenuItem asChild>
-                <Link href="/admin-dashboard" className="cursor-pointer no-underline">
-                  <ShieldCheck /> Admin dashboard
-                </Link>
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin-dashboard" className="cursor-pointer no-underline">
+                    <ShieldCheck /> Admin dashboard
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin-dashboard/profile" className="cursor-pointer no-underline">
+                    <UserRound /> Profile
+                  </Link>
+                </DropdownMenuItem>
+              </>
             )}
-            <DropdownMenuItem onSelect={() => supabase.auth.signOut()}>
+            <DropdownMenuItem onSelect={() => setTheme(isDark ? "light" : "dark")}>
+              {isDark ? <Sun /> : <Moon />}
+              {isDark ? "Light mode" : "Dark mode"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={signOut}>
               <LogOut /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

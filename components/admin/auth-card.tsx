@@ -1,5 +1,5 @@
 import type React from "react"
-import Image from "next/image"
+import { BrandLogo } from "@/components/brand-logo"
 import { AdminFooter } from "@/components/admin/admin-footer"
 
 // Centered card used by the two admin sign-in pages.
@@ -19,8 +19,7 @@ export function AuthCard({
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <div className="w-full max-w-sm">
           <div className="mb-6 flex items-center justify-center gap-2">
-            <Image src="/ip_logo.svg" alt="" width={28} height={28} />
-            <span className="text-sm font-semibold tracking-tight">Infinite Planner</span>
+            <BrandLogo />
             <span className="rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Admin
             </span>
