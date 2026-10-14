@@ -12,6 +12,6 @@ export const metadata: Metadata = {
 }
 
 export default async function VisualizerPage() {
-  const flights = await getRecentFlightsLive(20)
+  const flights = await getRecentFlightsLive(100)
   return <Visualizer flights={flights} />
 }

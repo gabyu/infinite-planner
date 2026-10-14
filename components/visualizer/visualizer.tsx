@@ -1,7 +1,7 @@
 "use client"
 
 import { BrandLogo } from "@/components/brand-logo"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatAgo, formatUtc } from "@/lib/format-ago"
@@ -31,6 +31,15 @@ export function Visualizer({ flights }: { flights: GlobeFlight[] }) {
       window.clearTimeout(reload)
     }
   }, [])
+
+  // The list holds up to a hundred flights: keep the active one in view inside it.
+  const listRef = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    const list = listRef.current
+    const item = list?.children[active] as HTMLElement | undefined
+    if (!list || !item) return
+    list.scrollTo({ top: item.offsetTop - list.clientHeight / 2 + item.clientHeight / 2, behavior: "smooth" })
+  }, [active])
 
   const current = flights[active]
 
@@ -98,9 +107,12 @@ export function Visualizer({ flights }: { flights: GlobeFlight[] }) {
           <p className="absolute left-8 top-8 text-muted-foreground">No flight plans yet.</p>
         )}
 
-        {/* The latest twenty, the active one lit. Wide screens only: the globe stays the subject. */}
+        {/* The latest flights, the active one lit. Wide screens only: the globe stays the subject. */}
         {flights.length > 0 && (
-          <ol className="absolute right-8 top-1/2 hidden -translate-y-1/2 flex-col gap-0.5 xl:flex">
+          <ol
+            ref={listRef}
+            className="absolute right-8 top-1/2 hidden max-h-[60%] -translate-y-1/2 flex-col gap-0.5 overflow-y-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:flex"
+          >
             {flights.map((f, i) => (
               <li key={`${f.createdAt}-${i}`}>
                 <button
@@ -111,7 +123,7 @@ export function Visualizer({ flights }: { flights: GlobeFlight[] }) {
                     i === active ? "opacity-100" : "opacity-35 hover:opacity-70",
                   )}
                 >
-                  <span className="w-5 text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="w-6 text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <span className="font-medium">
                     {f.origin} → {f.destination}
                   </span>
