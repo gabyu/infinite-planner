@@ -35,29 +35,50 @@ export function unwrapLongitudes<T extends { lng: number }>(waypoints: T[]): T[]
   return unwrapped
 }
 
-// Equirectangular projection fitted into the frame, aspect ratio kept, centered.
-export function projectRoute(waypoints: RoutePoint[], frame: Frame): Point[] {
-  if (waypoints.length === 0) return []
+// Equirectangular projection fitted to a route inside a frame, aspect ratio kept, centered. `project`
+// goes from a position to the frame, `unproject` back, so a picture can also be filled with the
+// map around the route (land dots) and not only the route itself.
+export interface Projection {
+  project: (lat: number, lng: number) => Point
+  unproject: (x: number, y: number) => { lat: number; lng: number }
+  // The route's longitudes unwrapped (continuous across the antimeridian).
+  route: RoutePoint[]
+}
+
+export function createProjection(waypoints: RoutePoint[], frame: Frame, minSpanDeg = 0.01): Projection {
   const route = unwrapLongitudes(waypoints)
   const lats = route.map((w) => w.lat)
   const lngs = route.map((w) => w.lng)
   const midLat = (Math.min(...lats) + Math.max(...lats)) / 2
-  const k = Math.cos((midLat * Math.PI) / 180)
-  const minX = Math.min(...lngs) * k
-  const spanX = Math.max((Math.max(...lngs) - Math.min(...lngs)) * k, 0.01)
-  const maxY = Math.max(...lats)
-  const spanY = Math.max(maxY - Math.min(...lats), 0.01)
+  const k = Math.max(0.05, Math.cos((midLat * Math.PI) / 180))
+  const minLng = Math.min(...lngs)
+  const maxLat = Math.max(...lats)
+  const spanX = Math.max((Math.max(...lngs) - minLng) * k, minSpanDeg)
+  const spanY = Math.max(maxLat - Math.min(...lats), minSpanDeg)
+  const centerX = minLng * k + ((Math.max(...lngs) - minLng) * k) / 2
+  const centerY = maxLat - (maxLat - Math.min(...lats)) / 2
 
   const innerW = frame.width - frame.pad * 2
   const innerH = frame.height - frame.pad * 2
   const scale = Math.min(innerW / spanX, innerH / spanY)
-  const offX = (frame.width - spanX * scale) / 2
-  const offY = (frame.height - spanY * scale) / 2
 
-  return route.map((w) => ({
-    x: offX + (w.lng * k - minX) * scale,
-    y: offY + (maxY - w.lat) * scale,
-  }))
+  return {
+    route,
+    project: (lat, lng) => ({
+      x: frame.width / 2 + (lng * k - centerX) * scale,
+      y: frame.height / 2 + (centerY - lat) * scale,
+    }),
+    unproject: (x, y) => ({
+      lat: centerY - (y - frame.height / 2) / scale,
+      lng: (centerX + (x - frame.width / 2) / scale) / k,
+    }),
+  }
+}
+
+export function projectRoute(waypoints: RoutePoint[], frame: Frame): Point[] {
+  if (waypoints.length === 0) return []
+  const { project, route } = createProjection(waypoints, frame)
+  return route.map((w) => project(w.lat, w.lng))
 }
 
 // Thousands of waypoints are pointless at picture size: keep every n-th one and the last.

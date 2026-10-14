@@ -1,5 +1,6 @@
 import { CounterDisplay } from "./counter-display"
 import { LegalLinks } from "./legal-links"
+import { FooterSimulationNotice } from "./footer-simulation-notice"
 
 export async function SiteFooter() {
   // Start with 0 and let the client-side component fetch the real value
@@ -18,6 +19,7 @@ export async function SiteFooter() {
         <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">
           © {new Date().getFullYear()} Infinite Planner. All rights reserved.
         </p>
+        <FooterSimulationNotice />
         <div className="mt-2">
           <LegalLinks showCookiePreferences />
         </div>

@@ -3,7 +3,6 @@ import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
 import { Button } from "@/components/ui/button"
 import { RouteArrow } from "@/components/route-arrow"
-import { SIMULATION_DISCLAIMER } from "@/lib/brand"
 import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
 import { describeEnd } from "@/lib/plan-meta"
 import type { PublicPlan } from "@/lib/public-plans"
@@ -96,7 +95,6 @@ export function PlanView({ plan }: { plan: PublicPlan }) {
         <AltitudeGraph waypoints={plan.waypoints} />
       </section>
 
-      <p className="mt-16 text-center text-xs text-muted-foreground">{SIMULATION_DISCLAIMER}</p>
     </article>
   )
 }
