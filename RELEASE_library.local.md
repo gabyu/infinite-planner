@@ -42,6 +42,7 @@ Migrations, in order (`supabase/migrations/`), all additive, `library_launched` 
 20261015000300_plan_library_profiles.sql
 20261015000400_plan_library_moderation.sql
 20261015000500_plan_library_launch.sql
+20261015000600_plan_library_simplify.sql   (private/public only; WITHDRAWS every old share link; see below)
 ```
 
 Prerequisite: the production DB must already have the history/share migrations (`flight_plans`, `status`, link-discord).
@@ -57,6 +58,25 @@ production's tables, not its migration list.
    an anonymous browser that public plan URLs return 404 and `sitemap.xml` has no library URLs.
 4. Admin dashboard > **Settings** > Library launch: when the counter reaches the target, **Launch to everyone**.
    It revalidates the `library` tag (every cached library page, the header link, the sitemap); no deploy.
+
+## Changes of 2026-10-14 (after the first staging push)
+
+- **Two visibilities, not three**: private or public. "Unlisted" and the old share links are gone. The migration
+  `...000600` sends every unlisted/shared plan back to private, clears all share tokens and drops the share functions.
+  **In production this destroys every existing `/shared/...` link** (they 404). Say so in the announcement.
+  Before the launch, non-admin users have no way to publish (no Share button any more: the Visibility switch only
+  appears once the library is open to them), so nothing replaces the old links until launch day.
+- A **Visibility switch** (private/public, with copy-link and "feature on profile") replaces the Share button in the
+  dashboard rows and in the editor. First switch to public asks for the consent.
+- `/how-it-works` and `/faq` redirect (308) to **/help**; one "Help" entry in the header. The FAQ entries about Explore
+  I wrote earlier were in a dead copy of the FAQ data (the page renders `components/faq-selector.tsx`): they are now there.
+- The map screen of Convert is called the **flight plan editor**.
+- `/explore/airports/{icao}` became `/explore/location/KPHX`; new `/explore/flight_number/AF69` (a flight-number search
+  such as `AF69` jumps to it). Both use UPPERCASE codes; other cases redirect (308). Route hubs stay lowercase.
+- Cards: creation date, no source, land dots under the route, route coloured by altitude with the homepage ramp (also on
+  the plan page map and the link preview image). A plan without altitude gets no altitude figure or graph and a single
+  route colour. The source filter is gone from Explore.
+- `/explore` is laid out like a magazine (cover story, trending, latest, more).
 
 ## Emergency rollback of the launch
 

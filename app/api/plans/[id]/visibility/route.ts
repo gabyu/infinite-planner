@@ -3,12 +3,12 @@ import { z } from "zod"
 import { isUuid, json, requireUser } from "@/lib/flight-plan-server"
 import { getViewer, isLibraryOpenFor } from "@/lib/library"
 
-const bodySchema = z.object({ visibility: z.enum(["private", "unlisted", "public"]) })
+const bodySchema = z.object({ visibility: z.enum(["private", "public"]) })
 
 // What the database says when set_plan_visibility refuses, in words for the person who asked.
 function messageFor(error: { code?: string; message?: string }) {
   const text = error.message ?? ""
-  if (text.includes("plan_not_exported")) return "Export the flight plan first: only exported plans can be shared."
+  if (text.includes("plan_not_exported")) return "Export the flight plan first: only exported plans can be made public."
   if (text.includes("publishing_blocked")) return "Publishing is disabled for your account."
   if (text.includes("unchanged_fork")) return "Change the route before publishing a copy of someone else's flight plan."
   if (text.includes("rate_limited")) return "You've published a lot today. Try again tomorrow."

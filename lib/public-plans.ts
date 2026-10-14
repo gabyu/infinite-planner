@@ -1,13 +1,13 @@
 import "server-only"
 import { unstable_cache } from "next/cache"
 import { isPublicId } from "@/lib/plan-slug"
-import { UUID_PATTERN, type FlightPlanSource, type StoredWaypoint } from "@/lib/flight-plans"
+import type { FlightPlanSource, StoredWaypoint } from "@/lib/flight-plans"
 import { getCachedServiceRoleSupabase, getServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // The public side of the library: one plan by its public id. No RLS policy lets anyone read a
 // flight plan; get_public_plan (service role only) is the way in, and it never returns user_id.
 
-export type SharedVisibility = "unlisted" | "public"
+export type SharedVisibility = "public"
 
 export interface PublicPlan {
   publicId: string
@@ -119,28 +119,4 @@ export function getPublicPlan(publicId: string): Promise<PublicPlan | null> {
 export function getPublicPlanLive(publicId: string): Promise<PublicPlan | null> {
   if (!isPublicId(publicId)) return Promise.resolve(null)
   return loadPublicPlan(publicId, getServiceRoleSupabase())
-}
-
-// Legacy /shared/{token} link -> the plan's public id. null when the token doesn't exist or was
-// revoked (going private clears it).
-export async function publicIdForShareToken(token: string): Promise<string | null> {
-  if (!UUID_PATTERN.test(token)) return null
-  const service = getServiceRoleSupabase()
-  if (!service) return null
-  const { data, error } = await service.rpc("public_id_for_share_token", { p_token: token })
-  if (error) console.error("Resolving a share token failed:", error.message)
-  return typeof data === "string" ? data : null
-}
-
-// What a download needs, counted in the same statement. null when the plan isn't downloadable.
-export async function takePublicDownload(publicId: string) {
-  if (!isPublicId(publicId)) return null
-  const service = getServiceRoleSupabase()
-  if (!service) return null
-  const { data, error } = await service.rpc("record_public_download", { p_public_id: publicId })
-  if (error) console.error("Recording a download failed:", error.message)
-  const row = (
-    data as { origin_airport: string; destination_airport: string; waypoints: StoredWaypoint[] }[] | null
-  )?.[0]
-  return row ?? null
 }

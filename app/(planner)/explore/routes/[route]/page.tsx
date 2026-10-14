@@ -11,7 +11,7 @@ import { requireLibraryAccess } from "@/lib/library-access"
 import { getLibraryLaunched } from "@/lib/library"
 import { decodeCursor, encodeCursor, listPlans } from "@/lib/library-listing"
 import { describeEnd } from "@/lib/plan-meta"
-import { routeHubPath } from "@/lib/plan-slug"
+import { locationPath, routeHubPath } from "@/lib/plan-slug"
 
 // /explore/routes/lfpg-klax: every public plan of one origin-destination pair. Indexable only while it has
 // at least one plan; an empty hub is a 404 with noindex.
@@ -108,11 +108,11 @@ export default async function RouteHubPage({
           )}
         </div>
         <p className="mt-12 text-sm text-muted-foreground">
-          <Link href={`/explore/airports/${ends.from.toLowerCase()}`} className="underline underline-offset-2">
+          <Link href={locationPath(ends.from)} className="underline underline-offset-2">
             More from {from.city ?? ends.from}
           </Link>
           {" · "}
-          <Link href={`/explore/airports/${ends.to.toLowerCase()}`} className="underline underline-offset-2">
+          <Link href={locationPath(ends.to)} className="underline underline-offset-2">
             More to {to.city ?? ends.to}
           </Link>
         </p>

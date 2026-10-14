@@ -1,28 +1,12 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MapPin } from "lucide-react"
-import { SiteHeader } from "@/components/site-header"
-import { SiteFooter } from "@/components/site-footer"
 import { VideoSelector } from "@/components/video-selector"
 
-export default function HowItWorksPage() {
+// The step-by-step guide, shown on /help (it used to be the page /how-it-works).
+export function HowItWorksContent() {
   return (
-    <div className="flex flex-col min-h-screen">
-      <SiteHeader />
-
-      {/* Page Content */}
-      <main className="flex-grow">
-        {/* Hero Section */}
-        <section className="py-12 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
-          <div className="container mx-auto px-4 text-center">
-            <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-[-0.03em] mb-6">How Infinite Planner Works</h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              Learn how to convert real-world flights into Infinite Flight custom flight plans in just a few simple
-              steps
-            </p>
-          </div>
-        </section>
-
+    <>
         {/* Main Content */}
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto prose prose-lg prose-gray dark:prose-invert">
@@ -228,13 +212,13 @@ export default function HowItWorksPage() {
                 Transform your next Infinite Flight experience with real-world flight plans
               </p>
               <div className="flex flex-wrap justify-center gap-4">
-                <Link href="/planner" className="no-underline">
+                <Link href="/convert" className="no-underline">
                   <Button size="lg" className="flex items-center gap-2">
                     <MapPin size={20} />
                     Open Planner Tool
                   </Button>
                 </Link>
-                <Link href="/faq" className="no-underline">
+                <Link href="#faq" className="no-underline">
                   <Button variant="outline" size="lg" className="flex items-center gap-2 bg-transparent">
                     FAQ
                   </Button>
@@ -243,10 +227,6 @@ export default function HowItWorksPage() {
             </div>
           </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <SiteFooter />
-    </div>
+    </>
   )
 }

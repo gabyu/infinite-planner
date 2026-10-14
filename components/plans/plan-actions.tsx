@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Download, Flag, Heart, Import, Settings2 } from "lucide-react"
+import { Download, Flag, Heart, Import } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
-import { ShareDialog } from "@/components/share-dialog"
+import { VisibilitySwitch } from "@/components/visibility-switch"
 import { Button } from "@/components/ui/button"
 import { ReportDialog } from "@/components/plans/report-dialog"
 import { signInWithDiscordTo, useAuthUser } from "@/hooks/use-auth-user"
@@ -35,7 +35,6 @@ interface PlanActionsProps {
   origin: string
   destination: string
   flightNumber: string | null
-  visibility: "unlisted" | "public"
 }
 
 const INTENTS: Intent[] = ["like", "download", "import"]
@@ -43,7 +42,7 @@ const INTENTS: Intent[] = ["like", "download", "import"]
 // The part of a plan page that depends on who is looking, so it lives in the browser while the page
 // itself stays cached. Anonymous visitors see everything but the actions, and get an invitation to
 // sign in: whichever action they pressed is carried out when they come back (?intent=...), once.
-export function PlanActions({ publicId, path, initial, origin, destination, flightNumber, visibility }: PlanActionsProps) {
+export function PlanActions({ publicId, path, initial, origin, destination, flightNumber }: PlanActionsProps) {
   const router = useRouter()
   const { user, ready } = useAuthUser()
   const [stats, setStats] = useState<Stats>(initial)
@@ -51,9 +50,9 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState<Intent | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [managing, setManaging] = useState(false)
   const [reporting, setReporting] = useState(false)
-  const [share, setShare] = useState<PlanShare>({ visibility, publicId })
+  const [share, setShare] = useState<PlanShare>({ visibility: "public", publicId })
+  const [featured, setFeatured] = useState(false)
   const intentRan = useRef(false)
 
   const refresh = useCallback(async () => {
@@ -144,17 +143,25 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
       <div className="mt-8 flex flex-wrap items-center gap-3">
         {owner ? (
           <>
-            <Button size="lg" className="rounded-full px-6" onClick={() => setManaging(true)}>
-              <Settings2 /> Manage
-            </Button>
             <Button size="lg" variant="outline" className="rounded-full px-6" onClick={download}>
               <Download /> Download .fpl
             </Button>
-            <Button asChild size="lg" variant="ghost" className="rounded-full px-4">
-              <Link href="/dashboard" className="no-underline">
-                Open in dashboard
-              </Link>
-            </Button>
+            {me?.planId && (
+              <VisibilitySwitch
+                planId={me.planId}
+                origin={origin}
+                destination={destination}
+                flightNumber={flightNumber}
+                share={share}
+                featured={featured}
+                onFeaturedChange={setFeatured}
+                onShareChange={(next) => {
+                  setShare(next)
+                  // A private plan has no page any more.
+                  if (next.visibility === "private") window.location.assign("/dashboard")
+                }}
+              />
+            )}
           </>
         ) : (
           <>
@@ -226,23 +233,6 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
 
       {reporting && <ReportDialog publicId={publicId} onClose={() => setReporting(false)} />}
 
-      {managing && owner && me?.planId && (
-        <ShareDialog
-          open
-          onOpenChange={(open) => !open && setManaging(false)}
-          planId={me.planId}
-          origin={origin}
-          destination={destination}
-          flightNumber={flightNumber}
-          share={share}
-          allowPublic
-          onShareChange={(next) => {
-            setShare(next)
-            // A private plan has no page any more.
-            if (next.visibility === "private") window.location.assign("/dashboard")
-          }}
-        />
-      )}
     </div>
   )
 }

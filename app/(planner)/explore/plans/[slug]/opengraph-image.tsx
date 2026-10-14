@@ -6,7 +6,7 @@ import { formatFlightTime } from "@/lib/flight-plans"
 import { getLibraryLaunched } from "@/lib/library"
 import { publicIdFromSlug } from "@/lib/plan-slug"
 import { getPublicPlan } from "@/lib/public-plans"
-import { projectRoute, sampleWaypoints, toSvgPath } from "@/lib/route-render"
+import { altitudeHex, hasAltitudeData, projectRoute, sampleWaypoints, toSvgPath } from "@/lib/route-render"
 
 // The preview card of a plan link: the route drawn on a blue field, with the airports and a few
 // facts. Same lifecycle as the page: data-cached, refreshed every 5 minutes and dropped at once by
@@ -41,6 +41,16 @@ export default async function Image({ params }: { params: { slug: string } }) {
 
   const points = plan.waypoints.length >= 2 ? projectRoute(sampleWaypoints(plan.waypoints, 150), MAP) : []
   const path = toSvgPath(points)
+  // Coloured by altitude with the homepage's ramp, unless the plan has none.
+  const sampledRoute = sampleWaypoints(plan.waypoints, 150)
+  const colored = hasAltitudeData(sampledRoute)
+  const segments = colored
+    ? points.slice(1).map((point, i) => ({
+        from: points[i],
+        to: point,
+        color: altitudeHex(((sampledRoute[i].altitude ?? 0) + (sampledRoute[i + 1].altitude ?? 0)) / 2),
+      }))
+    : []
   const first = points[0]
   const last = points[points.length - 1]
 
@@ -111,7 +121,20 @@ export default async function Image({ params }: { params: { slug: string } }) {
         >
           {path && first && last ? (
             <svg width={MAP.width} height={MAP.height} viewBox={`0 0 ${MAP.width} ${MAP.height}`}>
-              <path d={path} fill="none" stroke="#7ee0ff" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+              {colored ? (
+                segments.map((segment, i) => (
+                  <path
+                    key={i}
+                    d={`M${segment.from.x.toFixed(1)} ${segment.from.y.toFixed(1)} L${segment.to.x.toFixed(1)} ${segment.to.y.toFixed(1)}`}
+                    fill="none"
+                    stroke={segment.color}
+                    strokeWidth={6}
+                    strokeLinecap="round"
+                  />
+                ))
+              ) : (
+                <path d={path} fill="none" stroke="#7ee0ff" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+              )}
               <circle cx={first.x} cy={first.y} r={12} fill="white" stroke="#0a5cff" strokeWidth={5} />
               <circle cx={last.x} cy={last.y} r={12} fill="#7ee0ff" stroke="#0a5cff" strokeWidth={5} />
             </svg>

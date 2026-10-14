@@ -20,7 +20,6 @@ import {
   LassoSelect,
   AlertCircle,
   Info,
-  Share2,
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
@@ -37,7 +36,7 @@ import {
   type PlanVisibility,
   type StoredWaypoint,
 } from "@/lib/flight-plans"
-import { ShareDialog } from "@/components/share-dialog"
+import { VisibilitySwitch } from "@/components/visibility-switch"
 import { RouteArrow } from "@/components/route-arrow"
 import { IcaoInput } from "@/components/ds/icao-input"
 import { StartLayout } from "@/components/convert/start-layouts"
@@ -204,8 +203,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // waypoints go into the exported (and saved) plan. Needs BRANDING_MIN_WAYPOINTS waypoints to apply.
   const [includeBranding, setIncludeBranding] = useState(true)
   const [flightTimeMinutes, setFlightTimeMinutes] = useState<number | null>(null)
-  const [showShareDialog, setShowShareDialog] = useState(false)
-  const [isPreparingShare, setIsPreparingShare] = useState(false)
   // Share link of the plan this session saved, if it is being shared (null = not shared).
   const [planShare, setPlanShare] = useState<PlanShare>(PRIVATE_SHARE)
   const [planFeatured, setPlanFeatured] = useState(false)
@@ -1184,26 +1181,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       .catch(() => setLibraryOpen(false))
   }, [authUser])
 
-  // Share: only an exported plan can be shared, and only while the page still shows it as exported.
-  // Opens the share modal for that row (it may already be shared from an earlier press).
-  const handleShare = async () => {
-    if (!savedPlanIdRef.current || savedStatusRef.current !== "exported") return
-    setError(null)
-    setSuccessMessage(null)
-    setIsPreparingShare(true)
-
-    const supabase = getBrowserSupabase()
-    const { data } = supabase
-      ? await supabase.from("flight_plans").select("visibility, public_id, featured").eq("id", savedPlanIdRef.current).maybeSingle()
-      : { data: null }
-    setPlanFeatured(!!data?.featured)
-    setPlanShare(
-      data ? { visibility: data.visibility as PlanVisibility, publicId: data.public_id as string | null } : PRIVATE_SHARE,
-    )
-    setIsPreparingShare(false)
-    setShowShareDialog(true)
-  }
-
   // Applies the naming rules: the first/last waypoints are locked to the origin/destination,
   // everything else is numbered by position, and - when the branding checkbox is ticked and
   // the plan has at least BRANDING_MIN_WAYPOINTS - the four waypoints before the destination
@@ -1322,7 +1299,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     ) : null
 
   // Share needs an exported plan, and the page must still show that exact plan.
-  const canShare = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
+  const canSetVisibility = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
 
   // Where the plan stands: draft autosave, or exported (locked).
   const saveStatusLine = (() => {
@@ -1364,21 +1341,26 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           <Download />
           Export FPL
         </Button>
-        <span
-          title={
-            !canSave
-              ? "Sign in with Discord to share a flight plan"
-              : canShare
-                ? undefined
-                : "Export the flight plan first to share it"
-          }
-        >
-          <Button variant="outline" onClick={handleShare} disabled={!canShare || isLoading || isPreparingShare}>
-            <Share2 />
-            {isPreparingShare ? "Opening..." : "Share"}
-          </Button>
-        </span>
       </div>
+      {libraryOpen && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">Visibility</span>
+          <VisibilitySwitch
+            planId={savedPlanId ?? ""}
+            origin={originAirport || "ORIG"}
+            destination={destinationAirport || "DEST"}
+            flightNumber={detectedFlightNumber}
+            share={planShare}
+            onShareChange={setPlanShare}
+            featured={planFeatured}
+            onFeaturedChange={setPlanFeatured}
+            disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty}
+            disabledReason={
+              !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
+            }
+          />
+        </div>
+      )}
       <p className={cn("text-xs text-muted-foreground", autosaveError && canSave && "text-destructive")}>
         {saveStatusLine}
       </p>
@@ -1719,7 +1701,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     {flightSummary}
                   </div>
 
-                  <PanelSection label="Preview">
+                  <PanelSection label="Flight plan editor">
                     <Button
                       onClick={() => setShowMapPreview(true)}
                       variant="outline"
@@ -1728,7 +1710,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                       disabled={waypoints.length === 0 || isLoading}
                     >
                       <Map />
-                      Flight plan map
+                      Open the editor
                     </Button>
                   </PanelSection>
 
@@ -1743,21 +1725,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           </div>
         )}
 
-        {showShareDialog && savedPlanId && (
-          <ShareDialog
-            open
-            onOpenChange={setShowShareDialog}
-            planId={savedPlanId}
-            origin={originAirport || "ORIG"}
-            destination={destinationAirport || "DEST"}
-            flightNumber={detectedFlightNumber}
-            share={planShare}
-            onShareChange={setPlanShare}
-            allowPublic={libraryOpen}
-            featured={planFeatured}
-            onFeaturedChange={libraryOpen ? setPlanFeatured : undefined}
-          />
-        )}
 
         {/* Map Preview Dialog */}
         <Dialog
@@ -1775,9 +1742,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           >
             <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
               <div>
-                <DialogTitle>Flight Plan Preview</DialogTitle>
+                <DialogTitle>Flight plan editor</DialogTitle>
                 <DialogDescription>
-                  <span className="hidden lg:inline">Visualize your flight plan with {waypoints.length} waypoints</span>
+                  <span className="hidden lg:inline">Edit your flight plan: {waypoints.length} waypoints</span>
                   <span className="lg:hidden">{waypoints.length} waypoints</span>
                 </DialogDescription>
               </div>

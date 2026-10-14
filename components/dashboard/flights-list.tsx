@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, Eye, MoreHorizontal, Pencil, PencilRuler, Share2, Trash2, Upload } from "lucide-react"
+import { Copy, Download, Eye, MoreHorizontal, Pencil, PencilRuler, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,7 +27,7 @@ import { toast } from "@/hooks/use-toast"
 import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
-import { ShareDialog } from "@/components/share-dialog"
+import { VisibilitySwitch } from "@/components/visibility-switch"
 import { planPath } from "@/lib/plan-slug"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 import {
@@ -82,12 +82,11 @@ const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
 // no sorting or filtering). Drafts can be viewed, edited and deleted; exported plans are locked and
-// can be viewed, downloaded, shared, duplicated (into a new draft) and deleted.
+// can be viewed, downloaded, made public, duplicated (into a new draft) and deleted.
 export function FlightsList({ initialPlans, total: initialTotal, library = false }: FlightsListProps) {
   const [plans, setPlans] = useState(initialPlans)
   const [total, setTotal] = useState(initialTotal)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [sharing, setSharing] = useState<FlightPlanSummary | null>(null)
   const [deleting, setDeleting] = useState<FlightPlanSummary | null>(null)
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
@@ -184,13 +183,13 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
       setPlans(result.rows)
       setTotal(result.total)
     }
-    toast({ title: "Draft created", description: `${routeOf(plan)}: a copy you can edit, not shared.` })
+    toast({ title: "Draft created", description: `${routeOf(plan)}: a copy you can edit, private.` })
   }
 
   async function confirmDelete() {
     if (!deleting) return
     setBusy(true)
-    // Through the API (not straight to the table) so the cached public page of a shared plan is dropped at once.
+    // Through the API (not straight to the table) so the cached public page of a public plan is dropped at once.
     const response = await fetch(`/api/flight-plans/${deleting.id}`, { method: "DELETE" })
     setBusy(false)
     if (!response.ok) {
@@ -209,7 +208,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
         <h2 className="text-sm font-medium">No flight plans yet</h2>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
           While you edit in Convert or Sketch, your flight plan is saved here as a draft. Once you export it, it is
-          kept here too, ready to share or duplicate.
+          kept here too, ready to download, make public or duplicate.
         </p>
         <div className="mt-5 flex gap-2">
           <Button asChild>
@@ -227,7 +226,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
     )
   }
 
-  const columns = "md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_11rem]"
+  const columns = "md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_minmax(11rem,17rem)]"
 
   return (
     <>
@@ -370,7 +369,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                   <LocalTime iso={plan.created_at} />
                 </span>
 
-                {/* Actions by status. Draft: view, edit, delete. Exported (locked): view, download, share, duplicate, delete. */}
+                {/* Actions by status. Draft: view, edit, delete. Exported (locked): view, download, visibility, duplicate, delete. */}
                 <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
@@ -395,19 +394,25 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                           <Download />
                         </a>
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSharing(plan)}
-                        title={plan.visibility === "private" ? "Share" : "Shared: manage link"}
-                        aria-label={plan.visibility === "private" ? "Share" : "Manage share link"}
-                        className="relative"
-                      >
-                        <Share2 />
-                        {plan.visibility !== "private" && (
-                          <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-                        )}
-                      </Button>
+                      {library && (
+                        <VisibilitySwitch
+                          planId={plan.id}
+                          origin={plan.origin_airport}
+                          destination={plan.destination_airport}
+                          flightNumber={plan.flight_number}
+                          share={shareOf(plan)}
+                          featured={plan.featured}
+                          onFeaturedChange={(featured) => patchPlan(plan.id, { featured })}
+                          onShareChange={(share) =>
+                            patchPlan(plan.id, {
+                              visibility: share.visibility,
+                              public_id: share.publicId,
+                              ...(share.visibility === "public" ? {} : { featured: false }),
+                            })
+                          }
+                          className="mx-1 flex-nowrap gap-1"
+                        />
+                      )}
                     </>
                   )}
 
@@ -455,21 +460,6 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
 
       {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
 
-      {sharing && (
-        <ShareDialog
-          open
-          onOpenChange={(open) => !open && setSharing(null)}
-          planId={sharing.id}
-          origin={sharing.origin_airport}
-          destination={sharing.destination_airport}
-          flightNumber={sharing.flight_number}
-          share={shareOf(plans.find((plan) => plan.id === sharing.id) ?? sharing)}
-          onShareChange={(share) => patchPlan(sharing.id, { visibility: share.visibility, public_id: share.publicId, ...(share.visibility === "public" ? {} : { featured: false }) })}
-          allowPublic={library}
-          featured={(plans.find((plan) => plan.id === sharing.id) ?? sharing).featured}
-          onFeaturedChange={library ? (featured) => patchPlan(sharing.id, { featured }) : undefined}
-        />
-      )}
 
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className="max-w-sm">

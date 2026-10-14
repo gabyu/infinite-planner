@@ -59,15 +59,15 @@ export default function PrivacyPage() {
         </p>
         <p>
           Your Discord username is the name by which you are identified on the Service, and the only element of your
-          profile that is visible to anyone, until you share a flight plan. When you share or publish a flight plan,
+          profile that is visible to anyone, until you make a flight plan public. When you make a flight plan public,
           your Discord username and avatar are displayed with it as its author to anyone who opens its page, whether or
           not they have an account. Your email address is never shown to other users or visitors.
         </p>
         <p>
           A flight plan you make <strong>public</strong> is listed in the Service's library, and search engines may index
-          it, together with your Discord username. An <strong>unlisted</strong> plan is not listed, and search engines
-          are asked not to index it. Search engines and other caches may keep a page for some time after you withdraw
-          it, which we do not control.
+          it, together with your Discord username. A <strong>private</strong> plan is visible to you only. Search
+          engines and other caches may keep a page for some time after you make a plan private again, which we do not
+          control.
         </p>
         <p>
           Signed-in users can open a pilot profile page, which shows your Discord username and avatar, the month you
@@ -111,8 +111,8 @@ export default function PrivacyPage() {
             account at any time (see Section 9).
           </li>
           <li>
-            <strong>Display of your Discord username on shared flight plans:</strong> your consent, given when you
-            choose to share a flight plan, as the sharing screen informs you.
+            <strong>Display of your Discord name and avatar on public flight plans:</strong> your consent, given when you
+            make a flight plan public, as the confirmation screen informs you.
           </li>
         </ul>
       </section>
@@ -122,9 +122,9 @@ export default function PrivacyPage() {
         <p>We share information only with the following recipients, and only as needed to operate the Service:</p>
         <ul>
           <li>
-            <strong>Anyone who opens a flight plan link you share</strong>, who can view and download the flight plan
-            and sees your Discord username as its author. You can stop sharing at any time, after which the link no
-            longer works.
+            <strong>Anyone who opens a flight plan you make public</strong>, who can view it, sees your Discord name and
+            avatar as its author and, once signed in, can download it. You can make it private at any time, after which
+            its page no longer works.
           </li>
           <li>
             <strong>Discord</strong>, which handles authentication if you sign in. See{" "}

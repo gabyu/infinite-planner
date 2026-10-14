@@ -279,6 +279,53 @@ export const faqData = [
       </div>
     ),
   },
+  {
+    id: "explore",
+    question: "What is Explore, and who can see my flight plans?",
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Explore is the library of flight plans published by the community: real flights converted from FlightRadar24
+          or FlightAware, and hand-drawn routes. Every flight plan you export is <strong>private</strong> until you
+          switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore
+          and indexed by search engines, and your Discord name and avatar are shown with it.
+        </p>
+        <p>
+          You can switch it back to private at any time and its page stops working. Search engines can keep an old copy
+          for a while, which we don't control.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "download-import",
+    question: "Can I download or adapt someone else's flight plan?",
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Yes, once you are signed in with Discord. <strong>Download</strong> gives you the .fpl file for Infinite
+          Flight. <strong>Import</strong> puts a copy in your dashboard as a draft that you can open in the flight plan
+          editor, adjust and export as your own: the original is never changed, and your copy stays yours even if its
+          author later makes theirs private. You can also like a flight plan to find it again under Favorites.
+        </p>
+        <p>A copy can only be published once you have changed its route.</p>
+      </div>
+    ),
+  },
+  {
+    id: "report",
+    question: "How do I report a flight plan?",
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Open the flight plan's page while signed in and use <strong>Report this flight plan</strong>. Choose a reason
+          and, if you like, add a few words. Admins review reports and can hide a flight plan. To ask for the removal of
+          something you believe infringes your rights, write to the address in our{" "}
+          <a href="/terms">Terms of Service</a>.
+        </p>
+      </div>
+    ),
+  },
 ]
 
 export default function FAQSelector() {
