@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, Eye, MoreHorizontal, Pencil, PencilRuler, Trash2, Upload } from "lucide-react"
+import { Copy, Download, Eye, Link2, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -171,6 +171,34 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
     setTotal(result.total)
   }
 
+  async function copyLink(plan: FlightPlanSummary) {
+    if (!plan.public_id) return
+    const link = `${window.location.origin}${planPath({
+      origin: plan.origin_airport,
+      destination: plan.destination_airport,
+      flightNumber: plan.flight_number,
+      publicId: plan.public_id,
+    })}`
+    try {
+      await navigator.clipboard.writeText(link)
+      toast({ title: "Link copied", description: routeOf(plan) })
+    } catch {
+      toast({ title: "Couldn't copy the link", variant: "destructive" })
+    }
+  }
+
+  async function toggleFeatured(plan: FlightPlanSummary) {
+    const response = await fetch(`/api/plans/${plan.id}/featured`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ featured: !plan.featured }),
+    }).catch(() => null)
+    const body = await response?.json().catch(() => null)
+    if (!response?.ok) return toast({ title: "Couldn't update your profile", description: body?.error, variant: "destructive" })
+    patchPlan(plan.id, { featured: !plan.featured })
+    toast({ title: plan.featured ? "Removed from your profile" : "Featured on your profile", description: routeOf(plan) })
+  }
+
   async function duplicate(plan: FlightPlanSummary) {
     const response = await fetch(`/api/flight-plans/${plan.id}/duplicate`, { method: "POST" })
     if (!response.ok) {
@@ -226,7 +254,11 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
     )
   }
 
-  const columns = "md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_minmax(11rem,17rem)]"
+  // Route | Flight | Flight time | Date | (Visibility) | Actions. The actions are always three icons wide (view,
+  // download or edit, more), so the rows line up.
+  const columns = library
+    ? "md:grid-cols-[minmax(0,1fr)_8rem_6rem_10rem_8rem_8.5rem]"
+    : "md:grid-cols-[minmax(0,1fr)_9rem_6rem_10rem_8.5rem]"
 
   return (
     <>
@@ -290,6 +322,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
           <span>Flight</span>
           <span>Flight time</span>
           <span>Date</span>
+          {library && <span>Visibility</span>}
           <span className="text-right">Actions</span>
         </div>
 
@@ -369,7 +402,30 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                   <LocalTime iso={plan.created_at} />
                 </span>
 
-                {/* Actions by status. Draft: view, edit, delete. Exported (locked): view, download, visibility, duplicate, delete. */}
+                {library && (
+                  <div className="order-last col-span-2 md:order-none md:col-span-1">
+                    {!isDraft && (
+                      <VisibilitySwitch
+                        planId={plan.id}
+                        origin={plan.origin_airport}
+                        destination={plan.destination_airport}
+                        flightNumber={plan.flight_number}
+                        share={shareOf(plan)}
+                        showExtras={false}
+                        onShareChange={(share) =>
+                          patchPlan(plan.id, {
+                            visibility: share.visibility,
+                            public_id: share.publicId,
+                            ...(share.visibility === "public" ? {} : { featured: false }),
+                          })
+                        }
+                        className="flex-nowrap"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Actions: view, then download (exported) or edit (draft), then a menu: duplicate, copy link, feature, delete. */}
                 <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
@@ -394,25 +450,6 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                           <Download />
                         </a>
                       </Button>
-                      {library && (
-                        <VisibilitySwitch
-                          planId={plan.id}
-                          origin={plan.origin_airport}
-                          destination={plan.destination_airport}
-                          flightNumber={plan.flight_number}
-                          share={shareOf(plan)}
-                          featured={plan.featured}
-                          onFeaturedChange={(featured) => patchPlan(plan.id, { featured })}
-                          onShareChange={(share) =>
-                            patchPlan(plan.id, {
-                              visibility: share.visibility,
-                              public_id: share.publicId,
-                              ...(share.visibility === "public" ? {} : { featured: false }),
-                            })
-                          }
-                          className="mx-1 flex-nowrap gap-1"
-                        />
-                      )}
                     </>
                   )}
 
@@ -428,6 +465,17 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                           <DropdownMenuItem onSelect={() => duplicate(plan)}>
                             <Copy /> Duplicate
                           </DropdownMenuItem>
+                          {library && plan.visibility === "public" && plan.public_id && (
+                            <>
+                              <DropdownMenuItem onSelect={() => copyLink(plan)}>
+                                <Link2 /> Copy link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={() => toggleFeatured(plan)}>
+                                <Star className={cn(plan.featured && "fill-primary text-primary")} />
+                                {plan.featured ? "Remove from profile" : "Feature on profile"}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           <DropdownMenuSeparator />
                         </>
                       )}
