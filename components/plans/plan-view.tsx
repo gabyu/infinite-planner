@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
@@ -97,16 +98,22 @@ export function PlanView({
             "Flight plan"
           )}
         </p>
-        {/* Origin on one line, destination on the next, led by the arrow: the title always reads as two
-            balanced lines, and neither the arrow nor the codes can end up alone at the end of a line. */}
-        <h1 className="mt-3 text-balance font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
+        {/* Origin on one line, destination on the next. A small arrow in the left gutter flies down from the first line
+            to the second when the page loads, like an aircraft going from origin to destination (no animation
+            for people who ask for reduced motion: it simply rests beside the destination). Both lines start
+            on the same edge: the gutter is in the margin on wide screens and a left indent where there is none. */}
+        <h1 className="relative mt-3 text-balance pl-[0.85em] font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em] min-[1200px]:pl-0">
+          <span
+            aria-hidden
+            className="plan-flight pointer-events-none absolute -top-[0.02em] left-0 flex h-[1.05em] w-[0.8em] items-center justify-center text-primary min-[1200px]:-left-[1.1em]"
+          >
+            <ArrowDown className="h-[0.7em] w-[0.7em]" strokeWidth={2.4} />
+          </span>
           <span className="block">
             <Place end={from} />
           </span>
-          <span className="relative block">
-            {/* On wide screens the arrow hangs in the left margin, so both city names start on the same edge;
-                where there is no margin to hang in, it leads the line. */}
-            <GluedArrow className="text-primary min-[1200px]:absolute min-[1200px]:-left-[1.2em] min-[1200px]:top-[0.2em] min-[1200px]:mr-0" />
+          <span className="block">
+            <span className="sr-only">to </span>
             <Place end={to} />
           </span>
         </h1>
