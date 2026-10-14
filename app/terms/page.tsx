@@ -66,9 +66,9 @@ export default function TermsPage() {
           Discord; we do not manage it and only receive confirmation of your sign-in from Discord.
         </p>
         <p>
-          Your Discord username is the name by which you are identified on the Service, including to other users. It is
-          the only element of your Discord profile that is made visible to other people. Your avatar and email address
-          are never shown to other users or visitors.
+          Your Discord username is the name by which you are identified on the Service, including to other users. When
+          you share or publish a flight plan (Section 5), your Discord username and your avatar are shown with it. Your
+          email address is never shown to other users or visitors.
         </p>
       </section>
 
@@ -81,9 +81,32 @@ export default function TermsPage() {
           download that flight plan, and nothing more.
         </p>
         <p>
-          When you share a flight plan, your Discord username is displayed with it as its author, and this cannot be
-          turned off for a shared plan. If you do not wish your Discord username to be displayed, do not share the
-          flight plan. You may stop sharing at any time, after which the link no longer works.
+          Each exported flight plan has a visibility that you choose, and that is <strong>private</strong> until you
+          change it. <strong>Unlisted</strong> means anyone with the link can open it; it is not listed on the Service
+          and search engines are asked not to index it. <strong>Public</strong> means it is listed in the public
+          library of the Service (Explore), can be found by search, and is indexed by search engines. Nothing is made
+          public without an explicit action from you.
+        </p>
+        <p>
+          When you share or publish a flight plan, your Discord username and avatar are displayed with it as its
+          author, and this cannot be turned off for that plan. If you do not wish them to be displayed, do not share the
+          flight plan. By publishing a flight plan you grant the Service a non-exclusive, worldwide, royalty-free
+          licence to host, display, and distribute it, and to let signed-in users download it, like it, and import a
+          copy of it, for as long as it remains published. You confirm that you are entitled to publish it, and that it
+          does not infringe the rights of anyone else, including the providers of the flight data it was derived from.
+        </p>
+        <p>
+          You may change a flight plan back to private at any time, after which its page and link stop working.
+          Search engines and other caches may keep showing a page for some time after it was withdrawn, which we do not
+          control. A copy that another user imported while your plan was published belongs to that user: it stays in
+          their account and is not affected when you unpublish or delete the original. Downloading a flight plan from
+          the library requires signing in with Discord.
+        </p>
+        <p>
+          Anyone who is signed in may report a published flight plan. We may hide a flight plan, or stop an account
+          from publishing, if it breaks these Terms or the rights of others. To ask for the removal of a flight plan you
+          believe infringes your rights, write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> with the address
+          of its page.
         </p>
         <p>
           For legal reasons, imported KML files are not retained; only the flight plan data generated from them may be

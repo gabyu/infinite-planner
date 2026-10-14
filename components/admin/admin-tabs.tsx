@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 
 const sections = [
   { href: "/admin-dashboard", label: "Activity" },
+  { href: "/admin-dashboard/routes", label: "Routes" },
   { href: "/admin-dashboard/admins", label: "Admins" },
 ]
 

@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Download, Heart, Import, Settings2 } from "lucide-react"
+import { Download, Flag, Heart, Import, Settings2 } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { ShareDialog } from "@/components/share-dialog"
 import { Button } from "@/components/ui/button"
+import { ReportDialog } from "@/components/plans/report-dialog"
 import { signInWithDiscordTo, useAuthUser } from "@/hooks/use-auth-user"
 import type { PlanShare } from "@/lib/flight-plans"
 import { cn } from "@/lib/utils"
@@ -51,6 +52,7 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
   const [busy, setBusy] = useState<Intent | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [managing, setManaging] = useState(false)
+  const [reporting, setReporting] = useState(false)
   const [share, setShare] = useState<PlanShare>({ visibility, publicId })
   const intentRan = useRef(false)
 
@@ -197,6 +199,16 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
         {stats.importCount === 1 ? "" : "s"} · {stats.likeCount} like{stats.likeCount === 1 ? "" : "s"}
       </p>
 
+      {user && !owner && (
+        <button
+          type="button"
+          onClick={() => setReporting(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          <Flag size={12} aria-hidden /> Report this flight plan
+        </button>
+      )}
+
       {ready && !user && (
         <div className="mt-8 rounded-3xl bg-card p-6 ring-1 ring-border sm:p-8">
           <h2 className="font-display text-2xl font-semibold tracking-tight">Fly this route, your way.</h2>
@@ -211,6 +223,8 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
           </Button>
         </div>
       )}
+
+      {reporting && <ReportDialog publicId={publicId} onClose={() => setReporting(false)} />}
 
       {managing && owner && me?.planId && (
         <ShareDialog

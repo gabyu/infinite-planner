@@ -208,6 +208,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [isPreparingShare, setIsPreparingShare] = useState(false)
   // Share link of the plan this session saved, if it is being shared (null = not shared).
   const [planShare, setPlanShare] = useState<PlanShare>(PRIVATE_SHARE)
+  const [planFeatured, setPlanFeatured] = useState(false)
+  // Whether "Public" is offered when sharing: the library is launched, or the user is an admin (asked once signed in).
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
@@ -1173,6 +1176,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
+  useEffect(() => {
+    if (!authUser) return setLibraryOpen(false)
+    fetch("/api/library/access", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((body) => setLibraryOpen(body?.open === true))
+      .catch(() => setLibraryOpen(false))
+  }, [authUser])
+
   // Share: only an exported plan can be shared, and only while the page still shows it as exported.
   // Opens the share modal for that row (it may already be shared from an earlier press).
   const handleShare = async () => {
@@ -1183,8 +1194,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
     const supabase = getBrowserSupabase()
     const { data } = supabase
-      ? await supabase.from("flight_plans").select("visibility, public_id").eq("id", savedPlanIdRef.current).maybeSingle()
+      ? await supabase.from("flight_plans").select("visibility, public_id, featured").eq("id", savedPlanIdRef.current).maybeSingle()
       : { data: null }
+    setPlanFeatured(!!data?.featured)
     setPlanShare(
       data ? { visibility: data.visibility as PlanVisibility, publicId: data.public_id as string | null } : PRIVATE_SHARE,
     )
@@ -1741,6 +1753,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             flightNumber={detectedFlightNumber}
             share={planShare}
             onShareChange={setPlanShare}
+            allowPublic={libraryOpen}
+            featured={planFeatured}
+            onFeaturedChange={libraryOpen ? setPlanFeatured : undefined}
           />
         )}
 
