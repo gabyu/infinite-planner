@@ -43,6 +43,8 @@ interface FlightsListProps {
   total: number
 }
 
+const shareOf = (plan: FlightPlanSummary) => ({ visibility: plan.visibility, publicId: plan.public_id })
+
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
@@ -112,13 +114,13 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
   }
 
   async function confirmDelete() {
-    const supabase = getBrowserSupabase()
-    if (!supabase || !deleting) return
+    if (!deleting) return
     setBusy(true)
-    const { error } = await supabase.from("flight_plans").delete().eq("id", deleting.id)
+    // Through the API (not straight to the table) so the cached public page of a shared plan is dropped at once.
+    const response = await fetch(`/api/flight-plans/${deleting.id}`, { method: "DELETE" })
     setBusy(false)
-    if (error) {
-      console.error("Deleting a flight plan failed:", error.message)
+    if (!response.ok) {
+      console.error("Deleting a flight plan failed:", response.status)
       return toast({ title: "Couldn't delete", variant: "destructive" })
     }
     setPlans((current) => current.filter((plan) => plan.id !== deleting.id))
@@ -245,12 +247,12 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
                         variant="ghost"
                         size="icon"
                         onClick={() => setSharing(plan)}
-                        title={plan.share_token ? "Shared: manage link" : "Share"}
-                        aria-label={plan.share_token ? "Manage share link" : "Share"}
+                        title={plan.visibility === "private" ? "Share" : "Shared: manage link"}
+                        aria-label={plan.visibility === "private" ? "Share" : "Manage share link"}
                         className="relative"
                       >
                         <Share2 />
-                        {plan.share_token && (
+                        {plan.visibility !== "private" && (
                           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
                         )}
                       </Button>
@@ -307,8 +309,9 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
           planId={sharing.id}
           origin={sharing.origin_airport}
           destination={sharing.destination_airport}
-          shareToken={plans.find((plan) => plan.id === sharing.id)?.share_token ?? null}
-          onShareChange={(token) => patchPlan(sharing.id, { share_token: token })}
+          flightNumber={sharing.flight_number}
+          share={shareOf(plans.find((plan) => plan.id === sharing.id) ?? sharing)}
+          onShareChange={(share) => patchPlan(sharing.id, { visibility: share.visibility, public_id: share.publicId })}
         />
       )}
 
@@ -318,7 +321,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
             <DialogTitle>Delete this {deleting?.status === "draft" ? "draft" : "flight plan"}?</DialogTitle>
             <DialogDescription>
               {deleting && <span className="font-mono">{routeOf(deleting)}</span>} will be removed from your dashboard.
-              {deleting?.share_token && " Its share link stops working."} This can&apos;t be undone.
+              {deleting && deleting.visibility !== "private" && " Its public page and link stop working; copies other people made stay with them."} This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">

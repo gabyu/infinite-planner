@@ -30,8 +30,11 @@ import {
   AUTOSAVE_INTERVAL_MS,
   BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
+  PRIVATE_SHARE,
   type FlightPlanSource,
   type FlightPlanStatus,
+  type PlanShare,
+  type PlanVisibility,
   type StoredWaypoint,
 } from "@/lib/flight-plans"
 import { ShareDialog } from "@/components/share-dialog"
@@ -204,7 +207,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [isPreparingShare, setIsPreparingShare] = useState(false)
   // Share link of the plan this session saved, if it is being shared (null = not shared).
-  const [planShareToken, setPlanShareToken] = useState<string | null>(null)
+  const [planShare, setPlanShare] = useState<PlanShare>(PRIVATE_SHARE)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
@@ -558,7 +561,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setSavedStatus(null)
     setSavedFingerprint(null)
     setLastSavedAt(null)
-    setPlanShareToken(null)
+    setPlanShare(PRIVATE_SHARE)
     setDraftArmed(false)
     setAutosaveError(null)
   }
@@ -578,7 +581,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       savedStatusRef.current = null
       setSavedPlanId(null)
       setSavedStatus(null)
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
     }
 
     const body = JSON.stringify({
@@ -596,7 +599,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       fetch(url, { method, headers: { "Content-Type": "application/json" }, body })
     const startNewRow = () => {
       savedPlanIdRef.current = null
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
       return send("/api/flight-plans", "POST")
     }
 
@@ -740,7 +743,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         savedStatusRef.current = "draft"
         setSavedPlanId(body.id)
         setSavedStatus("draft")
-        setPlanShareToken(null)
+        setPlanShare(PRIVATE_SHARE)
         setLastSavedAt(new Date(body.created_at))
         setDraftArmed(true)
         setResume({ state: "idle" })
@@ -1176,9 +1179,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
     const supabase = getBrowserSupabase()
     const { data } = supabase
-      ? await supabase.from("flight_plans").select("share_token").eq("id", savedPlanIdRef.current).maybeSingle()
+      ? await supabase.from("flight_plans").select("visibility, public_id").eq("id", savedPlanIdRef.current).maybeSingle()
       : { data: null }
-    setPlanShareToken((data?.share_token as string | null | undefined) ?? null)
+    setPlanShare(
+      data ? { visibility: data.visibility as PlanVisibility, publicId: data.public_id as string | null } : PRIVATE_SHARE,
+    )
     setIsPreparingShare(false)
     setShowShareDialog(true)
   }
@@ -1729,8 +1734,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             planId={savedPlanId}
             origin={originAirport || "ORIG"}
             destination={destinationAirport || "DEST"}
-            shareToken={planShareToken}
-            onShareChange={setPlanShareToken}
+            flightNumber={detectedFlightNumber}
+            share={planShare}
+            onShareChange={setPlanShare}
           />
         )}
 

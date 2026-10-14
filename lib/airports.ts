@@ -19,6 +19,22 @@ export interface AirportMatch {
   country: string
 }
 
+// Name, city and IATA code of an airport, for page text: people search "CDG to LAX", not ICAO codes.
+export interface AirportInfo {
+  icao: string
+  name: string
+  city: string
+  iata: string
+  country: string
+}
+
+export function getAirportInfo(icao: string): AirportInfo | null {
+  const code = icao.trim().toUpperCase()
+  const entry = AIRPORTS[code]
+  if (!entry) return null
+  return { icao: code, name: entry[0], city: entry[1], iata: entry[2], country: entry[3] }
+}
+
 export function resolveAirportName(icao: string): string | null {
   return AIRPORTS[icao.trim().toUpperCase()]?.[0] ?? null
 }
