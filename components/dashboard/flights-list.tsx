@@ -39,9 +39,30 @@ import {
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
+type Tab = "all" | "draft" | "exported" | "published" | "favorites" | "imported"
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "draft", label: "Drafts" },
+  { value: "exported", label: "Exported" },
+  { value: "published", label: "Published" },
+  { value: "favorites", label: "Favorites" },
+  { value: "imported", label: "Imported" },
+]
+
 interface FlightsListProps {
   initialPlans: FlightPlanSummary[]
   total: number
+  // The library is open to this user: Public sharing, the tabs for Published / Favorites / Imported.
+  library?: boolean
+}
+
+interface Favorite {
+  public_id: string
+  origin_airport: string
+  destination_airport: string
+  flight_number: string | null
+  author_name: string | null
 }
 
 // What the database says about a copy's original (get_plan_lineage): a link back to it, or nothing
@@ -62,7 +83,7 @@ const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
 // no sorting or filtering). Drafts can be viewed, edited and deleted; exported plans are locked and
 // can be viewed, downloaded, shared, duplicated (into a new draft) and deleted.
-export function FlightsList({ initialPlans, total: initialTotal }: FlightsListProps) {
+export function FlightsList({ initialPlans, total: initialTotal, library = false }: FlightsListProps) {
   const [plans, setPlans] = useState(initialPlans)
   const [total, setTotal] = useState(initialTotal)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -71,6 +92,9 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
+  const [tab, setTab] = useState<Tab>("all")
+  const [tabLoading, setTabLoading] = useState(false)
+  const [favorites, setFavorites] = useState<Favorite[] | null>(null)
   const [lineage, setLineage] = useState<Record<string, Lineage>>({})
 
   // Copies imported from the library: where they come from.
@@ -99,11 +123,18 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
 
   // Rows come back newest first; `from` is how many are already on screen.
   async function fetchPlans(from: number, count: number) {
+    return fetchPlansFor(tab, from, count)
+  }
+
+  async function fetchPlansFor(forTab: Tab, from: number, count: number) {
     const supabase = getBrowserSupabase()
     if (!supabase) return null
-    const { data, count: nextTotal, error } = await supabase
-      .from("flight_plans")
-      .select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
+    let query = supabase.from("flight_plans").select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
+    if (forTab === "draft") query = query.eq("status", "draft")
+    else if (forTab === "exported") query = query.eq("status", "exported")
+    else if (forTab === "published") query = query.eq("visibility", "public")
+    else if (forTab === "imported") query = query.eq("is_fork", true)
+    const { data, count: nextTotal, error } = await query
       .order("created_at", { ascending: false })
       .range(from, from + count - 1)
     if (error) {
@@ -111,6 +142,25 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
       return null
     }
     return { rows: (data ?? []) as unknown as FlightPlanSummary[], total: nextTotal ?? 0 }
+  }
+
+  // The list is filtered by the database, not by what happens to be loaded: switching tab reloads from the start.
+  async function changeTab(next: Tab) {
+    if (next === tab) return
+    setTab(next)
+    setTabLoading(true)
+    if (next === "favorites") {
+      const supabase = getBrowserSupabase()
+      const { data } = supabase ? await supabase.rpc("get_my_favorites", { p_limit: 100, p_offset: 0 }) : { data: null }
+      setFavorites((data as Favorite[] | null) ?? [])
+      setTabLoading(false)
+      return
+    }
+    const result = await fetchPlansFor(next, 0, HISTORY_PAGE_SIZE)
+    setTabLoading(false)
+    if (!result) return toast({ title: "Couldn't load your flight plans", variant: "destructive" })
+    setPlans(result.rows)
+    setTotal(result.total)
   }
 
   async function loadMore() {
@@ -153,7 +203,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
     toast({ title: "Flight plan deleted", description: routeOf(deleting) })
   }
 
-  if (plans.length === 0) {
+  if (plans.length === 0 && tab === "all") {
     return (
       <div className="flex max-w-xl flex-col items-start rounded-lg border bg-card px-6 py-8">
         <h2 className="text-sm font-medium">No flight plans yet</h2>
@@ -181,6 +231,60 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
 
   return (
     <>
+      {library && (
+        <div role="tablist" aria-label="Filter your flight plans" className="mb-3 flex flex-wrap gap-1">
+          {TABS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => changeTab(value)}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm transition-colors motion-reduce:transition-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                tab === value ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tabLoading ? (
+        <p className="py-8 text-sm text-muted-foreground">Loading...</p>
+      ) : tab === "favorites" ? (
+        favorites && favorites.length > 0 ? (
+          <ul className="divide-y overflow-hidden rounded-lg border bg-card">
+            {favorites.map((favorite) => (
+              <li key={favorite.public_id} className="flex items-center justify-between gap-4 px-4 py-3">
+                <Link
+                  href={planPath({
+                    origin: favorite.origin_airport,
+                    destination: favorite.destination_airport,
+                    flightNumber: favorite.flight_number,
+                    publicId: favorite.public_id,
+                  })}
+                  className="font-mono text-sm font-medium no-underline hover:underline"
+                >
+                  {favorite.origin_airport}
+                  <RouteArrow />
+                  {favorite.destination_airport}
+                  {favorite.flight_number && <span className="ml-2 text-muted-foreground">{favorite.flight_number}</span>}
+                </Link>
+                <span className="truncate text-xs text-muted-foreground">by {favorite.author_name ?? "Infinite Planner admin"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-8 text-sm text-muted-foreground">
+            No favorites yet. Like a flight plan in <Link href="/explore" className="underline underline-offset-2">Explore</Link> and it shows up here.
+          </p>
+        )
+      ) : plans.length === 0 ? (
+        <p className="py-8 text-sm text-muted-foreground">Nothing here yet.</p>
+      ) : (
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className={cn("studio-label hidden items-center gap-4 border-b bg-muted/40 px-4 py-2.5 md:grid", columns)}>
           <span>Route</span>
@@ -347,6 +451,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
           )}
         </div>
       </div>
+      )}
 
       {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
 
@@ -359,7 +464,10 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
           destination={sharing.destination_airport}
           flightNumber={sharing.flight_number}
           share={shareOf(plans.find((plan) => plan.id === sharing.id) ?? sharing)}
-          onShareChange={(share) => patchPlan(sharing.id, { visibility: share.visibility, public_id: share.publicId })}
+          onShareChange={(share) => patchPlan(sharing.id, { visibility: share.visibility, public_id: share.publicId, ...(share.visibility === "public" ? {} : { featured: false }) })}
+          allowPublic={library}
+          featured={(plans.find((plan) => plan.id === sharing.id) ?? sharing).featured}
+          onFeaturedChange={library ? (featured) => patchPlan(sharing.id, { featured }) : undefined}
         />
       )}
 

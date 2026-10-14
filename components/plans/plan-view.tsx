@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Download } from "lucide-react"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
+import { AuthorLink } from "@/components/plans/author-link"
 import { PlanActions } from "@/components/plans/plan-actions"
 import { Button } from "@/components/ui/button"
 import { RouteArrow } from "@/components/route-arrow"
@@ -75,7 +76,7 @@ export function PlanView({
                 className="h-6 w-6 rounded-full"
               />
             ) : null}
-            <span>{plan.authorName}</span>
+            <AuthorLink name={plan.authorName} profilePublicId={plan.authorPublicId} />
           </span>
           <span>{sourceLabel(plan.source)}</span>
           <span>Generated on {generated}</span>

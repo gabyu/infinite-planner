@@ -34,8 +34,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!(await isLibraryOpenFor(viewer))) return json({ error: "Publishing isn't available yet." }, 403)
 
     // The public page names its author: an account with no Discord name (an admin who didn't link one) can't publish.
-    const { data: profile } = await supabase.from("profiles").select("discord_username").eq("id", user.id).maybeSingle()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("discord_username, library_consent_at")
+      .eq("id", user.id)
+      .maybeSingle()
     if (!profile?.discord_username) return json({ error: "Link your Discord account to publish." }, 403)
+    // The first time, the person has to agree to the name and avatar being shown and indexed.
+    if (!profile.library_consent_at) return json({ error: "Please confirm before publishing.", code: "consent_required" }, 409)
   }
 
   const { data, error } = await supabase.rpc("set_plan_visibility", { p_plan_id: params.id, p_visibility: visibility })

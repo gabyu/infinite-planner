@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -28,6 +29,9 @@ interface ShareDialogProps {
   onShareChange: (share: PlanShare) => void
   // Offer "Public" (listed in the library, indexed). Off until the library is open to this user.
   allowPublic?: boolean
+  // Whether the plan is featured on the author's profile (only offered while it is public).
+  featured?: boolean
+  onFeaturedChange?: (featured: boolean) => void
 }
 
 const OPTIONS: { value: PlanVisibility; label: string; hint: string }[] = [
@@ -57,11 +61,15 @@ export function ShareDialog({
   share,
   onShareChange,
   allowPublic = false,
+  featured = false,
+  onFeaturedChange,
 }: ShareDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [siteOrigin, setSiteOrigin] = useState("")
+  // The first time someone chooses Public they confirm what that means.
+  const [askConsent, setAskConsent] = useState(false)
 
   useEffect(() => setSiteOrigin(window.location.origin), [])
   useEffect(() => {
@@ -87,6 +95,10 @@ export function ShareDialog({
         body: JSON.stringify({ visibility }),
       })
       const body = await response.json().catch(() => null)
+      if (response.status === 409 && body?.code === "consent_required") {
+        setAskConsent(true)
+        return
+      }
       if (!response.ok) {
         setError(body?.error ?? "Couldn't change the visibility. Please try again.")
         return
@@ -97,6 +109,36 @@ export function ShareDialog({
     } finally {
       setBusy(false)
     }
+  }
+
+  async function acceptConsent() {
+    setBusy(true)
+    const response = await fetch("/api/library/consent", { method: "POST" }).catch(() => null)
+    setBusy(false)
+    if (!response?.ok) {
+      setAskConsent(false)
+      setError("Couldn't save your choice. Please try again.")
+      return
+    }
+    setAskConsent(false)
+    await choose("public")
+  }
+
+  async function toggleFeatured(next: boolean) {
+    setBusy(true)
+    setError(null)
+    const response = await fetch(`/api/plans/${planId}/featured`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ featured: next }),
+    }).catch(() => null)
+    const body = await response?.json().catch(() => null)
+    setBusy(false)
+    if (!response?.ok) {
+      setError(body?.error ?? "Couldn't update your profile. Please try again.")
+      return
+    }
+    onFeaturedChange?.(next)
   }
 
   async function copy() {
@@ -166,6 +208,19 @@ export function ShareDialog({
             </div>
           )}
 
+          {share.visibility === "public" && onFeaturedChange && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={featured}
+                disabled={busy}
+                onChange={(e) => toggleFeatured(e.target.checked)}
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+              />
+              Feature on my profile
+            </label>
+          )}
+
           {share.visibility !== "private" && (
             <p className="text-xs text-muted-foreground">
               Switch back to Private at any time and the link stops working. Search engines and caches can take a while
@@ -175,6 +230,26 @@ export function ShareDialog({
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
       </DialogContent>
+
+      <Dialog open={askConsent} onOpenChange={setAskConsent}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Publish this flight plan?</DialogTitle>
+            <DialogDescription>
+              Your Discord name and avatar will be shown publicly on this plan, and search engines can index it. You can
+              unpublish at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button variant="outline" onClick={() => setAskConsent(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={acceptConsent} disabled={busy}>
+              Publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

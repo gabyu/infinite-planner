@@ -38,6 +38,7 @@ export interface PlanCardData {
   authorPublicId: string
   route: { lat: number; lng: number }[]
   sortValue: number
+  featured: boolean
 }
 
 export interface ListFilters {
@@ -48,6 +49,8 @@ export interface ListFilters {
   source?: FlightPlanSource
   authorPublicId?: string
   excludePublicId?: string
+  // Only the plans their author features on their profile.
+  featuredOnly?: boolean
 }
 
 export interface Cursor {
@@ -79,6 +82,7 @@ interface Row {
   author_public_id: string
   route: { lat: number; lng: number }[] | null
   sort_value: number
+  featured: boolean
 }
 
 const ADMIN_AUTHOR_NAME = "Infinite Planner admin"
@@ -107,6 +111,7 @@ async function load(args: {
     p_after_value: cursor?.v ?? null,
     p_after_id: cursor?.id ?? null,
     p_limit: limit + 1,
+    p_featured_only: filters.featuredOnly ?? false,
   })
   // Thrown, so a failed read is never cached as an empty library.
   if (error) throw new Error(`Listing public plans failed: ${error.message}`)
@@ -133,6 +138,7 @@ async function load(args: {
       authorPublicId: row.author_public_id,
       route: row.route ?? [],
       sortValue: row.sort_value,
+      featured: row.featured,
     })),
     next: rows.length > limit && last ? { v: last.sort_value, id: last.id, asOf } : null,
   }

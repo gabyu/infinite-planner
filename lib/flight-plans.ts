@@ -51,10 +51,12 @@ export interface FlightPlanSummary {
   is_fork: boolean
   // Set once the plan has been shared; the plan page lives at /explore/plans/{...}-{public_id}.
   public_id: string | null
+  // Shown first on the author's profile (only while public).
+  featured: boolean
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork"
+  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
 
 // How many dashboard rows are loaded at a time ("Load more" fetches the next page).
 export const HISTORY_PAGE_SIZE = 50

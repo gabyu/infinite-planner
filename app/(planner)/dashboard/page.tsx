@@ -7,6 +7,8 @@ import { ActivityOverview } from "@/components/dashboard/activity-overview"
 import { FlightsList } from "@/components/dashboard/flights-list"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
 import { FLIGHT_PLAN_SUMMARY_COLUMNS, HISTORY_PAGE_SIZE, type FlightPlanSummary } from "@/lib/flight-plans"
+import { LibraryOverview } from "@/components/dashboard/library-overview"
+import { getViewer, isLibraryOpenFor } from "@/lib/library"
 import { getServerSupabase } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
@@ -56,7 +58,8 @@ export default async function DashboardPage() {
   // Both queries only ever see the signed-in user's own rows (RLS), the same flight_plans table the
   // admin overview reads unfiltered.
   const since = new Date(Date.now() - GRAPH_WINDOW_DAYS * 86_400_000).toISOString()
-  const [plans, exported] = await Promise.all([
+  const libraryOpen = await isLibraryOpenFor(await getViewer())
+  const [plans, exported, library, profile] = await Promise.all([
     supabase
       .from("flight_plans")
       .select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
@@ -69,7 +72,23 @@ export default async function DashboardPage() {
       .eq("status", "exported")
       .gte("created_at", since)
       .order("created_at", { ascending: true }),
+    // What the community did with the user's plans (their own rows only, by RLS).
+    libraryOpen
+      ? supabase.from("flight_plans").select("visibility, like_count, import_count, download_count").eq("status", "exported")
+      : Promise.resolve({ data: null }),
+    libraryOpen
+      ? supabase.from("profiles").select("public_id").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ])
+  const totals = (library.data ?? []).reduce(
+    (sum, row) => ({
+      published: sum.published + (row.visibility === "public" ? 1 : 0),
+      downloads: sum.downloads + row.download_count,
+      likes: sum.likes + row.like_count,
+      imports: sum.imports + row.import_count,
+    }),
+    { published: 0, downloads: 0, likes: 0, imports: 0 },
+  )
   if (plans.error) console.error("Loading the dashboard failed:", plans.error.message)
   if (exported.error) console.error("Loading the activity graph failed:", exported.error.message)
 
@@ -97,6 +116,8 @@ export default async function DashboardPage() {
     >
       <ActivityOverview exportTimes={exportTimes} />
 
+      {libraryOpen && <LibraryOverview totals={totals} profilePublicId={profile.data?.public_id ?? null} />}
+
       <section className="mt-8" aria-labelledby="my-flights-title">
         <h2 id="my-flights-title" className="mb-3 text-sm font-semibold">
           My flights
@@ -104,7 +125,7 @@ export default async function DashboardPage() {
         {plans.error ? (
           <p className="text-sm text-muted-foreground">Couldn&apos;t load your flight plans right now.</p>
         ) : (
-          <FlightsList initialPlans={(plans.data ?? []) as unknown as FlightPlanSummary[]} total={plans.count ?? 0} />
+          <FlightsList initialPlans={(plans.data ?? []) as unknown as FlightPlanSummary[]} total={plans.count ?? 0} library={libraryOpen} />
         )}
       </section>
     </PageShell>
