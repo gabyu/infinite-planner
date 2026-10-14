@@ -1,1 +1,1 @@
-export { default } from "../../plans/[slug]/not-found"
+export { default } from "../../explore/plans/[slug]/not-found"

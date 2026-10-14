@@ -47,7 +47,7 @@ export interface FlightPlanSummary {
   includes_branding: boolean
   flight_time_minutes: number | null
   visibility: PlanVisibility
-  // Set once the plan has been shared; the plan page lives at /plans/{...}-{public_id}.
+  // Set once the plan has been shared; the plan page lives at /explore/plans/{...}-{public_id}.
   public_id: string | null
 }
 

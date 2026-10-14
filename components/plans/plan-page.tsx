@@ -9,9 +9,9 @@ import { planPath, planSlug, publicIdFromSlug } from "@/lib/plan-slug"
 import { getPublicPlan, type PublicPlan } from "@/lib/public-plans"
 
 // One plan page, two ways to reach it:
-//   "public"  /plans/{slug}          cached for everyone (ISR). While the library isn't launched it
+//   "public"  /explore/plans/{slug}          cached for everyone (ISR). While the library isn't launched it
 //                                    shows an unlisted plan the legacy way and 404s a public one.
-//   "preview" /preview/plans/{slug}  per request, admins only: the middleware sends signed-in admins
+//   "preview" /preview/explore/plans/{slug}  per request, admins only: the middleware sends signed-in admins
 //                                    here while the library isn't launched, so they see everything.
 export type PlanPageMode = "public" | "preview"
 

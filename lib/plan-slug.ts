@@ -1,7 +1,7 @@
 // URLs of the library, shared by the server and the client (no server-only imports here).
 //
-// A plan page lives at /plans/{origin}-{destination}[-{flightnumber}]-{publicId}, e.g.
-// /plans/lfpg-klax-af65-k3x9p2qa. Only the trailing public id identifies the plan; the rest is
+// A plan page lives at /explore/plans/{origin}-{destination}[-{flightnumber}]-{publicId}, e.g.
+// /explore/plans/lfpg-klax-af65-k3x9p2qa. Only the trailing public id identifies the plan; the rest is
 // there for readers and search engines, and a wrong one is redirected to the canonical form.
 
 // Same alphabet as generate_public_id() in the database: no 0 o 1 i l u.
@@ -26,7 +26,7 @@ export function planSlug({ origin, destination, flightNumber, publicId }: SlugSo
 }
 
 export function planPath(source: SlugSource) {
-  return `/plans/${planSlug(source)}`
+  return `/explore/plans/${planSlug(source)}`
 }
 
 // The public id at the end of a slug, or null when the slug doesn't end in one.

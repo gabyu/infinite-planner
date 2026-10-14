@@ -4,7 +4,7 @@ import { PlanPage, planPageMetadata } from "@/components/plans/plan-page"
 import { getViewer } from "@/lib/library"
 
 // The live variant of a plan page that admins get while the library isn't launched (the middleware
-// rewrites /plans/* to it). Never cached, never indexed, and refuses everyone who isn't an admin
+// rewrites /explore/plans/* to it). Never cached, never indexed, and refuses everyone who isn't an admin
 // even if a request reaches it directly.
 export const dynamic = "force-dynamic"
 

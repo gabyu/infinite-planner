@@ -9,7 +9,7 @@ const FIRST_LOGIN = `${ADMIN_BASE}/first-login`
 // While the library isn't launched, the cached pages 404 for everyone: a signed-in admin is sent to the
 // live /preview variant of the same page instead, which shows the whole feature. Anyone else, and every
 // request once the library is launched, is untouched. Only library routes ever reach the flag lookup.
-const LIBRARY_PREFIXES = ["/plans/"]
+const LIBRARY_PREFIXES = ["/explore/plans/"]
 
 async function previewForAdmins(
   request: NextRequest,
