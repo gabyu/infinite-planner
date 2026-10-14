@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
 import { AuthorLink } from "@/components/plans/author-link"
@@ -26,6 +27,33 @@ function AirportCodes({ end }: { end: PlanEnd }) {
       ({end.icao}
       {end.iata ? `/${end.iata}` : ""})
     </Link>
+  )
+}
+
+// The arrow, written with no space after it: it is one unit with the word that follows, so it can never be the
+// last thing on a line (the only break opportunities are the spaces around the words).
+function GluedArrow({ className }: { className?: string }) {
+  return <RouteArrow className={cn("mx-0 mr-[0.3em]", className)} />
+}
+
+// A place name with its airport codes. From the small breakpoint up the codes sit after the name, glued to its
+// last word so they never wrap alone and a long name wraps before that word. On a phone the codes take their own
+// line under the name, so a two-word city (San Francisco) is never split to make room for them.
+function Place({ end }: { end: PlanEnd }) {
+  const name = end.city ?? end.name ?? end.icao
+  const cut = name.lastIndexOf(" ")
+  const head = cut === -1 ? "" : name.slice(0, cut + 1)
+  const tail = cut === -1 ? name : name.slice(cut + 1)
+  return (
+    <>
+      {head}
+      <span className="sm:whitespace-nowrap">
+        {tail}
+        <span className="block leading-[0.85] sm:ml-[0.4em] sm:inline sm:leading-[inherit]">
+          <AirportCodes end={end} />
+        </span>
+      </span>
+    </>
   )
 }
 
@@ -69,15 +97,23 @@ export function PlanView({
             "Flight plan"
           )}
         </p>
-        <h1 className="mt-3 font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
-          {from.city ?? from.name ?? from.icao} <AirportCodes end={from} />
-          <RouteArrow className="mx-[0.25em] text-primary" />
-          {to.city ?? to.name ?? to.icao} <AirportCodes end={to} />
+        {/* Origin on one line, destination on the next, led by the arrow: the title always reads as two
+            balanced lines, and neither the arrow nor the codes can end up alone at the end of a line. */}
+        <h1 className="mt-3 text-balance font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
+          <span className="block">
+            <Place end={from} />
+          </span>
+          <span className="relative block">
+            {/* On wide screens the arrow hangs in the left margin, so both city names start on the same edge;
+                where there is no margin to hang in, it leads the line. */}
+            <GluedArrow className="text-primary min-[1200px]:absolute min-[1200px]:-left-[1.2em] min-[1200px]:top-[0.2em] min-[1200px]:mr-0" />
+            <Place end={to} />
+          </span>
         </h1>
         {(from.name || to.name) && (
-          <p className="mt-4 text-[17px] text-muted-foreground">
-            {from.name ?? from.icao}
-            <RouteArrow className="mx-1" />
+          <p className="mt-4 text-balance text-[17px] text-muted-foreground">
+            {from.name ?? from.icao}{" "}
+            <GluedArrow />
             {to.name ?? to.icao}
           </p>
         )}
