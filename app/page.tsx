@@ -36,7 +36,7 @@ const TEAM = [
 ]
 
 export default async function HomePage() {
-  const flights = await getRecentFlights(8)
+  const flights = await getRecentFlights(20)
 
   return (
     <div className="flex min-h-screen flex-col">

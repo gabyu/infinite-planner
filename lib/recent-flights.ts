@@ -50,7 +50,7 @@ async function loadRecentFlights(limit: number): Promise<GlobeFlight[]> {
       .select("origin_airport, destination_airport, origin_airport_name, destination_airport_name, created_at, waypoints")
       .eq("status", "exported")
       .order("created_at", { ascending: false })
-      .limit(Math.min(limit * 6, 120))
+      .limit(Math.min(limit * 6, 300))
     if (error || !Array.isArray(data)) return []
 
     const flights: GlobeFlight[] = []
