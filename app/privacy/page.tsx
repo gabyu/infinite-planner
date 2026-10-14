@@ -59,9 +59,29 @@ export default function PrivacyPage() {
         </p>
         <p>
           Your Discord username is the name by which you are identified on the Service, and the only element of your
-          profile that is visible to other people. In particular, when you share a flight plan, your Discord username
-          is displayed with it as its author to anyone who opens the link, whether or not they have an account. Your
-          avatar and email address are never shown to other users or visitors.
+          profile that is visible to anyone, until you share a flight plan. When you share or publish a flight plan,
+          your Discord username and avatar are displayed with it as its author to anyone who opens its page, whether or
+          not they have an account. Your email address is never shown to other users or visitors.
+        </p>
+        <p>
+          A flight plan you make <strong>public</strong> is listed in the Service's library, and search engines may index
+          it, together with your Discord username. An <strong>unlisted</strong> plan is not listed, and search engines
+          are asked not to index it. Search engines and other caches may keep a page for some time after you withdraw
+          it, which we do not control.
+        </p>
+        <p>
+          Signed-in users can open a pilot profile page, which shows your Discord username and avatar, the month you
+          joined, the flight plans you published, and a few totals: the number of flight plans you created (including
+          private ones), your published plans, the total distance, and the downloads and likes your plans received. It
+          also shows your favorite airport and your most frequent flight numbers; these are worked out from all of your
+          exported flight plans, private ones included, but only the result is shown, never the private plans
+          themselves.
+        </p>
+        <p>
+          We record which signed-in users liked, downloaded, or imported a published flight plan (one record per user
+          and plan, to avoid counting twice), and the reports users send about flight plans, with the reporter and the
+          reason. Anonymous visits are not counted. The record of who liked or downloaded a plan is visible to you for
+          your own actions only; other users see totals.
         </p>
         <p>The core features of the Service can be used without creating an account.</p>
       </section>
@@ -148,7 +168,11 @@ export default function PrivacyPage() {
             Anonymous flight plan statistics are kept indefinitely in aggregate form. As they are not linked to any
             individual, standard retention limits for personal data do not apply to them.
           </li>
-          <li>Discord account data is kept until you delete your account.</li>
+          <li>
+            Discord account data is kept until you delete your account. Deleting it also removes the flight plans you
+            published, your likes and download records, and the reports you sent. Copies of your plans that other users
+            imported stay in their accounts, without any link back to you.
+          </li>
           <li>
             Unsaved drafts are not retained indefinitely, as described in our{" "}
             <Link href="/terms">Terms of Service</Link>.

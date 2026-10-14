@@ -30,8 +30,11 @@ import {
   AUTOSAVE_INTERVAL_MS,
   BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
+  PRIVATE_SHARE,
   type FlightPlanSource,
   type FlightPlanStatus,
+  type PlanShare,
+  type PlanVisibility,
   type StoredWaypoint,
 } from "@/lib/flight-plans"
 import { ShareDialog } from "@/components/share-dialog"
@@ -204,7 +207,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [isPreparingShare, setIsPreparingShare] = useState(false)
   // Share link of the plan this session saved, if it is being shared (null = not shared).
-  const [planShareToken, setPlanShareToken] = useState<string | null>(null)
+  const [planShare, setPlanShare] = useState<PlanShare>(PRIVATE_SHARE)
+  const [planFeatured, setPlanFeatured] = useState(false)
+  // Whether "Public" is offered when sharing: the library is launched, or the user is an admin (asked once signed in).
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
@@ -558,7 +564,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setSavedStatus(null)
     setSavedFingerprint(null)
     setLastSavedAt(null)
-    setPlanShareToken(null)
+    setPlanShare(PRIVATE_SHARE)
     setDraftArmed(false)
     setAutosaveError(null)
   }
@@ -578,7 +584,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       savedStatusRef.current = null
       setSavedPlanId(null)
       setSavedStatus(null)
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
     }
 
     const body = JSON.stringify({
@@ -596,7 +602,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       fetch(url, { method, headers: { "Content-Type": "application/json" }, body })
     const startNewRow = () => {
       savedPlanIdRef.current = null
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
       return send("/api/flight-plans", "POST")
     }
 
@@ -698,9 +704,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           return
         }
         // Sketch drafts belong in Sketch, imported ones in Convert.
-        const rightMode = body.source === "Sketch" ? "draw" : "import"
+        // A copy of someone else's plan (an import from the library) always opens in Convert's map view, whatever
+        // its source: it is edited as waypoints, not on the Sketch board.
+        const rightMode = body.source === "Sketch" && !body.is_fork ? "draw" : "import"
         if (rightMode !== mode) {
-          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}`)
+          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}${body.is_fork ? "&fork=1" : ""}`)
           return
         }
 
@@ -735,12 +743,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
+          // Straight from the library: map first, editing tools at hand (the same view a fresh conversion opens).
+          if (new URLSearchParams(window.location.search).get("fork") === "1") setShowMapPreview(true)
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"
         setSavedPlanId(body.id)
         setSavedStatus("draft")
-        setPlanShareToken(null)
+        setPlanShare(PRIVATE_SHARE)
         setLastSavedAt(new Date(body.created_at))
         setDraftArmed(true)
         setResume({ state: "idle" })
@@ -1166,6 +1176,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
+  useEffect(() => {
+    if (!authUser) return setLibraryOpen(false)
+    fetch("/api/library/access", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((body) => setLibraryOpen(body?.open === true))
+      .catch(() => setLibraryOpen(false))
+  }, [authUser])
+
   // Share: only an exported plan can be shared, and only while the page still shows it as exported.
   // Opens the share modal for that row (it may already be shared from an earlier press).
   const handleShare = async () => {
@@ -1176,9 +1194,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
     const supabase = getBrowserSupabase()
     const { data } = supabase
-      ? await supabase.from("flight_plans").select("share_token").eq("id", savedPlanIdRef.current).maybeSingle()
+      ? await supabase.from("flight_plans").select("visibility, public_id, featured").eq("id", savedPlanIdRef.current).maybeSingle()
       : { data: null }
-    setPlanShareToken((data?.share_token as string | null | undefined) ?? null)
+    setPlanFeatured(!!data?.featured)
+    setPlanShare(
+      data ? { visibility: data.visibility as PlanVisibility, publicId: data.public_id as string | null } : PRIVATE_SHARE,
+    )
     setIsPreparingShare(false)
     setShowShareDialog(true)
   }
@@ -1729,8 +1750,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             planId={savedPlanId}
             origin={originAirport || "ORIG"}
             destination={destinationAirport || "DEST"}
-            shareToken={planShareToken}
-            onShareChange={setPlanShareToken}
+            flightNumber={detectedFlightNumber}
+            share={planShare}
+            onShareChange={setPlanShare}
+            allowPublic={libraryOpen}
+            featured={planFeatured}
+            onFeaturedChange={libraryOpen ? setPlanFeatured : undefined}
           />
         )}
 

@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils"
 
 const sections = [
   { href: "/admin-dashboard", label: "Activity" },
+  { href: "/admin-dashboard/routes", label: "Routes" },
   { href: "/admin-dashboard/admins", label: "Admins" },
+  { href: "/admin-dashboard/settings", label: "Settings" },
 ]
 
 // Section switcher under the shared site header. Activity is the dashboard root, so it only

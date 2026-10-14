@@ -10,6 +10,17 @@ export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 export const FLIGHT_PLAN_STATUSES = ["draft", "exported"] as const
 export type FlightPlanStatus = (typeof FLIGHT_PLAN_STATUSES)[number]
 
+// Who can open a plan: private (only the author), unlisted (anyone with the link, not indexed) or
+// public (listed in the library and indexed). Only an exported plan can leave private.
+export const PLAN_VISIBILITIES = ["private", "unlisted", "public"] as const
+export type PlanVisibility = (typeof PLAN_VISIBILITIES)[number]
+
+export interface PlanShare {
+  visibility: PlanVisibility
+  publicId: string | null
+}
+export const PRIVATE_SHARE: PlanShare = { visibility: "private", publicId: null }
+
 // A draft is saved about once a minute while it is being edited (only when something changed).
 export const AUTOSAVE_INTERVAL_MS = 60_000
 
@@ -35,11 +46,17 @@ export interface FlightPlanSummary {
   destination_airport_name: string | null
   includes_branding: boolean
   flight_time_minutes: number | null
-  share_token: string | null
+  visibility: PlanVisibility
+  // A copy of someone else's plan (imported from the library).
+  is_fork: boolean
+  // Set once the plan has been shared; the plan page lives at /explore/plans/{...}-{public_id}.
+  public_id: string | null
+  // Shown first on the author's profile (only while public).
+  featured: boolean
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, share_token"
+  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
 
 // How many dashboard rows are loaded at a time ("Load more" fetches the next page).
 export const HISTORY_PAGE_SIZE = 50
@@ -69,6 +86,7 @@ export function sourceLabel(source: FlightPlanSource): string {
 }
 
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.
-export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource }) {
+export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource; is_fork?: boolean }) {
+  if (plan.is_fork) return `/convert?draft=${plan.id}&fork=1`
   return `${plan.source === "Sketch" ? "/sketch" : "/convert"}?draft=${plan.id}`
 }

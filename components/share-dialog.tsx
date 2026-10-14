@@ -1,18 +1,21 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, Copy, Link2 } from "lucide-react"
+import { Check, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { RouteArrow } from "@/components/route-arrow"
-import { getBrowserSupabase } from "@/lib/supabase/client"
+import type { PlanShare, PlanVisibility } from "@/lib/flight-plans"
+import { planPath } from "@/lib/plan-slug"
+import { cn } from "@/lib/utils"
 
 interface ShareDialogProps {
   open: boolean
@@ -20,22 +23,55 @@ interface ShareDialogProps {
   planId: string
   origin: string
   destination: string
-  shareToken: string | null
-  // Called with the new token after "Share", or null after "Stop sharing".
-  onShareChange: (token: string | null) => void
+  flightNumber: string | null
+  share: PlanShare
+  // Called with the new state once the server has applied it.
+  onShareChange: (share: PlanShare) => void
+  // Offer "Public" (listed in the library, indexed). Off until the library is open to this user.
+  allowPublic?: boolean
+  // Whether the plan is featured on the author's profile (only offered while it is public).
+  featured?: boolean
+  onFeaturedChange?: (featured: boolean) => void
 }
 
-// The whole sharing UI: one small modal. Not shared yet: a Share button. Shared: the link
-// with a copy action, and Stop sharing. Both go through database functions (share_flight_plan /
-// unshare_flight_plan) that only touch the caller's own plan, so the token is generated
-// server-side and a repeated "Share" returns the existing one instead of making a new link.
-export function ShareDialog({ open, onOpenChange, planId, origin: from, destination: to, shareToken, onShareChange }: ShareDialogProps) {
+const OPTIONS: { value: PlanVisibility; label: string; hint: string }[] = [
+  { value: "private", label: "Private", hint: "Only you can open this flight plan." },
+  {
+    value: "unlisted",
+    label: "Unlisted",
+    hint: "Anyone with the link can view it. It isn't listed anywhere and search engines are told to skip it. Your Discord username is shown as its author.",
+  },
+  {
+    value: "public",
+    label: "Public",
+    hint: "Listed in the library and indexed by search engines. Your Discord name and avatar are shown as its author.",
+  },
+]
+
+// The whole sharing UI: one small modal with a three-way control. Changes go through
+// /api/plans/{id}/visibility, which asks the database function that owns the rules (only the
+// owner, only an exported plan) and drops the cached public page.
+export function ShareDialog({
+  open,
+  onOpenChange,
+  planId,
+  origin: from,
+  destination: to,
+  flightNumber,
+  share,
+  onShareChange,
+  allowPublic = false,
+  featured = false,
+  onFeaturedChange,
+}: ShareDialogProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [origin, setOrigin] = useState("")
+  const [siteOrigin, setSiteOrigin] = useState("")
+  // The first time someone chooses Public they confirm what that means.
+  const [askConsent, setAskConsent] = useState(false)
 
-  useEffect(() => setOrigin(window.location.origin), [])
+  useEffect(() => setSiteOrigin(window.location.origin), [])
   useEffect(() => {
     if (open) {
       setError(null)
@@ -43,36 +79,66 @@ export function ShareDialog({ open, onOpenChange, planId, origin: from, destinat
     }
   }, [open])
 
-  const link = shareToken ? `${origin}/shared/${shareToken}` : ""
+  const link =
+    share.publicId && share.visibility !== "private"
+      ? `${siteOrigin}${planPath({ origin: from, destination: to, flightNumber, publicId: share.publicId })}`
+      : ""
 
-  async function share() {
-    const supabase = getBrowserSupabase()
-    if (!supabase) return
+  async function choose(visibility: PlanVisibility) {
+    if (visibility === share.visibility || busy) return
     setBusy(true)
     setError(null)
-    const { data, error: rpcError } = await supabase.rpc("share_flight_plan", { plan_id: planId })
-    setBusy(false)
-    if (rpcError || !data) {
-      console.error("Sharing failed:", rpcError?.message)
-      setError("Couldn't create the link. Please try again.")
-      return
+    try {
+      const response = await fetch(`/api/plans/${planId}/visibility`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility }),
+      })
+      const body = await response.json().catch(() => null)
+      if (response.status === 409 && body?.code === "consent_required") {
+        setAskConsent(true)
+        return
+      }
+      if (!response.ok) {
+        setError(body?.error ?? "Couldn't change the visibility. Please try again.")
+        return
+      }
+      onShareChange({ visibility: body.visibility, publicId: body.publicId })
+    } catch {
+      setError("Couldn't change the visibility. Please try again.")
+    } finally {
+      setBusy(false)
     }
-    onShareChange(data as string)
   }
 
-  async function stopSharing() {
-    const supabase = getBrowserSupabase()
-    if (!supabase) return
+  async function acceptConsent() {
     setBusy(true)
-    setError(null)
-    const { error: rpcError } = await supabase.rpc("unshare_flight_plan", { plan_id: planId })
+    const response = await fetch("/api/library/consent", { method: "POST" }).catch(() => null)
     setBusy(false)
-    if (rpcError) {
-      console.error("Stopping the share failed:", rpcError.message)
-      setError("Couldn't stop sharing. Please try again.")
+    if (!response?.ok) {
+      setAskConsent(false)
+      setError("Couldn't save your choice. Please try again.")
       return
     }
-    onShareChange(null)
+    setAskConsent(false)
+    await choose("public")
+  }
+
+  async function toggleFeatured(next: boolean) {
+    setBusy(true)
+    setError(null)
+    const response = await fetch(`/api/plans/${planId}/featured`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ featured: next }),
+    }).catch(() => null)
+    const body = await response?.json().catch(() => null)
+    setBusy(false)
+    if (!response?.ok) {
+      setError(body?.error ?? "Couldn't update your profile. Please try again.")
+      return
+    }
+    onFeaturedChange?.(next)
   }
 
   async function copy() {
@@ -85,6 +151,9 @@ export function ShareDialog({ open, onOpenChange, planId, origin: from, destinat
       setError("Couldn't copy automatically. Select the link and copy it.")
     }
   }
+
+  const options = OPTIONS.filter((option) => option.value !== "public" || allowPublic)
+  const current = OPTIONS.find((option) => option.value === share.visibility) ?? OPTIONS[0]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,55 +168,88 @@ export function ShareDialog({ open, onOpenChange, planId, origin: from, destinat
         </DialogHeader>
 
         <div className="space-y-3 px-5 py-4">
-          {shareToken ? (
-            <>
-              <p className="text-sm text-muted-foreground">
-                Anyone with this link can view and download the flight plan, no account needed. Your Discord username is shown on the link as its author.
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={link}
-                  onFocus={(e) => e.target.select()}
-                  aria-label="Share link"
-                  className="font-mono text-xs"
-                />
-                <Button variant="outline" onClick={copy} className="shrink-0">
-                  {copied ? <Check /> : <Copy />}
-                  {copied ? "Copied" : "Copy"}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Create a link anyone can use to view and download this flight plan, no account needed.
+          <div role="radiogroup" aria-label="Who can open this flight plan" className="flex rounded-full bg-muted p-1">
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={share.visibility === option.value}
+                disabled={busy}
+                onClick={() => choose(option.value)}
+                className={cn(
+                  "flex-1 rounded-full px-3 py-1.5 text-sm font-medium transition-colors motion-reduce:transition-none",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  share.visibility === option.value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-sm text-muted-foreground">{current.hint}</p>
+
+          {link && (
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={link}
+                onFocus={(e) => e.target.select()}
+                aria-label="Link to this flight plan"
+                className="font-mono text-xs"
+              />
+              <Button variant="outline" onClick={copy} className="shrink-0">
+                {copied ? <Check /> : <Copy />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          )}
+
+          {share.visibility === "public" && onFeaturedChange && (
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={featured}
+                disabled={busy}
+                onChange={(e) => toggleFeatured(e.target.checked)}
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+              />
+              Feature on my profile
+            </label>
+          )}
+
+          {share.visibility !== "private" && (
+            <p className="text-xs text-muted-foreground">
+              Switch back to Private at any time and the link stops working. Search engines and caches can take a while
+              to forget a page.
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
-            The link always shows the plan as it is now, so later changes reach everyone who has it, and people who
-            already downloaded it aren&apos;t notified.
-          </p>
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
-
-        <div className="flex justify-end gap-2 border-t px-5 py-3">
-          {shareToken ? (
-            <Button
-              variant="outline"
-              onClick={stopSharing}
-              disabled={busy}
-              className="hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
-            >
-              Stop sharing
-            </Button>
-          ) : (
-            <Button onClick={share} disabled={busy}>
-              <Link2 />
-              {busy ? "Creating link..." : "Share"}
-            </Button>
-          )}
-        </div>
       </DialogContent>
+
+      <Dialog open={askConsent} onOpenChange={setAskConsent}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Publish this flight plan?</DialogTitle>
+            <DialogDescription>
+              Your Discord name and avatar will be shown publicly on this plan, and search engines can index it. You can
+              unpublish at any time.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button variant="outline" onClick={() => setAskConsent(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={acceptConsent} disabled={busy}>
+              Publish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

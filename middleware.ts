@@ -1,16 +1,46 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { updateSession } from "@/lib/supabase/middleware"
+import { fetchLibraryLaunched } from "@/lib/library-state"
 
 const ADMIN_BASE = "/admin-dashboard"
 const LOGIN = `${ADMIN_BASE}/login`
 const FIRST_LOGIN = `${ADMIN_BASE}/first-login`
+
+// While the library isn't launched, the cached pages 404 for everyone: a signed-in admin is sent to the
+// live /preview variant of the same page instead, which shows the whole feature. Anyone else, and every
+// request once the library is launched, is untouched. Only library routes ever reach the flag lookup.
+const LIBRARY_PREFIXES = ["/explore/plans/"]
+
+async function previewForAdmins(
+  request: NextRequest,
+  response: NextResponse,
+  supabase: Awaited<ReturnType<typeof updateSession>>["supabase"],
+  user: Awaited<ReturnType<typeof updateSession>>["user"],
+) {
+  const { pathname } = request.nextUrl
+  if (!user || !supabase || !LIBRARY_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null
+  if (await fetchLibraryLaunched()) return null
+
+  const { data: isAdmin } = await supabase.rpc("is_admin")
+  if (isAdmin !== true) return null
+
+  const url = request.nextUrl.clone()
+  url.pathname = `/preview${pathname}`
+  const rewrite = NextResponse.rewrite(url, { request })
+  // Carry the refreshed session cookies set on `response`.
+  response.cookies.getAll().forEach((cookie) => rewrite.cookies.set(cookie))
+  rewrite.headers.set("Cache-Control", "no-store")
+  return rewrite
+}
 
 // Keeps the Supabase session fresh everywhere, and guards /admin-dashboard on the server.
 export async function middleware(request: NextRequest) {
   const { response, supabase, user } = await updateSession(request)
   const { pathname } = request.nextUrl
 
-  if (pathname !== ADMIN_BASE && !pathname.startsWith(`${ADMIN_BASE}/`)) return response
+  if (pathname !== ADMIN_BASE && !pathname.startsWith(`${ADMIN_BASE}/`)) {
+    return (await previewForAdmins(request, response, supabase, user)) ?? response
+  }
 
   // The admin area must never be indexed or cached.
   response.headers.set("X-Robots-Tag", "noindex, nofollow")

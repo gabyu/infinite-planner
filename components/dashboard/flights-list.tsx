@@ -28,6 +28,7 @@ import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
 import { ShareDialog } from "@/components/share-dialog"
+import { planPath } from "@/lib/plan-slug"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 import {
   FLIGHT_PLAN_SUMMARY_COLUMNS,
@@ -38,17 +39,51 @@ import {
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
+type Tab = "all" | "draft" | "exported" | "published" | "favorites" | "imported"
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "draft", label: "Drafts" },
+  { value: "exported", label: "Exported" },
+  { value: "published", label: "Published" },
+  { value: "favorites", label: "Favorites" },
+  { value: "imported", label: "Imported" },
+]
+
 interface FlightsListProps {
   initialPlans: FlightPlanSummary[]
   total: number
+  // The library is open to this user: Public sharing, the tabs for Published / Favorites / Imported.
+  library?: boolean
 }
+
+interface Favorite {
+  public_id: string
+  origin_airport: string
+  destination_airport: string
+  flight_number: string | null
+  author_name: string | null
+}
+
+// What the database says about a copy's original (get_plan_lineage): a link back to it, or nothing
+// when it is gone, private or hidden (never who wrote it then).
+interface Lineage {
+  orphan: boolean
+  original_public_id: string | null
+  original_origin: string | null
+  original_destination: string | null
+  original_flight_number: string | null
+  original_author: string | null
+}
+
+const shareOf = (plan: FlightPlanSummary) => ({ visibility: plan.visibility, publicId: plan.public_id })
 
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
 // no sorting or filtering). Drafts can be viewed, edited and deleted; exported plans are locked and
 // can be viewed, downloaded, shared, duplicated (into a new draft) and deleted.
-export function FlightsList({ initialPlans, total: initialTotal }: FlightsListProps) {
+export function FlightsList({ initialPlans, total: initialTotal, library = false }: FlightsListProps) {
   const [plans, setPlans] = useState(initialPlans)
   const [total, setTotal] = useState(initialTotal)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -57,6 +92,21 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
+  const [tab, setTab] = useState<Tab>("all")
+  const [tabLoading, setTabLoading] = useState(false)
+  const [favorites, setFavorites] = useState<Favorite[] | null>(null)
+  const [lineage, setLineage] = useState<Record<string, Lineage>>({})
+
+  // Copies imported from the library: where they come from.
+  const forkIds = plans.filter((plan) => plan.is_fork).map((plan) => plan.id).join(",")
+  useEffect(() => {
+    const supabase = getBrowserSupabase()
+    if (!supabase || !forkIds) return
+    supabase.rpc("get_plan_lineage", { p_plan_ids: forkIds.split(",") }).then(({ data }) => {
+      const rows = (data ?? []) as (Lineage & { plan_id: string })[]
+      setLineage(Object.fromEntries(rows.map((row) => [row.plan_id, row])))
+    })
+  }, [forkIds])
 
   // Signing out from the header menu: re-render on the server so the list doesn't linger.
   useEffect(() => {
@@ -73,11 +123,18 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
 
   // Rows come back newest first; `from` is how many are already on screen.
   async function fetchPlans(from: number, count: number) {
+    return fetchPlansFor(tab, from, count)
+  }
+
+  async function fetchPlansFor(forTab: Tab, from: number, count: number) {
     const supabase = getBrowserSupabase()
     if (!supabase) return null
-    const { data, count: nextTotal, error } = await supabase
-      .from("flight_plans")
-      .select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
+    let query = supabase.from("flight_plans").select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
+    if (forTab === "draft") query = query.eq("status", "draft")
+    else if (forTab === "exported") query = query.eq("status", "exported")
+    else if (forTab === "published") query = query.eq("visibility", "public")
+    else if (forTab === "imported") query = query.eq("is_fork", true)
+    const { data, count: nextTotal, error } = await query
       .order("created_at", { ascending: false })
       .range(from, from + count - 1)
     if (error) {
@@ -85,6 +142,25 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
       return null
     }
     return { rows: (data ?? []) as unknown as FlightPlanSummary[], total: nextTotal ?? 0 }
+  }
+
+  // The list is filtered by the database, not by what happens to be loaded: switching tab reloads from the start.
+  async function changeTab(next: Tab) {
+    if (next === tab) return
+    setTab(next)
+    setTabLoading(true)
+    if (next === "favorites") {
+      const supabase = getBrowserSupabase()
+      const { data } = supabase ? await supabase.rpc("get_my_favorites", { p_limit: 100, p_offset: 0 }) : { data: null }
+      setFavorites((data as Favorite[] | null) ?? [])
+      setTabLoading(false)
+      return
+    }
+    const result = await fetchPlansFor(next, 0, HISTORY_PAGE_SIZE)
+    setTabLoading(false)
+    if (!result) return toast({ title: "Couldn't load your flight plans", variant: "destructive" })
+    setPlans(result.rows)
+    setTotal(result.total)
   }
 
   async function loadMore() {
@@ -112,13 +188,13 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
   }
 
   async function confirmDelete() {
-    const supabase = getBrowserSupabase()
-    if (!supabase || !deleting) return
+    if (!deleting) return
     setBusy(true)
-    const { error } = await supabase.from("flight_plans").delete().eq("id", deleting.id)
+    // Through the API (not straight to the table) so the cached public page of a shared plan is dropped at once.
+    const response = await fetch(`/api/flight-plans/${deleting.id}`, { method: "DELETE" })
     setBusy(false)
-    if (error) {
-      console.error("Deleting a flight plan failed:", error.message)
+    if (!response.ok) {
+      console.error("Deleting a flight plan failed:", response.status)
       return toast({ title: "Couldn't delete", variant: "destructive" })
     }
     setPlans((current) => current.filter((plan) => plan.id !== deleting.id))
@@ -127,7 +203,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
     toast({ title: "Flight plan deleted", description: routeOf(deleting) })
   }
 
-  if (plans.length === 0) {
+  if (plans.length === 0 && tab === "all") {
     return (
       <div className="flex max-w-xl flex-col items-start rounded-lg border bg-card px-6 py-8">
         <h2 className="text-sm font-medium">No flight plans yet</h2>
@@ -155,6 +231,60 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
 
   return (
     <>
+      {library && (
+        <div role="tablist" aria-label="Filter your flight plans" className="mb-3 flex flex-wrap gap-1">
+          {TABS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => changeTab(value)}
+              className={cn(
+                "rounded-full px-3 py-1 text-sm transition-colors motion-reduce:transition-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                tab === value ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tabLoading ? (
+        <p className="py-8 text-sm text-muted-foreground">Loading...</p>
+      ) : tab === "favorites" ? (
+        favorites && favorites.length > 0 ? (
+          <ul className="divide-y overflow-hidden rounded-lg border bg-card">
+            {favorites.map((favorite) => (
+              <li key={favorite.public_id} className="flex items-center justify-between gap-4 px-4 py-3">
+                <Link
+                  href={planPath({
+                    origin: favorite.origin_airport,
+                    destination: favorite.destination_airport,
+                    flightNumber: favorite.flight_number,
+                    publicId: favorite.public_id,
+                  })}
+                  className="font-mono text-sm font-medium no-underline hover:underline"
+                >
+                  {favorite.origin_airport}
+                  <RouteArrow />
+                  {favorite.destination_airport}
+                  {favorite.flight_number && <span className="ml-2 text-muted-foreground">{favorite.flight_number}</span>}
+                </Link>
+                <span className="truncate text-xs text-muted-foreground">by {favorite.author_name ?? "Infinite Planner admin"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="py-8 text-sm text-muted-foreground">
+            No favorites yet. Like a flight plan in <Link href="/explore" className="underline underline-offset-2">Explore</Link> and it shows up here.
+          </p>
+        )
+      ) : plans.length === 0 ? (
+        <p className="py-8 text-sm text-muted-foreground">Nothing here yet.</p>
+      ) : (
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className={cn("studio-label hidden items-center gap-4 border-b bg-muted/40 px-4 py-2.5 md:grid", columns)}>
           <span>Route</span>
@@ -195,6 +325,30 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
                       {names[0] ?? plan.origin_airport}
                       <RouteArrow className="mx-1" />
                       {names[1] ?? plan.destination_airport}
+                    </p>
+                  )}
+                  {plan.is_fork && lineage[plan.id] && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {lineage[plan.id].orphan || !lineage[plan.id].original_public_id ? (
+                        "Original no longer available"
+                      ) : (
+                        <>
+                          Based on{" "}
+                          <Link
+                            href={planPath({
+                              origin: lineage[plan.id].original_origin ?? "",
+                              destination: lineage[plan.id].original_destination ?? "",
+                              flightNumber: lineage[plan.id].original_flight_number,
+                              publicId: lineage[plan.id].original_public_id!,
+                            })}
+                            className="underline underline-offset-2"
+                          >
+                            {lineage[plan.id].original_origin} → {lineage[plan.id].original_destination}
+                            {lineage[plan.id].original_flight_number ? ` ${lineage[plan.id].original_flight_number}` : ""}
+                          </Link>
+                          {lineage[plan.id].original_author ? ` by ${lineage[plan.id].original_author}` : ""}
+                        </>
+                      )}
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground md:hidden">
@@ -245,12 +399,12 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
                         variant="ghost"
                         size="icon"
                         onClick={() => setSharing(plan)}
-                        title={plan.share_token ? "Shared: manage link" : "Share"}
-                        aria-label={plan.share_token ? "Manage share link" : "Share"}
+                        title={plan.visibility === "private" ? "Share" : "Shared: manage link"}
+                        aria-label={plan.visibility === "private" ? "Share" : "Manage share link"}
                         className="relative"
                       >
                         <Share2 />
-                        {plan.share_token && (
+                        {plan.visibility !== "private" && (
                           <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
                         )}
                       </Button>
@@ -297,6 +451,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
           )}
         </div>
       </div>
+      )}
 
       {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
 
@@ -307,8 +462,12 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
           planId={sharing.id}
           origin={sharing.origin_airport}
           destination={sharing.destination_airport}
-          shareToken={plans.find((plan) => plan.id === sharing.id)?.share_token ?? null}
-          onShareChange={(token) => patchPlan(sharing.id, { share_token: token })}
+          flightNumber={sharing.flight_number}
+          share={shareOf(plans.find((plan) => plan.id === sharing.id) ?? sharing)}
+          onShareChange={(share) => patchPlan(sharing.id, { visibility: share.visibility, public_id: share.publicId, ...(share.visibility === "public" ? {} : { featured: false }) })}
+          allowPublic={library}
+          featured={(plans.find((plan) => plan.id === sharing.id) ?? sharing).featured}
+          onFeaturedChange={library ? (featured) => patchPlan(sharing.id, { featured }) : undefined}
         />
       )}
 
@@ -318,7 +477,7 @@ export function FlightsList({ initialPlans, total: initialTotal }: FlightsListPr
             <DialogTitle>Delete this {deleting?.status === "draft" ? "draft" : "flight plan"}?</DialogTitle>
             <DialogDescription>
               {deleting && <span className="font-mono">{routeOf(deleting)}</span>} will be removed from your dashboard.
-              {deleting?.share_token && " Its share link stops working."} This can&apos;t be undone.
+              {deleting && deleting.visibility !== "private" && " Its public page and link stop working; copies other people made stay with them."} This can&apos;t be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">

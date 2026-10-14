@@ -19,6 +19,42 @@ export interface AirportMatch {
   country: string
 }
 
+// Name, city and IATA code of an airport, for page text: people search "CDG to LAX", not ICAO codes.
+export interface AirportInfo {
+  icao: string
+  name: string
+  city: string
+  iata: string
+  country: string
+}
+
+export function getAirportInfo(icao: string): AirportInfo | null {
+  const code = icao.trim().toUpperCase()
+  const entry = AIRPORTS[code]
+  if (!entry) return null
+  return { icao: code, name: entry[0], city: entry[1], iata: entry[2], country: entry[3] }
+}
+
+// An airport from a typed code: 4 letters = ICAO, 3 letters = IATA. null when unknown.
+let byIata: Map<string, string> | null = null
+export function findAirportByCode(code: string): AirportInfo | null {
+  const value = code.trim().toUpperCase()
+  if (/^[A-Z0-9]{4}$/.test(value)) return getAirportInfo(value)
+  if (!/^[A-Z]{3}$/.test(value)) return null
+  if (!byIata) {
+    byIata = new Map()
+    for (const [icao, entry] of Object.entries(AIRPORTS)) {
+      // Several fields can share an IATA code: keep the biggest one (lowest rank).
+      const iata = entry[2]
+      if (!iata) continue
+      const current = byIata.get(iata)
+      if (!current || entry[4] < AIRPORTS[current][4]) byIata.set(iata, icao)
+    }
+  }
+  const icao = byIata.get(value)
+  return icao ? getAirportInfo(icao) : null
+}
+
 export function resolveAirportName(icao: string): string | null {
   return AIRPORTS[icao.trim().toUpperCase()]?.[0] ?? null
 }
