@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   // admin overview reads unfiltered.
   const since = new Date(Date.now() - GRAPH_WINDOW_DAYS * 86_400_000).toISOString()
   const libraryOpen = await isLibraryOpenFor(await getViewer())
-  const [plans, exported, library, profile] = await Promise.all([
+  const [plans, exported, library] = await Promise.all([
     supabase
       .from("flight_plans")
       .select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
@@ -75,9 +75,6 @@ export default async function DashboardPage() {
     // What the community did with the user's plans (their own rows only, by RLS).
     libraryOpen
       ? supabase.from("flight_plans").select("visibility, like_count, import_count, download_count").eq("status", "exported")
-      : Promise.resolve({ data: null }),
-    libraryOpen
-      ? supabase.from("profiles").select("public_id").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
   ])
   const totals = (library.data ?? []).reduce(
@@ -116,7 +113,7 @@ export default async function DashboardPage() {
     >
       <ActivityOverview exportTimes={exportTimes} />
 
-      {libraryOpen && <LibraryOverview totals={totals} profilePublicId={profile.data?.public_id ?? null} />}
+      {libraryOpen && <LibraryOverview totals={totals} />}
 
       <section className="mt-8" aria-labelledby="my-flights-title">
         <h2 id="my-flights-title" className="mb-3 text-sm font-semibold">

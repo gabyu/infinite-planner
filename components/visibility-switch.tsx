@@ -20,6 +20,8 @@ interface VisibilitySwitchProps {
   // Shown first on the author's profile (offered while the plan is public).
   featured?: boolean
   onFeaturedChange?: (featured: boolean) => void
+  // The copy-link and feature buttons next to the switch. The dashboard puts them in the row's menu instead.
+  showExtras?: boolean
   disabled?: boolean
   disabledReason?: string
   className?: string
@@ -38,6 +40,7 @@ export function VisibilitySwitch({
   onShareChange,
   featured = false,
   onFeaturedChange,
+  showExtras = true,
   disabled,
   disabledReason,
   className,
@@ -124,7 +127,7 @@ export function VisibilitySwitch({
       />
       <span className="text-sm">{isPublic ? "Public" : "Private"}</span>
 
-      {isPublic && link && (
+      {showExtras && isPublic && link && (
         <>
           <Button variant="ghost" size="icon" onClick={copy} title="Copy the link" aria-label="Copy the link">
             {copied ? <Check /> : <Link2 />}
