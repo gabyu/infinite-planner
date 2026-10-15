@@ -33,6 +33,8 @@ export interface PublicPlan {
   authorName: string
   authorAvatarUrl: string | null
   authorPublicId: string
+  // The author holds the contributor badge.
+  authorIsContributor: boolean
 }
 
 const ADMIN_AUTHOR_NAME = "Infinite Planner admin"
@@ -59,6 +61,7 @@ interface PlanRow {
   author_name: string | null
   author_avatar_url: string | null
   author_public_id: string
+  author_is_contributor: boolean
 }
 
 function fromRow(row: PlanRow): PublicPlan {
@@ -84,6 +87,7 @@ function fromRow(row: PlanRow): PublicPlan {
     authorName: row.author_name || ADMIN_AUTHOR_NAME,
     authorAvatarUrl: row.author_avatar_url,
     authorPublicId: row.author_public_id,
+    authorIsContributor: row.author_is_contributor === true,
   }
 }
 

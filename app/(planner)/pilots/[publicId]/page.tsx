@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { PlanGrid } from "@/components/explore/plan-card"
+import { Badges } from "@/components/badges"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
 import { PageShell } from "@/components/ds/page-shell"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
@@ -28,6 +29,7 @@ interface Profile {
   name: string
   avatar_url: string | null
   member_since: string
+  badges: string[]
   is_self: boolean
   plans_created: number
   plans_published: number
@@ -91,7 +93,10 @@ export default async function PilotPage({
           ) : null}
           <div>
             <h1 className="font-display text-[clamp(2rem,4.5vw,3.5rem)] font-semibold leading-[1.05] tracking-[-0.02em]">{profile.name}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Member since {memberSince}</p>
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
+              <span>Member since {memberSince}</span>
+              <Badges badges={profile.badges ?? []} />
+            </p>
           </div>
           {profile.is_self && (
             <Button asChild variant="outline" className="ml-auto rounded-full">

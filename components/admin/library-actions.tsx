@@ -8,6 +8,7 @@ type Action =
   | { action: "moderate"; planId: string; status: "ok" | "hidden" }
   | { action: "resolve"; reportId: string; hide: boolean }
   | { action: "block"; userId: string; blocked: boolean }
+  | { action: "contributor"; userId: string; contributor: boolean }
 
 // A small button that runs one moderation action and refreshes the page. Never optimistic: the table comes
 // back from the database.

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { Compass, Upload, PencilRuler, LayoutDashboard } from "lucide-react"
 import { BrandLogo } from "@/components/brand-logo"
 import { UserMenu } from "@/components/auth/user-menu"
-import { useIsAdmin } from "@/hooks/use-is-admin"
+import { useLibraryPreview } from "@/hooks/use-is-admin"
 import { LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 
 const navLinkClass =
@@ -53,9 +53,9 @@ function NavLink({
 // session (the Dashboard link is always there and the account slot has a fixed width), so
 // links never jump while the sign-in state loads.
 export function SiteHeaderClient({ showExplore }: { showExplore: boolean }) {
-  // Before the launch the library has no nav item, except for admins, who are the only ones who can open it.
-  const isAdmin = useIsAdmin(!showExplore)
-  const explore = showExplore || isAdmin
+  // Before the launch the library has no nav item, except for admins and contributors, who are the only ones who can open it.
+  const canPreview = useLibraryPreview(!showExplore)
+  const explore = showExplore || canPreview
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-xl backdrop-saturate-150">
       <div className="container mx-auto flex items-center justify-between px-4 py-2 sm:py-4">

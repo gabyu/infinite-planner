@@ -105,7 +105,7 @@ export default async function RoutesAdminPage({ searchParams }: { searchParams: 
         <div className="rounded-lg border bg-card px-4 py-3">
           <p className="studio-label">Public plans</p>
           <p className="mt-1.5 font-mono text-2xl">{coverage?.public_plans ?? 0}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{launched ? "Library launched" : "Pre-launch: visible to admins only"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{launched ? "Library launched" : "Pre-launch: visible to admins and contributors only"}</p>
         </div>
         <div className="rounded-lg border bg-card px-4 py-3">
           <p className="studio-label">Distinct routes</p>

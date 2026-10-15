@@ -12,7 +12,7 @@ import { getPublicPlan, type PublicPlan } from "@/lib/public-plans"
 
 // One plan page, two ways to reach it:
 //   "public"  /explore/plans/{slug}          cached for everyone (ISR). While the library isn't launched it 404s.
-//   "preview" /preview/explore/plans/{slug}  per request, admins only: the middleware sends signed-in admins
+//   "preview" /preview/explore/plans/{slug}  per request, admins and contributors only: the middleware sends signed-in ones
 //                                    here while the library isn't launched, so they see everything.
 export type PlanPageMode = "public" | "preview"
 
@@ -73,7 +73,7 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
       )}
       {mode === "preview" && prelaunch && (
         <div className="border-b bg-primary/10 px-4 py-1.5 text-center text-xs text-primary">
-          Pre-launch — visible to admins only
+          Pre-launch — visible to admins and contributors only
         </div>
       )}
       <PlanView plan={plan} sameRoute={sameRoute.plans} sameAuthor={sameAuthor.plans} />
