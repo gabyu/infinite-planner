@@ -6,7 +6,9 @@ import { formatFlightTime } from "@/lib/flight-plans"
 import { getLibraryLaunched } from "@/lib/library"
 import { publicIdFromSlug } from "@/lib/plan-slug"
 import { getPublicPlan } from "@/lib/public-plans"
-import { altitudeHex, hasAltitudeData, projectRoute, sampleWaypoints, toSvgPath } from "@/lib/route-render"
+import { isLand } from "@/lib/land"
+import { describeEnd } from "@/lib/plan-meta"
+import { altitudeHex, createProjection, hasAltitudeData, sampleWaypoints, terrainDots, toSvgPath } from "@/lib/route-render"
 
 // The preview card of a plan link: the route drawn on a blue field, with the airports and a few
 // facts. Same lifecycle as the page: data-cached, refreshed every 5 minutes and dropped at once by
@@ -21,7 +23,7 @@ const fontsDir = join(process.cwd(), "assets", "fonts")
 const loadFont = (file: string) => readFile(join(fontsDir, file))
 
 // Route panel (the wide band under the airports), in px.
-const MAP = { width: 1072, height: 252, pad: 40 }
+const MAP = { width: 1072, height: 226, pad: 36 }
 
 export default async function Image({ params }: { params: { slug: string } }) {
   const publicId = publicIdFromSlug(params.slug)
@@ -39,10 +41,14 @@ export default async function Image({ params }: { params: { slug: string } }) {
   // The logo's blue is the same as the top of the card's gradient: lightened a touch so it reads.
   const logoDataUri = `data:image/svg+xml;base64,${Buffer.from(logoSvg.toString().replace("#3C82F6", "#6FA3F9")).toString("base64")}`
 
-  const points = plan.waypoints.length >= 2 ? projectRoute(sampleWaypoints(plan.waypoints, 150), MAP) : []
-  const path = toSvgPath(points)
-  // Coloured by altitude with the homepage's ramp, unless the plan has none.
+  // The route over the land (the homepage globe's coastlines, as dots), coloured by altitude with the homepage's ramp.
   const sampledRoute = sampleWaypoints(plan.waypoints, 150)
+  const projection = plan.waypoints.length >= 2 ? createProjection(sampledRoute, MAP, 6) : null
+  const points = projection ? projection.route.map((w) => projection.project(w.lat, w.lng)) : []
+  const path = toSvgPath(points)
+  const land = projection ? terrainDots(MAP, projection.unproject, isLand, 9) : ""
+  const from = describeEnd(plan.origin, plan.originName)
+  const to = describeEnd(plan.destination, plan.destinationName)
   const colored = hasAltitudeData(sampledRoute)
   const segments = colored
     ? points.slice(1).map((point, i) => ({
@@ -97,7 +103,9 @@ export default async function Image({ params }: { params: { slug: string } }) {
             display: "block",
             maxWidth: MAP.width,
             marginTop: 14,
-            fontSize: 28,
+            fontSize: 36,
+            lineHeight: 1.25,
+            flexShrink: 0,
             fontWeight: 500,
             opacity: 0.95,
             whiteSpace: "nowrap",
@@ -105,7 +113,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
             overflow: "hidden",
           }}
         >
-          {`${plan.originName ?? plan.origin}  →  ${plan.destinationName ?? plan.destination}`}
+          {`${from.city ?? from.name ?? plan.origin}  →  ${to.city ?? to.name ?? plan.destination}`}
         </div>
 
         <div
@@ -121,6 +129,9 @@ export default async function Image({ params }: { params: { slug: string } }) {
         >
           {path && first && last ? (
             <svg width={MAP.width} height={MAP.height} viewBox={`0 0 ${MAP.width} ${MAP.height}`}>
+              <path d={land} fill="none" stroke="white" strokeOpacity={0.3} strokeWidth={4} strokeLinecap="round" />
+              {/* A white edge under the coloured line, so violet and blue still read on the blue card. */}
+              <path d={path} fill="none" stroke="white" strokeOpacity={0.6} strokeWidth={11} strokeLinecap="round" strokeLinejoin="round" />
               {colored ? (
                 segments.map((segment, i) => (
                   <path
