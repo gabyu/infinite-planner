@@ -6,7 +6,7 @@ import { PlanGrid } from "@/components/explore/plan-card"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
 import { Button } from "@/components/ui/button"
 import { getAirportInfo } from "@/lib/airports"
-import { BRAND_NAME, LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
+import { BRAND_NAME, LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 import { requireLibraryAccess } from "@/lib/library-access"
 import { getLibraryLaunched } from "@/lib/library"
 import { listPlans } from "@/lib/library-listing"
@@ -62,14 +62,14 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
       {prelaunch && <PrelaunchBanner />}
       <BreadcrumbJsonLd
         items={[
-          { name: LIBRARY_NAME, path: LIBRARY_PATH },
+          { name: LIBRARY_NAV_LABEL, path: LIBRARY_PATH },
           { name: airport.icao, path },
         ]}
       />
       <div className="container mx-auto max-w-6xl px-4 pb-24 pt-10 sm:pt-16">
         <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
           <Link href={LIBRARY_PATH} className="no-underline hover:text-foreground">
-            {LIBRARY_NAME}
+            {LIBRARY_NAV_LABEL}
           </Link>
           <span aria-hidden> / </span>
           <span>{airport.icao}</span>
@@ -114,7 +114,7 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
         <div className="mt-12">
           <Button asChild variant="outline" className="rounded-full">
             <Link href={LIBRARY_PATH} className="no-underline">
-              Browse all of {LIBRARY_NAME}
+              Browse all of {LIBRARY_NAV_LABEL}
             </Link>
           </Button>
         </div>

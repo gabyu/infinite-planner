@@ -15,6 +15,8 @@ All notable changes to Infinite Planner are documented here.
 
 ### Changed
 - **Share links are gone.** The Share button is replaced by a **Visibility** switch (Private / Public) on every exported flight plan, in the dashboard and in the editor. All the links created by the old sharing feature stop working. Downloading will require a Discord sign-in once the library is launched.
+- **Flight number you can edit.** In the flight plan editor (signed in) a new **Flight number** field lets you change or clear the number read from the file name, for a codeshare or a number of your own, until you export. It is saved with the plan.
+- **Breadcrumb on plan pages**: Explore / route / flight number, each step a link back up. The **Explore** item of the menu stays clickable on the pages under it.
 - **Help.** The guide and the FAQ are one page, **Help**, in the menu; `/how-it-works` and `/faq` redirect to it.
 - **The map screen of Convert is the flight plan editor.**
 - **The Terms of Service, Privacy Policy and FAQ cover the library**: visibility, the licence to display published plans, who sees your name and avatar, profiles, reports and what deleting an account removes. These texts need a human read before release.

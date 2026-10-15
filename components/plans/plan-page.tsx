@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from "next/navigation"
 import { BreadcrumbJsonLd } from "@/components/explore/breadcrumb-json-ld"
 import { PlanView } from "@/components/plans/plan-view"
 import { listPlans } from "@/lib/library-listing"
-import { BRAND_NAME, LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
+import { BRAND_NAME, LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 import { getLibraryLaunched } from "@/lib/library"
 import { planMetadata } from "@/lib/plan-meta"
 import { planPath, planSlug, publicIdFromSlug, routeHubPath } from "@/lib/plan-slug"
@@ -65,7 +65,7 @@ export async function PlanPage({ slug, mode }: { slug: string; mode: PlanPageMod
       {resolved.indexable && (
         <BreadcrumbJsonLd
           items={[
-            { name: LIBRARY_NAME, path: LIBRARY_PATH },
+            { name: LIBRARY_NAV_LABEL, path: LIBRARY_PATH },
             { name: `${plan.origin} to ${plan.destination}`, path: routeHubPath(plan.origin, plan.destination) },
             { name: plan.flightNumber ? `${plan.flightNumber}` : "Flight plan", path: planPath(plan) },
           ]}

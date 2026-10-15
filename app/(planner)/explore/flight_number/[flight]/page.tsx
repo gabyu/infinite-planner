@@ -5,7 +5,7 @@ import { BreadcrumbJsonLd } from "@/components/explore/breadcrumb-json-ld"
 import { PlanGrid } from "@/components/explore/plan-card"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
 import { Button } from "@/components/ui/button"
-import { BRAND_NAME, LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
+import { BRAND_NAME, LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 import { getLibraryLaunched } from "@/lib/library"
 import { requireLibraryAccess } from "@/lib/library-access"
 import { decodeCursor, encodeCursor, listPlans } from "@/lib/library-listing"
@@ -61,14 +61,14 @@ export default async function FlightNumberPage({
       {prelaunch && <PrelaunchBanner />}
       <BreadcrumbJsonLd
         items={[
-          { name: LIBRARY_NAME, path: LIBRARY_PATH },
+          { name: LIBRARY_NAV_LABEL, path: LIBRARY_PATH },
           { name: flight, path },
         ]}
       />
       <div className="container mx-auto max-w-6xl px-4 pb-24 pt-10 sm:pt-16">
         <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
           <Link href={LIBRARY_PATH} className="no-underline hover:text-foreground">
-            {LIBRARY_NAME}
+            {LIBRARY_NAV_LABEL}
           </Link>
           <span aria-hidden> / </span>
           <span>{flight}</span>
