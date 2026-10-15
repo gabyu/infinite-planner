@@ -231,6 +231,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const draftLoadedRef = useRef(false)
   const skipNamingRef = useRef(false)
   const [flightNumberOverride, setFlightNumberOverride] = useState<string | null>(null)
+  // What the person typed in the Flight number field (a codeshare, a callsign of their own...). undefined = untouched:
+  // the number read from the file name (or saved with the draft) stands.
+  const [flightNumberEdit, setFlightNumberEdit] = useState<string | undefined>(undefined)
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -423,6 +426,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         // A new import is a new plan: it must not overwrite the one saved from the previous import.
         resetSavedPlan()
         setFlightNumberOverride(null)
+        setFlightNumberEdit(undefined)
         setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -518,7 +522,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
   // strict patterns, so a looser guess never counts. Shown on the page and saved with the plan. A reopened
   // draft has no file name any more: it uses the flight number that was saved with it.
-  const detectedFlightNumber = (() => {
+  const fileFlightNumber = (() => {
     if (mode !== "import") return null
     if (importedFileName) {
       const parsed = parseFlightFilename(importedFileName)
@@ -526,6 +530,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
     return flightNumberOverride
   })()
+  // The flight number the plan carries: what was typed in the field when there is something, else the file's. It can be
+  // changed until the plan is exported (a flight often has codeshare numbers), and cleared.
+  const detectedFlightNumber = flightNumberEdit !== undefined ? flightNumberEdit || null : fileFlightNumber
 
   const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
   const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
@@ -562,6 +569,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setSavedFingerprint(null)
     setLastSavedAt(null)
     setPlanShare(PRIVATE_SHARE)
+    setFlightNumberEdit(undefined)
     setDraftArmed(false)
     setAutosaveError(null)
   }
@@ -1273,6 +1281,25 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
       {canSave && (
         <PanelSection
+          label="Flight number"
+          className={inGrid ? exportSectionClass : undefined}
+          help={`Optional. Read from the file name when it carries one; change it if you fly the flight under another number (codeshares). Letters and digits, up to 12. Saved with the plan.`}
+        >
+          <Input
+            id="flight-number"
+            value={detectedFlightNumber ?? ""}
+            onChange={(e) => setFlightNumberEdit(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12))}
+            placeholder="e.g. AF69"
+            aria-label="Flight number"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-8 w-full max-w-[9rem] font-mono"
+          />
+        </PanelSection>
+      )}
+
+      {canSave && (
+        <PanelSection
           label="Flight time"
           className={inGrid ? exportSectionClass : undefined}
           help="Optional. How long the flight takes: saved with the plan in your dashboard."
@@ -1292,7 +1319,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             {detectedFlightNumber}
           </span>
         ) : (
-          <span>No flight number in the file name</span>
+          <span>No flight number in the file name{canSave ? ": you can add one below" : ""}</span>
         )}
         <span>{importSource}</span>
       </div>
@@ -1539,7 +1566,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}
                 </div>
 
-                <div className="mt-4 grid overflow-hidden rounded-md border sm:grid-cols-[1fr_1fr_auto]">
+                <div
+                  className={cn(
+                    "mt-4 grid overflow-hidden rounded-md border",
+                    canSave ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_auto]",
+                  )}
+                >
                   {exportOptions(true)}
                   <div className="p-4 sm:w-72">{exportButtons}</div>
                 </div>

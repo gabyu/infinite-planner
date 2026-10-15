@@ -11,6 +11,7 @@ import { formatFlightTime, sourceLabel } from "@/lib/flight-plans"
 import { describeEnd, type PlanEnd } from "@/lib/plan-meta"
 import { PlanGrid } from "@/components/explore/plan-card"
 import type { PlanCardData } from "@/lib/library-listing"
+import { LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 import { flightNumberPath, locationPath, planPath, routeHubPath } from "@/lib/plan-slug"
 import type { PublicPlan } from "@/lib/public-plans"
 import { formatAltitude, formatDistanceNm, hasAltitudeData } from "@/lib/route-render"
@@ -90,20 +91,35 @@ export function PlanView({
   return (
     <article className="container mx-auto max-w-5xl px-4 pb-24 pt-10 sm:pt-16">
       <header>
-        <p className="font-mono text-sm uppercase tracking-wide text-muted-foreground">
-          {plan.flightNumber ? (
-            <Link href={flightNumberPath(plan.flightNumber)} className="no-underline hover:text-primary" title={`All flight plans of ${plan.flightNumber}`}>
-              Flight {plan.flightNumber}
-            </Link>
-          ) : (
-            "Flight plan"
-          )}
-        </p>
+        {/* Where this page sits: Explore > the route > this flight plan. Each step goes back up. */}
+        <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
+          <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <li>
+              <Link href={LIBRARY_PATH} className="no-underline hover:text-foreground">
+                {LIBRARY_NAV_LABEL}
+              </Link>
+            </li>
+            <li aria-hidden>/</li>
+            <li>
+              <Link
+                href={routeHubPath(plan.origin, plan.destination)}
+                className="font-mono no-underline hover:text-foreground"
+                title={`All flight plans from ${plan.origin} to ${plan.destination}`}
+              >
+                {plan.origin}–{plan.destination}
+              </Link>
+            </li>
+            <li aria-hidden>/</li>
+            <li aria-current="page" className={plan.flightNumber ? "font-mono text-foreground" : "text-foreground"}>
+              {plan.flightNumber ?? "Flight plan"}
+            </li>
+          </ol>
+        </nav>
         {/* Origin on one line, destination on the next. A small arrow in the left gutter flies down from the first line
             to the second when the page loads, like an aircraft going from origin to destination (no animation
             for people who ask for reduced motion: it simply rests beside the destination). Both lines start
             on the same edge: the gutter is in the margin on wide screens and a left indent where there is none. */}
-        <h1 className="relative mt-3 text-balance pl-[0.85em] font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em] min-[1200px]:pl-0">
+        <h1 className="relative mt-5 text-balance pl-[0.85em] font-display text-[clamp(2.25rem,5vw,4rem)] font-semibold leading-[1.05] tracking-[-0.02em] min-[1200px]:pl-0">
           <span
             aria-hidden
             className="plan-flight pointer-events-none absolute -top-[0.02em] left-0 flex h-[1.05em] w-[0.8em] items-center justify-center text-primary min-[1200px]:-left-[1.1em]"
@@ -142,6 +158,11 @@ export function PlanView({
             {plan.authorIsContributor && <Badges badges={["contributor"]} />}
           </span>
           <span>{sourceLabel(plan.source)}</span>
+          {plan.flightNumber && (
+            <Link href={flightNumberPath(plan.flightNumber)} className="no-underline hover:text-primary">
+              All {plan.flightNumber} flight plans
+            </Link>
+          )}
           <span>Generated on {generated}</span>
           {plan.includesBranding && <span>Made with Infinite Planner</span>}
         </div>

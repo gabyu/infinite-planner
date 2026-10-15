@@ -32,7 +32,8 @@ function NavLink({
   const isActive = matchPrefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href
   const responsiveClass = hideOnMobile ? "hidden sm:flex" : "flex"
 
-  if (isActive) {
+  // Exactly on the page: nothing to click. Somewhere below it (Explore and its plan pages): still a link back.
+  if (isActive && pathname === href) {
     return (
       <span className={`${activeNavLinkClass} ${responsiveClass}`}>
         {icon}
@@ -42,7 +43,11 @@ function NavLink({
   }
 
   return (
-    <Link href={href} className={`${navLinkClass} ${responsiveClass}`}>
+    <Link
+      href={href}
+      aria-current={isActive ? "true" : undefined}
+      className={`${isActive ? `${activeNavLinkClass} no-underline` : navLinkClass} ${responsiveClass}`}
+    >
       {icon}
       {children}
     </Link>
