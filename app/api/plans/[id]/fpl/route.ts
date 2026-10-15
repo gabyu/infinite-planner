@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
 // Downloads a public plan of the library as an .fpl; signing in with Discord is required, and each user counts
-// once per plan (never for their own). Before the launch the library is for admins only. `id` is the plan's PUBLIC
+// once per plan (never for their own). Before the launch the library is for admins and contributors only. `id` is the plan's PUBLIC
 // id (the visibility route next to it takes the plan's database id: same segment name, because Next needs one
 // name per path).
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
@@ -20,7 +20,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!plan) return json({ error: "This flight plan isn't available." }, 404)
 
   const viewer = await getViewer()
-  if (!(await fetchLibraryLaunched()) && !viewer.isAdmin) return json({ error: "This flight plan isn't available." }, 404)
+  if (!(await fetchLibraryLaunched()) && !viewer.canPreview) return json({ error: "This flight plan isn't available." }, 404)
   if (!viewer.userId) return json({ error: "Sign in with Discord to download flight plans." }, 401)
   if (!allowAction(viewer.userId)) return json({ error: "Too many actions. Try again in a minute." }, 429)
 

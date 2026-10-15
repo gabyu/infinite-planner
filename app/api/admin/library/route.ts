@@ -10,6 +10,7 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("moderate"), planId: z.string(), status: z.enum(["ok", "hidden"]) }),
   z.object({ action: z.literal("resolve"), reportId: z.string(), hide: z.boolean() }),
   z.object({ action: z.literal("block"), userId: z.string(), blocked: z.boolean() }),
+  z.object({ action: z.literal("contributor"), userId: z.string(), contributor: z.boolean() }),
   z.object({ action: z.literal("launch") }),
   z.object({ action: z.literal("target"), target: z.number().int().min(1).max(100000) }),
 ])
@@ -41,6 +42,16 @@ export async function POST(request: Request) {
     if (error) return fail(error)
     forgetLibraryState()
     revalidateTag("library")
+  } else if (body.action === "contributor") {
+    // Raises a Discord member to contributor, or demotes a contributor back to member. The database function refuses
+    // anything else (an admin, a non-Discord account).
+    if (!isUuid(body.userId)) return json({ error: "Invalid request." }, 400)
+    const { error } = await supabase.rpc("admin_set_contributor", { p_user_id: body.userId, p_contributor: body.contributor })
+    if (error) {
+      if (error.message.includes("user_not_eligible")) return json({ error: "This account can't be changed." }, 409)
+      return fail(error)
+    }
+    return json({ ok: true })
   } else if (body.action === "target") {
     const { error } = await supabase.rpc("admin_set_library_target", { p_target: body.target })
     if (error) return fail(error)

@@ -78,6 +78,19 @@ production's tables, not its migration list.
   route colour. The source filter is gone from Explore.
 - `/explore` is laid out like a magazine (cover story, trending, latest, more).
 
+## Contributor role (2026-10-15)
+
+- Migration `20261016000000_contributor_role.sql` (apply after the six library migrations): `profiles.role` accepts
+  `contributor`, new `contributor_since`, `viewer_role()` / `has_library_preview()`, admin functions to list, find,
+  raise and demote, and the badge in `get_pilot_profile` and `get_public_plan`.
+- A contributor can use the library before the launch (Explore, plan pages, the Visibility switch, likes, imports) like an
+  admin, but has no admin space: `is_admin()` and the admin middleware are unchanged. After the launch they keep the role
+  as a badge.
+- Admin > **Contributors**: search a Discord member by name, **Make contributor**; the list shows since / published plans /
+  downloads / likes, and **Demote**. Admins can't be raised or demoted from there. Demoting does not unpublish plans: before
+  the launch a demoted account simply loses access to the library (its public plans 404 for non-admins like any other).
+- Seeding in production: apply the migration, deploy, then raise the chosen members from the Contributors tab.
+
 ## Emergency rollback of the launch
 
 ```sql

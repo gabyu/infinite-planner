@@ -11,25 +11,34 @@ import { fetchLibraryLaunched } from "@/lib/library-state"
 export interface Viewer {
   userId: string | null
   isAdmin: boolean
+  // A Discord account an admin raised to publish during the soft launch. No admin space, but the library is open to it
+  // before the launch.
+  isContributor: boolean
+  // May use the library before its launch: an admin or a contributor.
+  canPreview: boolean
 }
 
-// The signed-in user, verified with the Auth server, and whether they are an active admin.
+const ANONYMOUS: Viewer = { userId: null, isAdmin: false, isContributor: false, canPreview: false }
+
+// The signed-in user, verified with the Auth server, and their role (admin / contributor / member).
 // Reads the session cookie, so a page that calls it is rendered per request: the cached library
 // pages never do (their gate is the launch flag alone, and admins are routed to the live
 // /preview variant by the middleware).
 export const getViewer = cache(async (): Promise<Viewer> => {
   const supabase = getServerSupabase()
-  if (!supabase) return { userId: null, isAdmin: false }
+  if (!supabase) return ANONYMOUS
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return { userId: null, isAdmin: false }
-  const { data } = await supabase.rpc("is_admin")
-  return { userId: user.id, isAdmin: data === true }
+  if (!user) return ANONYMOUS
+  const { data } = await supabase.rpc("viewer_role")
+  const isAdmin = data === "admin"
+  const isContributor = data === "contributor"
+  return { userId: user.id, isAdmin, isContributor, canPreview: isAdmin || isContributor }
 })
 
 export async function isLibraryOpenFor(viewer: Viewer): Promise<boolean> {
-  return (await fetchLibraryLaunched()) || viewer.isAdmin
+  return (await fetchLibraryLaunched()) || viewer.canPreview
 }
 
 // The launch flag as a cached page input: tagged `library`, so flipping the switch (which revalidates

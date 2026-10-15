@@ -10,6 +10,7 @@ All notable changes to Infinite Planner are documented here.
 - **Download, like, import.** Signed in with Discord, you can download a plan, like it (Favorites in your dashboard) and **import** it: a copy lands in your dashboard and opens in the map, ready to adjust and export as your own. Signed out, you see everything and are invited to sign in; whatever you clicked is done when you come back. A copy shows "Based on…" in your dashboard, or "Original no longer available" if the author unpublished it.
 - **Pilot profiles.** Signed-in users can open a profile (`/pilots/…`): published plans, up to six featured ones, and a few totals.
 - **Report a flight plan.** Signed-in users can report a published plan (a reason and a few words).
+- **Contributors.** A new role between a Discord member and an admin: the members an admin raises to publish flight plans while the library is still in soft launch. They see the same site as everyone else (no admin space) plus the library; after the launch they keep a **Contributor** badge on their profile and on their plans. The admin dashboard has a new **Contributors** tab: find a member, make them a contributor, see how many plans each one published, and demote them.
 - **A Routes section in the admin dashboard**: the library with its coverage, the open reports (resolve, or hide the plan), a Hide / Unhide on every plan, and a switch to stop a user from publishing.
 
 ### Changed

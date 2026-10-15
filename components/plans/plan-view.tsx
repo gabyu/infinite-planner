@@ -3,6 +3,7 @@ import { ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AltitudeGraph } from "@/components/plans/altitude-graph"
 import { RouteMap } from "@/components/plans/route-map"
+import { Badges } from "@/components/badges"
 import { AuthorLink } from "@/components/plans/author-link"
 import { PlanActions } from "@/components/plans/plan-actions"
 import { RouteArrow } from "@/components/route-arrow"
@@ -138,6 +139,7 @@ export function PlanView({
               />
             ) : null}
             <AuthorLink name={plan.authorName} profilePublicId={plan.authorPublicId} />
+            {plan.authorIsContributor && <Badges badges={["contributor"]} />}
           </span>
           <span>{sourceLabel(plan.source)}</span>
           <span>Generated on {generated}</span>

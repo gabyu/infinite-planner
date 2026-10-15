@@ -6,7 +6,7 @@ const ADMIN_BASE = "/admin-dashboard"
 const LOGIN = `${ADMIN_BASE}/login`
 const FIRST_LOGIN = `${ADMIN_BASE}/first-login`
 
-// While the library isn't launched, the cached pages 404 for everyone: a signed-in admin is sent to the
+// While the library isn't launched, the cached pages 404 for everyone: a signed-in admin or contributor is sent to the
 // live /preview variant of the same page instead, which shows the whole feature. Anyone else, and every
 // request once the library is launched, is untouched. Only library routes ever reach the flag lookup.
 const LIBRARY_PREFIXES = ["/explore/plans/"]
@@ -21,8 +21,9 @@ async function previewForAdmins(
   if (!user || !supabase || !LIBRARY_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return null
   if (await fetchLibraryLaunched()) return null
 
-  const { data: isAdmin } = await supabase.rpc("is_admin")
-  if (isAdmin !== true) return null
+  // Admins and contributors (the soft launch's publishers) get the live preview variant.
+  const { data: canPreview } = await supabase.rpc("has_library_preview")
+  if (canPreview !== true) return null
 
   const url = request.nextUrl.clone()
   url.pathname = `/preview${pathname}`
