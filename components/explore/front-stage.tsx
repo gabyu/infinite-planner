@@ -231,7 +231,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
               {item.codeTo}
               {item.facts && <> · {item.facts}</>}
             </p>
-            {item.note && <p className="mt-4 max-w-xl text-[17px] leading-snug text-foreground/90">&ldquo;{item.note}&rdquo;</p>}
+            {item.note && <p className="mt-4 max-w-xl text-[17px] leading-snug text-foreground/90">{item.note}</p>}
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
               <Button asChild size="lg" className="rounded-full px-6">
                 <Link href={item.href} className="no-underline">
