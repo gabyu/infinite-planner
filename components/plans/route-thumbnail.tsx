@@ -61,8 +61,8 @@ export function RouteThumbnail({ route, size = "card" }: { route: RoutePoint[]; 
           ) : (
             <path d={toSvgPath(points)} fill="none" stroke="hsl(var(--primary))" strokeWidth={config.line} strokeLinecap="round" strokeLinejoin="round" />
           )}
-          <circle cx={first.x} cy={first.y} r={config.end} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth={config.line} />
-          <circle cx={last.x} cy={last.y} r={config.end} fill="hsl(var(--foreground))" />
+          <circle cx={first.x.toFixed(1)} cy={first.y.toFixed(1)} r={config.end} fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth={config.line} />
+          <circle cx={last.x.toFixed(1)} cy={last.y.toFixed(1)} r={config.end} fill="hsl(var(--foreground))" />
         </>
       )}
     </svg>

@@ -9,6 +9,9 @@ type Action =
   | { action: "resolve"; reportId: string; hide: boolean }
   | { action: "block"; userId: string; blocked: boolean }
   | { action: "contributor"; userId: string; contributor: boolean }
+  | { action: "pin"; planId: string }
+  | { action: "unpin"; pickId: string }
+  | { action: "move"; pickId: string; direction: -1 | 1 }
 
 // A small button that runs one moderation action and refreshes the page. Never optimistic: the table comes
 // back from the database.
