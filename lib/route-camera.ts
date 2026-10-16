@@ -367,7 +367,7 @@ export function drawFrame(
     ctx.stroke()
   }
 
-  // --- The airports: a ring in the ramp's blue and a pill with the airport code, like the homepage's.
+  // --- The airports: a dot in the ramp's blue and a pill with the airport code, like the homepage's.
   const pill = (p: World, label: string, opacity: number) => {
     const x = sx(p.x)
     const y = sy(p.y)
@@ -377,12 +377,6 @@ export function drawFrame(
     ctx.arc(x, y, 5, 0, Math.PI * 2)
     ctx.fillStyle = palette.ramp[1]
     ctx.fill()
-    ctx.beginPath()
-    ctx.arc(x, y, 9, 0, Math.PI * 2)
-    ctx.lineWidth = 1.6
-    ctx.strokeStyle = palette.ramp[1]
-    ctx.globalAlpha = frame.alpha * 0.45
-    ctx.stroke()
 
     if (opacity <= 0.01) return
     ctx.font = '500 12px ui-monospace, "IBM Plex Mono", SFMono-Regular, monospace'
@@ -419,13 +413,6 @@ export function drawFrame(
     pill(world[world.length - 1], "", 0)
   }
 
-  // --- The aircraft at the head of the line: a dot filled with the colour of its altitude (no halo).
-  if (frame.drawn < flight.total - 1e-6) {
-    ctx.beginPath()
-    ctx.arc(sx(tip.x), sy(tip.y), 5.6, 0, Math.PI * 2)
-    ctx.globalAlpha = frame.alpha
-    ctx.fillStyle = color(tip.alt)
-    ctx.fill()
-  }
+  // The aircraft is not drawn: the coloured line, growing, is the flight.
   ctx.globalAlpha = 1
 }
