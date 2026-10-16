@@ -18,7 +18,7 @@ export default function HelpPage() {
       <SiteHeader />
 
       <main className="flex-grow">
-        <section className="bg-gradient-to-b from-blue-50 to-white py-12 dark:from-gray-900 dark:to-gray-950">
+        <section className="bg-gradient-to-b from-primary/10 to-background py-12">
           <div className="container mx-auto px-4 text-center">
             <h1 className="mb-6 font-display text-4xl font-semibold tracking-[-0.03em] md:text-5xl">Help</h1>
             <p className="mx-auto mb-8 max-w-3xl text-xl text-gray-600 dark:text-gray-300">
