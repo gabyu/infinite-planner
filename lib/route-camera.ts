@@ -341,7 +341,9 @@ export function drawFrame(
   const base = 0.3
   const u = clamp01(Math.log2(Math.max(spacingPx / cam.scale, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
   const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
-  const fine = lower + 1 < SPACINGS.length ? 1 - (u - lower) : 1
+  // The extra dots of the finer level only fade over the last quarter before the level changes, so for most of
+  // the zoom every dot has the same opacity.
+  const fine = lower + 1 < SPACINGS.length ? 1 - clamp01((u - lower - 0.75) / 0.25) : 1
   const spacing = SPACINGS[lower]
   const seaAlpha = 1 - landAlpha
   // Four groups by opacity: (kept dots | dots of the finer level only) x (land | sea).
