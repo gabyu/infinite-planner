@@ -269,9 +269,10 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
         <h2 id="front-list" className="mb-5 border-t-2 border-foreground pt-3 text-xs font-semibold uppercase tracking-[0.16em]">
           On the front
         </h2>
-        <ol className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 lg:mx-0 lg:block lg:overflow-visible lg:px-0 lg:pb-0">
+        {/* The plans are tabs of one folder: a single bordered block, the current one inverted. */}
+        <ol className="flex overflow-x-auto rounded-2xl ring-1 ring-border lg:block lg:overflow-hidden">
           {items.map((entry, index) => (
-            <li key={entry.id} className="relative min-w-[15rem] shrink-0 lg:min-w-0">
+            <li key={entry.id} className="relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:border-t lg:first:border-t-0">
               <a
                 href={entry.href}
                 aria-current={index === active ? "true" : undefined}
@@ -283,28 +284,28 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   select(index)
                 }}
                 className={cn(
-                  "flex items-baseline gap-4 rounded-xl px-3 py-3.5 no-underline transition-colors motion-reduce:transition-none",
-                  index === active ? "bg-muted/70" : "hover:bg-muted/40",
+                  "flex items-baseline gap-4 px-4 py-4 no-underline transition-colors motion-reduce:transition-none",
+                  index === active ? "bg-foreground text-background" : "hover:bg-muted/60",
                 )}
               >
-                <span className="w-6 shrink-0 font-mono text-sm text-muted-foreground" aria-hidden>
+                <span className={cn("w-6 shrink-0 font-mono text-sm", index === active ? "text-background/70" : "text-muted-foreground")} aria-hidden>
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-lg font-semibold leading-tight tracking-[-0.01em]">
                     {entry.cityFrom}
-                    <RouteArrow className="mx-[0.3em] text-muted-foreground" />
+                    <RouteArrow className={cn("mx-[0.3em]", index === active ? "text-background/70" : "text-muted-foreground")} />
                     {entry.cityTo}
                   </span>
-                  <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
+                  <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-background/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
                 </span>
               </a>
-              <span aria-hidden className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-border">
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-transparent">
                 <span
                   ref={(el) => {
                     barRefs.current[index] = el
                   }}
-                  className="block h-full origin-left bg-foreground"
+                  className="block h-full origin-left bg-primary"
                   style={{ transform: "scaleX(0)" }}
                 />
               </span>
