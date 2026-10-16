@@ -1,32 +1,39 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useAuthUser } from "@/hooks/use-auth-user"
 import { getBrowserSupabase } from "@/lib/supabase/client"
 
 // The signed-in user's role as far as the library is concerned. Display only (it decides whether a link is shown; the
 // pages behind it check again on the server). Does nothing, and asks nothing, unless `enabled`.
+//
+// The session comes from useAuthUser, whose onAuthStateChange callback only sets state. That matters: the auth library
+// awaits those callbacks while it holds its session lock, so a callback that itself calls Supabase (the profile query
+// below) would wait for a lock it is holding, and freeze every other auth call on the page: no avatar in the header,
+// no account menu. The query therefore lives in its own effect, run after the callback returned.
 function useRoleCheck(enabled: boolean, accepts: (role: string, mustChangePassword: boolean) => boolean) {
+  const { user } = useAuthUser()
+  const userId = enabled ? user?.id : undefined
   const [ok, setOk] = useState(false)
 
   useEffect(() => {
-    if (!enabled) return setOk(false)
+    if (!userId) return setOk(false)
     const supabase = getBrowserSupabase()
     if (!supabase) return
     let cancelled = false
-
-    const check = async (userId: string | undefined) => {
-      if (!userId) return !cancelled && setOk(false)
-      const { data } = await supabase.from("profiles").select("role, must_change_password").eq("id", userId).maybeSingle()
-      if (!cancelled) setOk(!!data && accepts(data.role, !!data.must_change_password))
-    }
-    supabase.auth.getSession().then(({ data }) => check(data.session?.user.id))
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => check(session?.user.id))
+    supabase
+      .from("profiles")
+      .select("role, must_change_password")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setOk(!!data && accepts(data.role, !!data.must_change_password))
+      })
     return () => {
       cancelled = true
-      subscription.subscription.unsubscribe()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled])
+  }, [userId])
 
   return ok
 }
