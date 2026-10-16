@@ -47,7 +47,9 @@ export interface Flight {
 
 // The timeline, in seconds.
 export const LOOP_SECONDS = 12
-const T = { depEnd: 3.6, depToOverEnd: 5.0, overEnd: 8.0, overToArrEnd: 9.4, arrEnd: 11.4, fadeStart: 11.5 }
+// The zoom out of the departure starts before its pan has finished, and the aircraft never stops: its speed is
+// continuous from one shot to the next (see `drawn` below).
+const T = { depEnd: 3.6, outStart: 3.0, depToOverEnd: 5.0, overEnd: 8.0, overToArrEnd: 9.4, arrEnd: 11.4, fadeStart: 11.5 }
 // A flight with nothing to zoom on is simply drawn once, in the overview.
 const PLAIN = { drawEnd: 6.5, fadeStart: 8.6 }
 export const PLAIN_LOOP_SECONDS = 9
@@ -55,7 +57,6 @@ export const PLAIN_LOOP_SECONDS = 9
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const easeInOutSine = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2
-const easeOutSine = (t: number) => Math.sin((t * Math.PI) / 2)
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 
 function nearest(points: World[], x: number, y: number): number {
@@ -149,6 +150,15 @@ export function pointAt(flight: Flight, until: number): { x: number; y: number; 
   return { x: end.x, y: end.y, alt: alts[alts.length - 1] }
 }
 
+// A cubic curve between two times with the speed fixed at both ends.
+function hermite(t: number, t0: number, t1: number, p0: number, p1: number, m0: number, m1: number): number {
+  const dt = t1 - t0
+  const u = clamp01((t - t0) / dt)
+  const u2 = u * u
+  const u3 = u2 * u
+  return (2 * u3 - 3 * u2 + 1) * p0 + (u3 - 2 * u2 + u) * dt * m0 + (-2 * u3 + 3 * u2) * p1 + (u3 - u2) * dt * m1
+}
+
 function mixCamera(a: Camera, b: Camera, t: number): Camera {
   // Zoom is interpolated in log space, so it feels even; the centre follows the same curve.
   return { cx: lerp(a.cx, b.cx, t), cy: lerp(a.cy, b.cy, t), scale: Math.exp(lerp(Math.log(a.scale), Math.log(b.scale), t)) }
@@ -181,11 +191,23 @@ export function frameAt(flight: Flight, time: number): Frame {
     }
   }
 
-  // Where the line has got to.
+  // Where the line has got to. One curve per stretch (the departure, the cruise, the arrival), each starting at the
+  // speed the previous one ended at, so the aircraft takes off from rest, never pauses between two shots, and
+  // slows down only on the final.
+  const midLen = tailStartLen - headLen
+  const tailLen = total - tailStartLen
+  // (a speed over three times a stretch's average would make it overshoot)
+  const midAverage = midLen / (T.overToArrEnd - T.depEnd)
+  // The takeoff ends at a good fraction of the cruise's pace, so when the camera pulls back the aircraft is visibly
+  // flying on, not creeping.
+  const headAverage = headLen / T.depEnd
+  const vHead = Math.min(2.8 * headAverage, Math.max(1.5 * headAverage, 0.5 * midAverage))
+  const vTail = (1.5 * tailLen) / (T.arrEnd - T.overToArrEnd)
   let drawn: number
-  if (t < T.depEnd) drawn = headLen * easeInOutSine(t / T.depEnd)
-  else if (t < T.overToArrEnd) drawn = lerp(headLen, tailStartLen, easeInOutSine((t - T.depEnd) / (T.overToArrEnd - T.depEnd)))
-  else if (t < T.arrEnd) drawn = lerp(tailStartLen, total, easeOutSine((t - T.overToArrEnd) / (T.arrEnd - T.overToArrEnd)))
+  if (t < T.depEnd) drawn = hermite(t, 0, T.depEnd, 0, headLen, 0, vHead)
+  else if (t < T.overToArrEnd) {
+    drawn = hermite(t, T.depEnd, T.overToArrEnd, headLen, tailStartLen, Math.min(vHead, 3 * midAverage), Math.min(vTail, 3 * midAverage))
+  } else if (t < T.arrEnd) drawn = hermite(t, T.overToArrEnd, T.arrEnd, tailStartLen, total, Math.min(vTail, 3 * midAverage), 0)
   else drawn = total
 
   // Where the camera is.
@@ -193,13 +215,28 @@ export function frameAt(flight: Flight, time: number): Frame {
   const last = world[world.length - 1]
   let cam: Camera
   let shot: Frame["shot"]
-  if (t < T.depEnd) {
-    // Close on the departure: starts centred on the airport and drifts after the aircraft.
-    const drift = easeInOutSine(t / T.depEnd)
-    cam = { cx: lerp(first.x, cams.dep.cx, drift), cy: lerp(first.y, cams.dep.cy, drift), scale: cams.dep.scale }
+  // Close on the departure: starts centred on the airport and drifts after the aircraft.
+  const depCam = (at: number): Camera => {
+    const drift = easeInOutSine(clamp01(at / T.depEnd))
+    return { cx: lerp(first.x, cams.dep.cx, drift), cy: lerp(first.y, cams.dep.cy, drift), scale: cams.dep.scale }
+  }
+  if (t < T.outStart) {
+    cam = depCam(t)
     shot = "departure"
   } else if (t < T.depToOverEnd) {
-    cam = mixCamera(cams.dep, cams.over, easeInOutCubic((t - T.depEnd) / (T.depToOverEnd - T.depEnd)))
+    // Out to the whole flight while the aircraft keeps flying: the zoom out begins before the departure's pan is over, and
+    // the camera stays on the aircraft while it pulls back, only settling on the overview's centre at the very end
+    // (that centre is usually beside the route, which arcs, so crossing straight to it would show empty ground).
+    const u = clamp01((t - T.outStart) / (T.depToOverEnd - T.outStart))
+    const tip = pointAt(flight, drawn)
+    const from = depCam(t)
+    const follow = 1 - Math.pow(1 - u, 3)
+    const settle = u * u * u
+    cam = {
+      cx: lerp(lerp(from.cx, tip.x, follow), cams.over.cx, settle),
+      cy: lerp(lerp(from.cy, tip.y, follow), cams.over.cy, settle),
+      scale: Math.exp(lerp(Math.log(cams.dep.scale), Math.log(cams.over.scale), easeInOutCubic(u))),
+    }
     shot = "cruise"
   } else if (t < T.overEnd) {
     cam = cams.over
@@ -326,15 +363,15 @@ export function drawFrame(
     if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], isLand, landAlpha * 0.3 * mix, 2.6)
   }
   if (landAlpha < 0.99) {
-    // The close lattice: about 34 px apart, anchored to the world.
-    const target = 34 / cam.scale
+    // The close lattice: big dots, about 110 px apart, anchored to the world.
+    const target = 110 / cam.scale
     const u = clamp01(Math.log2(Math.max(target, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
     const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
     const mix = u - lower
-    const a = (1 - landAlpha) * 0.38
-    // The closer the shot, the bigger the dots: they grow from the overview's size to more than four times it, so the
-    // ground still reads as a texture when the camera is on the climb or the final.
-    const dot = 2.6 + (1 - landAlpha) * 9.2
+    const a = (1 - landAlpha) * 0.3
+    // The closer the shot, the bigger the dots: they grow from the overview's size to about fifteen times it, and sit
+    // much further apart, so the ground reads as a bold texture when the camera is on the climb or the final.
+    const dot = 2.6 + (1 - landAlpha) * 38
     lattice(SPACINGS[lower], null, a * (1 - mix), dot)
     if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], null, a * mix, dot)
   }
@@ -383,8 +420,14 @@ export function drawFrame(
     const textWidth = ctx.measureText(label).width
     const pw = textWidth + 20
     const ph = 25
-    const px = x - pw / 2
-    const py = y - 20 - ph + (1 - opacity) * 4
+    // Above the airport; below it if there is no room above. Kept inside the picture on every side.
+    const margin = 6
+    const above = y - 20 - ph
+    const py = Math.min(
+      Math.max((above >= margin ? above : y + 20) + (1 - opacity) * 4, margin),
+      h - ph - margin,
+    )
+    const px = Math.min(Math.max(x - pw / 2, margin), w - pw - margin)
     ctx.globalAlpha = frame.alpha * opacity
     ctx.shadowColor = "rgba(0,0,0,0.12)"
     ctx.shadowBlur = 6
