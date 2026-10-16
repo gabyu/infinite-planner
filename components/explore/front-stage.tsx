@@ -42,7 +42,7 @@ export interface FrontDisplay {
   tailN: number
 }
 
-// The same colours as the homepage's globe: its altitude ramp (a light and a dark one) and its bright arc head.
+// The same colours as the homepage's globe: its altitude ramp (a light and a dark one).
 function readPalette(): Palette {
   const root = document.documentElement
   const style = getComputedStyle(root)
@@ -55,7 +55,6 @@ function readPalette(): Palette {
   return {
     ink: hsl("--foreground", "#111"),
     ramp: [...(dark ? ALTITUDE_RAMP.dark : ALTITUDE_RAMP.light)],
-    hot: dark ? "#e6efff" : "#bcd4ff",
     background: hsl("--card", "#fff"),
     labelBg: hsl("--background", "#fff", 0.8),
     labelBorder: hsl("--border", "#ddd"),
