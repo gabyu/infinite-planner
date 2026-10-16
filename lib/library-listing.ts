@@ -258,3 +258,86 @@ export function filtersFromParams(params: ExploreParams): ListFilters {
 export function sortFromParam(value: string | undefined): Sort {
   return (SORTS as readonly string[]).includes(value ?? "") ? (value as Sort) : "popular"
 }
+
+// --- The front of Explore ---------------------------------------------------------------------------------------
+
+// One plan of the featured stage: pinned by an admin (with an optional note) or filled in by popularity. `route` is the
+// flight with its first headN and last tailN waypoints at full resolution and the middle thinned out; both are 0 for a
+// short flight, which has no zoom to make.
+export interface FrontItem {
+  id: string
+  publicId: string
+  origin: string
+  destination: string
+  flightNumber: string | null
+  distanceNm: number
+  flightTimeMinutes: number | null
+  likeCount: number
+  downloadCount: number
+  createdAt: string
+  authorName: string
+  authorAvatarUrl: string | null
+  route: { lat: number; lng: number; altitude: number }[]
+  headN: number
+  tailN: number
+  waypointCount: number
+  note: string | null
+  pinned: boolean
+}
+
+interface FrontRow {
+  id: string
+  public_id: string
+  origin_airport: string
+  destination_airport: string
+  flight_number: string | null
+  distance_nm: number | null
+  flight_time_minutes: number | null
+  like_count: number
+  download_count: number
+  created_at: string
+  author_name: string | null
+  author_avatar_url: string | null
+  route: { lat: number; lng: number; alt: number }[] | null
+  head_n: number
+  tail_n: number
+  waypoint_count: number
+  note: string | null
+  pinned: boolean
+}
+
+async function loadFront(limit: number): Promise<FrontItem[]> {
+  const service = getCachedServiceRoleSupabase(["library-index", "library"])
+  if (!service) return []
+  const { data, error } = await service.rpc("list_explore_front", { p_limit: limit, p_section: "front" })
+  // Thrown, so a failed read is never cached as an empty front.
+  if (error) throw new Error(`Loading the Explore front failed: ${error.message}`)
+  return ((data as FrontRow[] | null) ?? []).map((row) => ({
+    id: row.id,
+    publicId: row.public_id,
+    origin: row.origin_airport,
+    destination: row.destination_airport,
+    flightNumber: row.flight_number,
+    distanceNm: row.distance_nm ?? 0,
+    flightTimeMinutes: row.flight_time_minutes,
+    likeCount: row.like_count,
+    downloadCount: row.download_count,
+    createdAt: row.created_at,
+    authorName: row.author_name || ADMIN_AUTHOR_NAME,
+    authorAvatarUrl: row.author_avatar_url,
+    route: (row.route ?? []).map((p) => ({ lat: p.lat, lng: p.lng, altitude: p.alt })),
+    headN: row.head_n,
+    tailN: row.tail_n,
+    waypointCount: row.waypoint_count,
+    note: row.note,
+    pinned: row.pinned,
+  }))
+}
+
+// The plans the top of Explore features, in order: the ones an admin pinned, then the most popular to fill up to `limit`.
+export function listExploreFront(limit = 6): Promise<FrontItem[]> {
+  return unstable_cache(() => loadFront(limit), ["explore-front", String(limit)], {
+    tags: ["library-index", "library"],
+    revalidate: 60,
+  })()
+}

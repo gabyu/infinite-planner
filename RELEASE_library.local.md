@@ -91,6 +91,17 @@ production's tables, not its migration list.
   the launch a demoted account simply loses access to the library (its public plans 404 for non-admins like any other).
 - Seeding in production: apply the migration, deploy, then raise the chosen members from the Contributors tab.
 
+## Explore front (2026-10-16)
+
+- Migration `20261016000100_explore_front.sql` (after `...000000_contributor_role`): table `explore_picks`, admin functions
+  (list / pin / unpin / move / note) and `list_explore_front`. Apply it in production with the others, in order.
+- Admin > **Explore**: pin up to 6 public plans in order, each with a note (160 characters). The page fills the rest with the
+  most popular plans, so it is never empty; a pinned plan that goes private, is hidden or deleted drops out by itself.
+- The stage is a canvas (`lib/route-camera.ts`, `components/explore/front-stage.tsx`) over a plain SVG that stays in the
+  HTML (search engines, no-JS, hover, reduced motion). One canvas only, animated while visible. No pause control; it pauses by
+  itself on hover / focus, when the tab is hidden or off screen, and never rotates under reduced motion.
+- Not tested with a real session: the admin Explore tab. The stage itself was checked frame by frame in the browser.
+
 ## Emergency rollback of the launch
 
 ```sql

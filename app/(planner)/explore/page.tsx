@@ -2,7 +2,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Search } from "lucide-react"
-import { PlanCardCover, PlanGrid, PlanListRow } from "@/components/explore/plan-card"
+import { getExploreFront } from "@/components/explore/explore-front"
+import { PlanGrid } from "@/components/explore/plan-card"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -81,10 +82,13 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
   // The front page: the default listing, first page. Anything else is a plain list of results.
   const front = !filtered && sort === "popular" && !cursor
 
-  const [{ plans, next }, latest] = await Promise.all([
+  const [{ plans, next }, latest, featured] = await Promise.all([
     listPlans({ sort, filters, cursor }),
     front ? listPlans({ sort: "latest", limit: 6 }) : Promise.resolve(null),
+    front ? getExploreFront() : Promise.resolve(null),
   ])
+  // What the top of the page already shows is not repeated below it.
+  const shown = new Set(featured?.ids ?? [])
 
   const nextHref = (() => {
     if (!next) return null
@@ -94,9 +98,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
     return `${LIBRARY_PATH}?${query.toString()}`
   })()
 
-  const cover = front ? plans[0] : null
-  const trending = front ? plans.slice(1, 6) : []
-  const rest = front ? plans.slice(6) : plans
+  const rest = front ? plans.filter((plan) => !shown.has(plan.id)) : plans
+  const latestPlans = (latest?.plans ?? []).filter((plan) => !shown.has(plan.id))
 
   return (
     <>
@@ -176,28 +179,12 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
           </div>
         ) : (
           <>
-            {cover && (
-              <section className="mt-10 grid gap-8 lg:grid-cols-12" aria-label="Cover story and trending">
-                <div className="lg:col-span-8">
-                  <PlanCardCover plan={cover} />
-                </div>
-                {trending.length > 0 && (
-                  <aside className="lg:col-span-4" aria-labelledby="trending">
-                    <SectionHeading id="trending">Trending</SectionHeading>
-                    <ol>
-                      {trending.map((plan, index) => (
-                        <PlanListRow key={plan.id} plan={plan} rank={index + 2} />
-                      ))}
-                    </ol>
-                  </aside>
-                )}
-              </section>
-            )}
+            {featured?.node && <section className="mt-10" aria-label="Featured">{featured.node}</section>}
 
-            {latest && latest.plans.length > 0 && (
+            {latestPlans.length > 0 && (
               <section className="mt-16" aria-labelledby="latest">
                 <SectionHeading id="latest">Latest</SectionHeading>
-                <PlanGrid plans={latest.plans} />
+                <PlanGrid plans={latestPlans} />
               </section>
             )}
 
