@@ -72,8 +72,6 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
   const [ready, setReady] = useState(false)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [reduced, setReduced] = useState(false)
-  const [canHover, setCanHover] = useState(false)
-  const [pointerOnStage, setPointerOnStage] = useState(false)
   // A click on the list stops the rotation for good (until the next visit): the chosen plan keeps playing its loop.
   const [locked, setLocked] = useState(false)
   const [visible, setVisible] = useState(true)
@@ -84,26 +82,24 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const barRefs = useRef<(HTMLSpanElement | null)[]>([])
   const timeRef = useRef(0)
+  // When the pointer last arrived on the stage: the plan doesn't change right under someone about to click it.
+  const arrivedRef = useRef(0)
   const item = items[Math.min(active, items.length - 1)]
 
   // The environment: motion preference, hover, scrolled into view, tab visible.
   useEffect(() => {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const hover = window.matchMedia("(hover: hover) and (pointer: fine)")
     const sync = () => {
       setReduced(motion.matches)
-      setCanHover(hover.matches)
     }
     sync()
     motion.addEventListener("change", sync)
-    hover.addEventListener("change", sync)
     const onVisibility = () => setTabHidden(document.hidden)
     document.addEventListener("visibilitychange", onVisibility)
     const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { threshold: 0.15 })
     if (rootRef.current) observer.observe(rootRef.current)
     return () => {
       motion.removeEventListener("change", sync)
-      hover.removeEventListener("change", sync)
       document.removeEventListener("visibilitychange", onVisibility)
       observer.disconnect()
     }
@@ -126,8 +122,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
   }, [])
 
   // The drawing loop. It runs only while there is something to animate: otherwise one still frame is drawn.
-  const hoverStill = canHover && pointerOnStage
-  const playing = !reduced && !hoverStill && visible && !tabHidden
+  const playing = !reduced && visible && !tabHidden
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !item || size.w < 10) return
@@ -142,7 +137,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
     const loop = flight.hasZoom ? LOOP_SECONDS : PLAIN_LOOP_SECONDS
 
     const paint = () => {
-      const frame = reduced || hoverStill ? overviewFrame(flight) : frameAt(flight, timeRef.current)
+      const frame = reduced ? overviewFrame(flight) : frameAt(flight, timeRef.current)
       drawFrame(ctx, flight, frame, palette, labels, dpr)
       barRefs.current[active]?.style.setProperty("transform", `scaleX(${reduced || locked ? 0 : Math.min(timeRef.current / loop, 1)})`)
     }
@@ -166,7 +161,8 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
       last = now
       if (timeRef.current >= loop) {
         timeRef.current = 0
-        if (items.length > 1 && !locked) {
+        // Held back for a moment after the pointer arrives: the same plan simply plays again.
+        if (items.length > 1 && !locked && performance.now() - arrivedRef.current > 700) {
           setActive((current) => (current + 1) % items.length)
           return
         }
@@ -180,12 +176,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
       themeObserver.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, size.w, size.h, reduced, hoverStill, playing, locked])
-
-  // Leaving the stage starts the loop again from the departure.
-  useEffect(() => {
-    if (!hoverStill) timeRef.current = 0
-  }, [hoverStill])
+  }, [active, size.w, size.h, reduced, playing, locked])
 
   // The progress mark of the others goes back to empty.
   useEffect(() => {
@@ -201,9 +192,12 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
       <div className="lg:col-span-8">
         <article
           className="group relative overflow-hidden rounded-[2rem] bg-card p-4 ring-1 ring-border sm:p-5"
-          onPointerEnter={(e) => e.pointerType === "mouse" && setPointerOnStage(true)}
-          onPointerLeave={(e) => e.pointerType === "mouse" && setPointerOnStage(false)}
+          onPointerEnter={() => {
+            arrivedRef.current = performance.now()
+          }}
         >
+          {/* The whole card opens the plan (the button below stays the accessible link): what looks clickable is. */}
+          <Link href={item.href} tabIndex={-1} aria-hidden className="absolute inset-0 z-10 rounded-[2rem]" />
           {/* The picture: the plain SVG is in the HTML, the canvas takes over once it is drawing. */}
           <div ref={frameRef} className="relative aspect-[760/360] w-full overflow-hidden rounded-2xl bg-muted/50">
             <div className={cn("transition-opacity duration-300", ready && "opacity-0")}>
@@ -220,7 +214,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">
               {item.pinned ? "Editor's pick" : "Trending"}
             </p>
-            <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
+            <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em] decoration-primary decoration-2 underline-offset-[6px] group-hover:underline">
               {item.cityFrom}
               <RouteArrow className="mx-[0.3em] text-primary" />
               {item.cityTo}
@@ -233,7 +227,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
             </p>
             {item.note && <p className="mt-4 max-w-xl text-[17px] leading-snug text-foreground/90">{item.note}</p>}
             <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
-              <Button asChild size="lg" className="rounded-full px-6">
+              <Button asChild size="lg" className="relative z-20 rounded-full px-6">
                 <Link href={item.href} className="no-underline">
                   View flight plan <ArrowRight />
                 </Link>
