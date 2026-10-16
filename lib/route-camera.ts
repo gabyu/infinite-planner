@@ -338,7 +338,8 @@ export function drawFrame(
   const close = 110
   const spacingPx = wide * Math.pow(close / wide, 1 - landAlpha)
   const size = 2.6 + (1 - landAlpha) * 38
-  const base = 0.3
+  // The bigger the dots get, the lighter they are, so the close shots stay soft instead of heavy.
+  const base = 0.3 - (1 - landAlpha) * 0.17
   const u = clamp01(Math.log2(Math.max(spacingPx / cam.scale, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
   const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
   // The extra dots of the finer level only fade over the last quarter before the level changes, so for most of
