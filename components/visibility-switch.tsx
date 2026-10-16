@@ -152,18 +152,18 @@ export function VisibilitySwitch({
       <Dialog open={askConsent} onOpenChange={setAskConsent}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Make this flight plan public?</DialogTitle>
+            <DialogTitle>Share this flight plan with the community?</DialogTitle>
             <DialogDescription>
-              Your Discord name and avatar will be shown publicly on this plan, and search engines can index it. You can
-              make it private again at any time.
+              It will show up in Explore for everyone to enjoy, with your Discord name and avatar as its author. You can
+              make it private again whenever you like.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:space-x-0">
             <Button variant="outline" onClick={() => setAskConsent(false)} disabled={busy}>
-              Cancel
+              Not now
             </Button>
             <Button onClick={acceptConsent} disabled={busy}>
-              Make public
+              Share it
             </Button>
           </DialogFooter>
         </DialogContent>
