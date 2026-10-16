@@ -18,7 +18,7 @@ export function BrandLogo({ href, className }: { href?: string; className?: stri
           className="h-full w-full transition-opacity group-hover:opacity-80"
         />
       </span>
-      <span className="whitespace-nowrap font-display text-sm font-semibold tracking-tight text-blue-600 transition-opacity group-hover:opacity-80 dark:text-blue-400 sm:text-xl">
+      <span className="whitespace-nowrap font-display text-sm font-semibold tracking-tight text-primary transition-opacity group-hover:opacity-80 sm:text-xl">
         Infinite Planner
       </span>
     </>

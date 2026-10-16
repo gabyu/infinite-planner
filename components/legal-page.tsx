@@ -19,9 +19,9 @@ export function LegalPage({
       <SiteHeader />
 
       <main className="flex-grow">
-        <section className="py-12 bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-950">
+        <section className="py-12 bg-gradient-to-b from-primary/10 to-background">
           <div className="container mx-auto px-4 text-center">
-            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+            <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-primary">
               {icon}
             </div>
             <h1 className="font-display text-4xl md:text-5xl font-semibold tracking-[-0.03em] mb-6">{title}</h1>

@@ -164,7 +164,7 @@ export const faqData = [
                 href="https://www.flightaware.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-primary hover:underline"
               >
                 FlightAware.com
               </a>
@@ -185,7 +185,7 @@ export const faqData = [
               href="https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="text-primary hover:underline break-all"
             >
               https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO
             </a>
@@ -345,7 +345,7 @@ export default function FAQSelector() {
               onClick={() => setSelectedId(faq.id)}
               className={`text-left px-4 py-3 rounded-lg transition-all duration-200 border-2 ${
                 selectedId === faq.id
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-gray-900 dark:text-gray-100"
+                  ? "border-primary bg-primary/10 text-gray-900 dark:text-gray-100"
                   : "border-gray-200 dark:border-gray-700 bg-transparent text-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
               }`}
             >

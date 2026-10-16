@@ -280,19 +280,19 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                 }}
                 className={cn(
                   "flex items-baseline gap-4 px-4 py-4 no-underline transition-colors motion-reduce:transition-none",
-                  index === active ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "hover:bg-muted/60",
+                  index === active ? "bg-primary/15 text-primary" : "hover:bg-muted/60",
                 )}
               >
-                <span className={cn("w-6 shrink-0 font-mono text-sm", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")} aria-hidden>
+                <span className={cn("w-6 shrink-0 font-mono text-sm", index === active ? "text-primary/70" : "text-muted-foreground")} aria-hidden>
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-lg font-semibold leading-tight tracking-[-0.01em]">
                     {entry.cityFrom}
-                    <RouteArrow className={cn("mx-[0.3em]", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")} />
+                    <RouteArrow className={cn("mx-[0.3em]", index === active ? "text-primary/70" : "text-muted-foreground")} />
                     {entry.cityTo}
                   </span>
-                  <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
+                  <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-primary/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
                 </span>
               </a>
               <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-transparent">
@@ -300,7 +300,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   ref={(el) => {
                     barRefs.current[index] = el
                   }}
-                  className="block h-full origin-left bg-blue-600 dark:bg-blue-400"
+                  className="block h-full origin-left bg-primary"
                   style={{ transform: "scaleX(0)" }}
                 />
               </span>

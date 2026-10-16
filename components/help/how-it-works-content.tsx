@@ -206,7 +206,7 @@ export function HowItWorksContent() {
             </ul>
 
             {/* Call to Action */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-8 text-center mb-8">
+            <div className="bg-primary/10 rounded-lg p-8 text-center mb-8">
               <h3 className="text-2xl font-bold mb-4">Ready to Get Started?</h3>
               <p className="text-lg mb-6">
                 Transform your next Infinite Flight experience with real-world flight plans

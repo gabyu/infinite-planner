@@ -12,7 +12,7 @@ import { LIBRARY_NAV_LABEL, LIBRARY_PATH } from "@/lib/brand"
 const navLinkClass =
   "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md transition-colors no-underline text-sm font-normal h-10 items-center gap-1.5"
 const activeNavLinkClass =
-  "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-2 rounded-md text-sm font-medium h-10 items-center gap-1.5"
+  "bg-primary/15 text-primary px-3 py-2 rounded-md text-sm font-medium h-10 items-center gap-1.5"
 
 function NavLink({
   href,
