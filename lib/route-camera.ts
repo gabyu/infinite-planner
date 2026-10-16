@@ -10,6 +10,7 @@ import { unwrapLongitudes } from "@/lib/route-render"
 export interface FlightPoint {
   lat: number
   lng: number
+  altitude?: number
 }
 
 interface World {
@@ -32,6 +33,9 @@ export interface Flight {
   headLen: number
   tailStartLen: number
   hasZoom: boolean
+  // Altitude of each point (feet), and whether the plan has any: without it the line is a single colour.
+  alts: number[]
+  hasAltitude: boolean
   cams: { over: Camera; dep: Camera; arr: Camera }
   width: number
   height: number
@@ -101,6 +105,8 @@ export function prepareFlight(
     headLen: cum[Math.max(headN, 2) - 1] ?? 0,
     tailStartLen: cum[world.length - Math.max(tailN, 2)] ?? total,
     hasZoom,
+    alts: points.map((p) => p.altitude ?? 0),
+    hasAltitude: points.some((p) => (p.altitude ?? 0) > 0),
     cams: { over, dep, arr },
     width,
     height,
@@ -183,8 +189,29 @@ export function overviewFrame(flight: Flight): Frame {
 
 export interface Palette {
   ink: string
-  accent: string
+  // The altitude ramp of the homepage globe, low to high (cyan, blue, violet, magenta), and the bright head of the line.
+  ramp: string[]
+  hot: string
   background: string
+  // The airport pills, like the homepage's: a soft background, a hairline border.
+  labelBg: string
+  labelBorder: string
+}
+
+const RAMP_TOP_FT = 40000
+
+function channels(hex: string): [number, number, number] {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]
+}
+
+// The ramp colour for an altitude: four evenly spaced stops from 0 to 40,000 ft, as on the globe.
+export function rampColor(ramp: string[], feet: number): string {
+  const t = clamp01(feet / RAMP_TOP_FT) * (ramp.length - 1)
+  const i = Math.min(Math.floor(t), ramp.length - 2)
+  const mix = t - i
+  const a = channels(ramp[i])
+  const b = channels(ramp[i + 1])
+  return `rgb(${[0, 1, 2].map((c) => Math.round(a[c] + (b[c] - a[c]) * mix)).join(",")})`
 }
 
 const SPACINGS = [0.25, 0.5, 1, 2, 4] // degrees, finest first
@@ -255,79 +282,116 @@ export function drawFrame(
     const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
     const mix = u - lower
     const a = (1 - landAlpha) * 0.38
-    // The closer the shot, the bigger the dots: they grow from the overview's size to more than double it, so the ground
-    // still reads as a texture when the camera is on the climb or the final.
-    const dot = 2.6 + (1 - landAlpha) * 4.2
+    // The closer the shot, the bigger the dots: they grow from the overview's size to more than four times it, so the
+    // ground still reads as a texture when the camera is on the climb or the final.
+    const dot = 2.6 + (1 - landAlpha) * 9.2
     lattice(SPACINGS[lower], null, a * (1 - mix), dot)
     if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], null, a * mix, dot)
   }
 
-  // --- The route: the whole line faintly, the part flown so far in full.
+  // --- The route: the whole line faintly, the part flown so far in colour (the altitude ramp, as on the homepage globe).
   ctx.globalAlpha = frame.alpha
   ctx.lineJoin = "round"
   ctx.lineCap = "round"
-  const trace = (until: number) => {
-    ctx.beginPath()
-    ctx.moveTo(sx(world[0].x), sy(world[0].y))
-    let tip = { x: world[0].x, y: world[0].y }
+  const tipAt = (until: number) => {
     for (let i = 1; i < world.length; i++) {
-      if (cum[i] <= until) {
-        ctx.lineTo(sx(world[i].x), sy(world[i].y))
-        tip = world[i]
-      } else {
+      if (cum[i] >= until) {
         const span = cum[i] - cum[i - 1] || 1
         const f = clamp01((until - cum[i - 1]) / span)
-        tip = { x: lerp(world[i - 1].x, world[i].x, f), y: lerp(world[i - 1].y, world[i].y, f) }
-        ctx.lineTo(sx(tip.x), sy(tip.y))
-        break
+        return {
+          x: lerp(world[i - 1].x, world[i].x, f),
+          y: lerp(world[i - 1].y, world[i].y, f),
+          alt: lerp(flight.alts[i - 1], flight.alts[i], f),
+        }
       }
     }
-    return tip
+    const end = world[world.length - 1]
+    return { x: end.x, y: end.y, alt: flight.alts[flight.alts.length - 1] }
   }
+
+  // The whole route, faint, so the viewer sees where it is going.
+  ctx.beginPath()
+  ctx.moveTo(sx(world[0].x), sy(world[0].y))
+  for (let i = 1; i < world.length; i++) ctx.lineTo(sx(world[i].x), sy(world[i].y))
   ctx.strokeStyle = palette.ink
-  ctx.globalAlpha = frame.alpha * 0.16
+  ctx.globalAlpha = frame.alpha * 0.14
   ctx.lineWidth = 2
-  trace(flight.total)
-  ctx.stroke()
-  ctx.globalAlpha = frame.alpha
-  ctx.lineWidth = 3.2
-  const tip = trace(frame.drawn)
   ctx.stroke()
 
-  // --- The airports, and the aircraft at the tip of the line.
-  const marker = (p: World, label: string, filled: boolean) => {
+  // The part flown, one segment at a time so each takes the colour of its altitude.
+  ctx.globalAlpha = frame.alpha
+  ctx.lineWidth = 3.6
+  const tip = tipAt(frame.drawn)
+  const color = (feet: number) => (flight.hasAltitude ? rampColor(palette.ramp, feet) : palette.ramp[1])
+  for (let i = 1; i < world.length && cum[i - 1] < frame.drawn; i++) {
+    const reached = cum[i] <= frame.drawn
+    const end = reached ? { x: world[i].x, y: world[i].y, alt: flight.alts[i] } : tip
+    ctx.beginPath()
+    ctx.moveTo(sx(world[i - 1].x), sy(world[i - 1].y))
+    ctx.lineTo(sx(end.x), sy(end.y))
+    ctx.strokeStyle = color((flight.alts[i - 1] + end.alt) / 2)
+    ctx.stroke()
+  }
+
+  // --- The airports: a ring in the ramp's blue and a pill with the airport code, like the homepage's.
+  const pill = (p: World, label: string, opacity: number) => {
     const x = sx(p.x)
     const y = sy(p.y)
-    if (x < -40 || x > w + 40 || y < -40 || y > h + 40) return
-    ctx.beginPath()
-    ctx.arc(x, y, 5.5, 0, Math.PI * 2)
-    ctx.fillStyle = filled ? palette.ink : palette.background
-    ctx.fill()
-    ctx.lineWidth = 2.4
-    ctx.strokeStyle = palette.ink
-    ctx.stroke()
-    ctx.font = '600 12px ui-monospace, "IBM Plex Mono", monospace'
-    ctx.fillStyle = palette.ink
-    ctx.globalAlpha = frame.alpha * 0.75
-    ctx.fillText(label, x + 11, y - 9)
+    if (x < -60 || x > w + 60 || y < -60 || y > h + 60) return
     ctx.globalAlpha = frame.alpha
-  }
-  marker(world[0], labels.origin, false)
-  if (frame.drawn >= flight.total - 1e-6) marker(world[world.length - 1], labels.destination, true)
-  else marker(world[world.length - 1], labels.destination, true)
+    ctx.beginPath()
+    ctx.arc(x, y, 5, 0, Math.PI * 2)
+    ctx.fillStyle = palette.ramp[1]
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x, y, 9, 0, Math.PI * 2)
+    ctx.lineWidth = 1.6
+    ctx.strokeStyle = palette.ramp[1]
+    ctx.globalAlpha = frame.alpha * 0.45
+    ctx.stroke()
 
+    if (opacity <= 0.01) return
+    ctx.font = '500 12px ui-monospace, "IBM Plex Mono", SFMono-Regular, monospace'
+    const textWidth = ctx.measureText(label).width
+    const pw = textWidth + 20
+    const ph = 25
+    const px = x - pw / 2
+    const py = y - 20 - ph + (1 - opacity) * 4
+    ctx.globalAlpha = frame.alpha * opacity
+    ctx.shadowColor = "rgba(0,0,0,0.12)"
+    ctx.shadowBlur = 6
+    ctx.shadowOffsetY = 1
+    ctx.beginPath()
+    ctx.roundRect(px, py, pw, ph, ph / 2)
+    ctx.fillStyle = palette.labelBg
+    ctx.fill()
+    ctx.shadowColor = "transparent"
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetY = 0
+    ctx.lineWidth = 1
+    ctx.strokeStyle = palette.labelBorder
+    ctx.stroke()
+    ctx.fillStyle = palette.ink
+    ctx.textBaseline = "middle"
+    ctx.fillText(label, px + 10, py + ph / 2 + 0.5)
+  }
+  pill(world[0], labels.origin, 1)
+  // The destination's pill comes in as the line arrives.
+  pill(world[world.length - 1], labels.destination, clamp01((frame.drawn / flight.total - 0.9) / 0.1))
+
+  // --- The aircraft at the head of the line: a bright core in the ramp's blue with a soft halo.
   if (frame.drawn < flight.total - 1e-6) {
     const x = sx(tip.x)
     const y = sy(tip.y)
     ctx.beginPath()
-    ctx.arc(x, y, 9, 0, Math.PI * 2)
-    ctx.fillStyle = palette.accent
-    ctx.globalAlpha = frame.alpha * 0.22
+    ctx.arc(x, y, 11, 0, Math.PI * 2)
+    ctx.fillStyle = color(tip.alt)
+    ctx.globalAlpha = frame.alpha * 0.25
     ctx.fill()
     ctx.beginPath()
-    ctx.arc(x, y, 4.6, 0, Math.PI * 2)
+    ctx.arc(x, y, 5.2, 0, Math.PI * 2)
     ctx.globalAlpha = frame.alpha
-    ctx.fillStyle = palette.accent
+    ctx.fillStyle = palette.hot
     ctx.fill()
   }
   ctx.globalAlpha = 1

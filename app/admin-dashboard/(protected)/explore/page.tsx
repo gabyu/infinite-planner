@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from "lucide-react"
 import { LibraryActionButton } from "@/components/admin/library-actions"
 import { PageHeader } from "@/components/admin/page-header"
 import { PickNote } from "@/components/admin/pick-note"
+import { RouteArrow } from "@/components/route-arrow"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getSessionContext, requireAdmin } from "@/lib/admin/auth"
@@ -95,7 +96,9 @@ export default async function ExploreEditorPage() {
                       })}
                       className="font-mono text-sm"
                     >
-                      {pick.origin_airport} → {pick.destination_airport}
+                      {pick.origin_airport}
+                      <RouteArrow />
+                      {pick.destination_airport}
                       {pick.flight_number ? ` ${pick.flight_number}` : ""}
                     </Link>
                     <p className="text-xs text-muted-foreground">
@@ -152,7 +155,9 @@ export default async function ExploreEditorPage() {
               {plans.map((plan) => (
                 <TableRow key={plan.id}>
                   <TableCell className="font-mono text-sm">
-                    {plan.origin_airport} → {plan.destination_airport}
+                    {plan.origin_airport}
+                    <RouteArrow />
+                    {plan.destination_airport}
                   </TableCell>
                   <TableCell className="font-mono text-sm">{plan.flight_number ?? "—"}</TableCell>
                   <TableCell>{plan.author_name}</TableCell>

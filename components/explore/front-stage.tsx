@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Download, Heart } from "lucide-react"
+import { ALTITUDE_RAMP } from "@/components/home/altitude-ramp"
 import { RouteThumbnail } from "@/components/plans/route-thumbnail"
+import { RouteArrow } from "@/components/route-arrow"
 import { Button } from "@/components/ui/button"
 import {
   drawFrame,
@@ -23,7 +25,8 @@ export interface FrontDisplay {
   href: string
   cityFrom: string
   cityTo: string
-  codes: string
+  codeFrom: string
+  codeTo: string
   origin: string
   destination: string
   facts: string
@@ -39,13 +42,24 @@ export interface FrontDisplay {
   tailN: number
 }
 
+// The same colours as the homepage's globe: its altitude ramp (a light and a dark one) and its bright arc head.
 function readPalette(): Palette {
-  const style = getComputedStyle(document.documentElement)
-  const hsl = (name: string, fallback: string) => {
+  const root = document.documentElement
+  const style = getComputedStyle(root)
+  const dark = root.classList.contains("dark")
+  const hsl = (name: string, fallback: string, alpha?: number) => {
     const value = style.getPropertyValue(name).trim()
-    return value ? `hsl(${value})` : fallback
+    if (!value) return fallback
+    return alpha === undefined ? `hsl(${value})` : `hsl(${value} / ${alpha})`
   }
-  return { ink: hsl("--foreground", "#111"), accent: hsl("--primary", "#3b82f6"), background: hsl("--card", "#fff") }
+  return {
+    ink: hsl("--foreground", "#111"),
+    ramp: [...(dark ? ALTITUDE_RAMP.dark : ALTITUDE_RAMP.light)],
+    hot: dark ? "#e6efff" : "#bcd4ff",
+    background: hsl("--card", "#fff"),
+    labelBg: hsl("--background", "#fff", 0.8),
+    labelBorder: hsl("--border", "#ddd"),
+  }
 }
 
 // The top of Explore: one featured flight on a large stage, drawn in three shots that loop (the departure, the whole
@@ -207,11 +221,13 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
             </p>
             <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
               {item.cityFrom}
-              <span className="text-primary"> → </span>
+              <RouteArrow className="mx-[0.3em] text-primary" />
               {item.cityTo}
             </h2>
             <p className="mt-2 font-mono text-sm text-muted-foreground">
-              {item.codes}
+              {item.codeFrom}
+              <RouteArrow className="mx-1.5" />
+              {item.codeTo}
               {item.facts && <> · {item.facts}</>}
             </p>
             {item.note && <p className="mt-4 max-w-xl text-[17px] leading-snug text-foreground/90">&ldquo;{item.note}&rdquo;</p>}
@@ -277,10 +293,10 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-lg font-semibold leading-tight tracking-[-0.01em]">
                     {entry.cityFrom}
-                    <span className="text-muted-foreground"> → </span>
+                    <RouteArrow className="mx-[0.3em] text-muted-foreground" />
                     {entry.cityTo}
                   </span>
-                  <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">{entry.facts || entry.codes}</span>
+                  <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
                 </span>
               </a>
               <span aria-hidden className="pointer-events-none absolute inset-x-3 bottom-0 h-px bg-border">
