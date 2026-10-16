@@ -375,7 +375,9 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                             })}
                             className="underline underline-offset-2"
                           >
-                            {lineage[plan.id].original_origin} → {lineage[plan.id].original_destination}
+                            {lineage[plan.id].original_origin}
+                            <RouteArrow className="mx-1" />
+                            {lineage[plan.id].original_destination}
                             {lineage[plan.id].original_flight_number ? ` ${lineage[plan.id].original_flight_number}` : ""}
                           </Link>
                           {lineage[plan.id].original_author ? ` by ${lineage[plan.id].original_author}` : ""}
