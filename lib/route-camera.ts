@@ -330,50 +330,54 @@ export function drawFrame(
   const lngMin = (cam.cx - w / 2 / cam.scale) / k
   const lngMax = (cam.cx + w / 2 / cam.scale) / k
 
-  const lattice = (spacing: number, test: ((lat: number, lng: number) => boolean) | null, alpha: number, size: number) => {
-    if (alpha <= 0.01) return
+  // One lattice for the whole ground, so every dot has the same size and, at rest, the same colour. The wide shot keeps
+  // only the land dots; as the camera closes in, the dots grow and spread, and the sea dots fade in. Neighbouring
+  // levels are exact halves of each other (anchored to the world), so changing level only fades in the extra dots:
+  // dots are never drawn twice on top of each other (that is what made some look darker and made moiré patterns).
+  const wide = 11
+  const close = 110
+  const spacingPx = wide * Math.pow(close / wide, 1 - landAlpha)
+  const size = 2.6 + (1 - landAlpha) * 38
+  const base = 0.3
+  const u = clamp01(Math.log2(Math.max(spacingPx / cam.scale, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
+  const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
+  const fine = lower + 1 < SPACINGS.length ? 1 - (u - lower) : 1
+  const spacing = SPACINGS[lower]
+  const seaAlpha = 1 - landAlpha
+  // Four groups by opacity: (kept dots | dots of the finer level only) x (land | sea).
+  const groups = [
+    { shared: true, land: true, alpha: 1 },
+    { shared: true, land: false, alpha: seaAlpha },
+    { shared: false, land: true, alpha: fine },
+    { shared: false, land: false, alpha: fine * seaAlpha },
+  ]
+  const i0 = Math.floor(latMin / spacing)
+  const i1 = Math.ceil(latMax / spacing)
+  const j0 = Math.floor(lngMin / spacing)
+  const j1 = Math.ceil(lngMax / spacing)
+  ctx.strokeStyle = palette.ink
+  ctx.lineWidth = size
+  ctx.lineCap = "round"
+  for (const group of groups) {
+    const alpha = group.alpha * base
+    if (alpha <= 0.004) continue
     ctx.globalAlpha = frame.alpha * alpha
-    ctx.strokeStyle = palette.ink
-    ctx.lineWidth = size
-    ctx.lineCap = "round"
     ctx.beginPath()
-    const lat0 = Math.floor(latMin / spacing) * spacing
-    const lng0 = Math.floor(lngMin / spacing) * spacing
     let count = 0
-    for (let lat = lat0; lat <= latMax; lat += spacing) {
-      for (let lng = lng0; lng <= lngMax; lng += spacing) {
-        if (test && !test(lat, lng)) continue
+    for (let i = i0; i <= i1 && count <= 9000; i++) {
+      for (let j = j0; j <= j1; j++) {
+        if ((((i & 1) === 0 && (j & 1) === 0) || lower + 1 >= SPACINGS.length) !== group.shared) continue
+        const lat = i * spacing
+        const lng = j * spacing
+        if (isLand(lat, lng) !== group.land) continue
         const x = sx(lng * k)
         const y = sy(-lat)
         ctx.moveTo(x, y)
         ctx.lineTo(x, y)
-        if (++count > 9000) break
+        count++
       }
     }
     ctx.stroke()
-  }
-
-  if (landAlpha > 0.01) {
-    // Spacing so that dots sit about 11 px apart, blended between the two nearest lattices.
-    const target = 11 / cam.scale
-    const u = clamp01(Math.log2(Math.max(target, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
-    const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
-    const mix = u - lower
-    lattice(SPACINGS[lower], isLand, landAlpha * 0.3 * (1 - mix), 2.6)
-    if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], isLand, landAlpha * 0.3 * mix, 2.6)
-  }
-  if (landAlpha < 0.99) {
-    // The close lattice: big dots, about 110 px apart, anchored to the world.
-    const target = 110 / cam.scale
-    const u = clamp01(Math.log2(Math.max(target, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
-    const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
-    const mix = u - lower
-    const a = (1 - landAlpha) * 0.3
-    // The closer the shot, the bigger the dots: they grow from the overview's size to about fifteen times it, and sit
-    // much further apart, so the ground reads as a bold texture when the camera is on the climb or the final.
-    const dot = 2.6 + (1 - landAlpha) * 38
-    lattice(SPACINGS[lower], null, a * (1 - mix), dot)
-    if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], null, a * mix, dot)
   }
 
   // --- The route: the whole line faintly, the part flown so far in colour (the altitude ramp, as on the homepage globe).

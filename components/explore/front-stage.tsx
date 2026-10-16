@@ -1,8 +1,9 @@
 "use client"
 
+import { ArrowRight } from "@/components/arrow-right"
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, Download, Heart } from "lucide-react"
+import { Download, Heart } from "lucide-react"
 import { ALTITUDE_RAMP } from "@/components/home/altitude-ramp"
 import { RouteThumbnail } from "@/components/plans/route-thumbnail"
 import { RouteArrow } from "@/components/route-arrow"

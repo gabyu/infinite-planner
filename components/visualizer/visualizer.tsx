@@ -1,8 +1,8 @@
 "use client"
 
+import { ArrowRight } from "@/components/arrow-right"
 import { BrandLogo } from "@/components/brand-logo"
 import { useEffect, useRef, useState } from "react"
-import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatAgo, formatUtc } from "@/lib/format-ago"
 import type { GlobeFlight } from "@/lib/recent-flights"

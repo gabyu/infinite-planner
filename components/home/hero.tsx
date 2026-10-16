@@ -1,7 +1,8 @@
 "use client"
 
+import { ArrowRight } from "@/components/arrow-right"
 import Link from "next/link"
-import { ArrowRight, PencilRuler, Upload } from "lucide-react"
+import { PencilRuler, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useIsTouchPrimary } from "@/hooks/use-is-touch-primary"
 import { cn } from "@/lib/utils"
