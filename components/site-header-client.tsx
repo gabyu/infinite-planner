@@ -20,6 +20,7 @@ function NavLink({
   children,
   hideOnMobile,
   matchPrefix,
+  alwaysLink,
 }: {
   href: string
   icon?: React.ReactNode
@@ -27,13 +28,15 @@ function NavLink({
   hideOnMobile?: boolean
   // Active on every page under the link, not just on it (Explore and its plan pages).
   matchPrefix?: boolean
+  // Stays a link on its own page too (Explore: the way back to the Explore home).
+  alwaysLink?: boolean
 }) {
   const pathname = usePathname()
   const isActive = matchPrefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href
   const responsiveClass = hideOnMobile ? "hidden sm:flex" : "flex"
 
-  // Exactly on the page: nothing to click. Somewhere below it (Explore and its plan pages): still a link back.
-  if (isActive && pathname === href) {
+  // Exactly on the page: nothing to click (unless it is meant to stay a link). Somewhere below it (Explore and its plan pages): still a link back.
+  if (isActive && pathname === href && !alwaysLink) {
     return (
       <span className={`${activeNavLinkClass} ${responsiveClass}`}>
         {icon}
@@ -76,7 +79,7 @@ export function SiteHeaderClient({ showExplore }: { showExplore: boolean }) {
             <span className="hidden sm:inline">Sketch</span>
           </NavLink>
           {explore && (
-            <NavLink href={LIBRARY_PATH} icon={<Compass size={16} />} matchPrefix>
+            <NavLink href={LIBRARY_PATH} icon={<Compass size={16} />} matchPrefix alwaysLink>
               <span className="hidden sm:inline">{LIBRARY_NAV_LABEL}</span>
             </NavLink>
           )}

@@ -74,7 +74,8 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
   const [reduced, setReduced] = useState(false)
   const [canHover, setCanHover] = useState(false)
   const [pointerOnStage, setPointerOnStage] = useState(false)
-  const [pausedByList, setPausedByList] = useState(false)
+  // A click on the list stops the rotation for good (until the next visit): the chosen plan keeps playing its loop.
+  const [locked, setLocked] = useState(false)
   const [visible, setVisible] = useState(true)
   const [tabHidden, setTabHidden] = useState(false)
 
@@ -126,7 +127,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
 
   // The drawing loop. It runs only while there is something to animate: otherwise one still frame is drawn.
   const hoverStill = canHover && pointerOnStage
-  const playing = !reduced && !hoverStill && !pausedByList && visible && !tabHidden
+  const playing = !reduced && !hoverStill && visible && !tabHidden
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !item || size.w < 10) return
@@ -143,7 +144,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
     const paint = () => {
       const frame = reduced || hoverStill ? overviewFrame(flight) : frameAt(flight, timeRef.current)
       drawFrame(ctx, flight, frame, palette, labels, dpr)
-      barRefs.current[active]?.style.setProperty("transform", `scaleX(${reduced ? 0 : Math.min(timeRef.current / loop, 1)})`)
+      barRefs.current[active]?.style.setProperty("transform", `scaleX(${reduced || locked ? 0 : Math.min(timeRef.current / loop, 1)})`)
     }
 
     // A theme switch changes the colours: pick them up again.
@@ -165,7 +166,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
       last = now
       if (timeRef.current >= loop) {
         timeRef.current = 0
-        if (items.length > 1) {
+        if (items.length > 1 && !locked) {
           setActive((current) => (current + 1) % items.length)
           return
         }
@@ -179,7 +180,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
       themeObserver.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, size.w, size.h, reduced, hoverStill, playing])
+  }, [active, size.w, size.h, reduced, hoverStill, playing, locked])
 
   // Leaving the stage starts the loop again from the departure.
   useEffect(() => {
@@ -258,14 +259,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
         </article>
       </div>
 
-      <aside
-        className="lg:col-span-4"
-        aria-labelledby="front-list"
-        onPointerEnter={(e) => e.pointerType === "mouse" && setPausedByList(true)}
-        onPointerLeave={(e) => e.pointerType === "mouse" && setPausedByList(false)}
-        onFocusCapture={() => setPausedByList(true)}
-        onBlurCapture={() => setPausedByList(false)}
-      >
+      <aside className="lg:col-span-4" aria-labelledby="front-list">
         <h2 id="front-list" className="mb-5 border-t-2 border-foreground pt-3 text-xs font-semibold uppercase tracking-[0.16em]">
           On the front
         </h2>
@@ -281,23 +275,24 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   // Without them, or with a modifier, it is a plain link.
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
                   e.preventDefault()
+                  setLocked(true)
                   select(index)
                 }}
                 className={cn(
                   "flex items-baseline gap-4 px-4 py-4 no-underline transition-colors motion-reduce:transition-none",
-                  index === active ? "bg-foreground text-background" : "hover:bg-muted/60",
+                  index === active ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "hover:bg-muted/60",
                 )}
               >
-                <span className={cn("w-6 shrink-0 font-mono text-sm", index === active ? "text-background/70" : "text-muted-foreground")} aria-hidden>
+                <span className={cn("w-6 shrink-0 font-mono text-sm", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")} aria-hidden>
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-display text-lg font-semibold leading-tight tracking-[-0.01em]">
                     {entry.cityFrom}
-                    <RouteArrow className={cn("mx-[0.3em]", index === active ? "text-background/70" : "text-muted-foreground")} />
+                    <RouteArrow className={cn("mx-[0.3em]", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")} />
                     {entry.cityTo}
                   </span>
-                  <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-background/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
+                  <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-blue-700/70 dark:text-blue-300/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
                 </span>
               </a>
               <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-transparent">
@@ -305,7 +300,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   ref={(el) => {
                     barRefs.current[index] = el
                   }}
-                  className="block h-full origin-left bg-primary"
+                  className="block h-full origin-left bg-blue-600 dark:bg-blue-400"
                   style={{ transform: "scaleX(0)" }}
                 />
               </span>
