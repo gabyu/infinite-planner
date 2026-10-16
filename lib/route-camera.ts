@@ -32,6 +32,9 @@ export interface Flight {
   total: number
   headLen: number
   tailStartLen: number
+  // Arc length of the route point nearest to the middle of the overview: where the camera joins the line when it
+  // starts following it (the overview's centre is usually beside the route, which arcs).
+  overFocusLen: number
   hasZoom: boolean
   // Altitude of each point (feet), and whether the plan has any: without it the line is a single colour.
   alts: number[]
@@ -54,6 +57,19 @@ const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2
 const easeInOutSine = (t: number) => -(Math.cos(Math.PI * t) - 1) / 2
 const easeOutSine = (t: number) => Math.sin((t * Math.PI) / 2)
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
+function nearest(points: World[], x: number, y: number): number {
+  let best = 0
+  let bestDistance = Infinity
+  points.forEach((p, i) => {
+    const d = (p.x - x) ** 2 + (p.y - y) ** 2
+    if (d < bestDistance) {
+      bestDistance = d
+      best = i
+    }
+  })
+  return best
+}
 
 function fit(points: World[], width: number, height: number, pad: number, minSpan: number): Camera {
   const xs = points.map((p) => p.x)
@@ -104,6 +120,7 @@ export function prepareFlight(
     total,
     headLen: cum[Math.max(headN, 2) - 1] ?? 0,
     tailStartLen: cum[world.length - Math.max(tailN, 2)] ?? total,
+    overFocusLen: cum[nearest(world, over.cx, over.cy)] ?? 0,
     hasZoom,
     alts: points.map((p) => p.altitude ?? 0),
     hasAltitude: points.some((p) => (p.altitude ?? 0) > 0),
@@ -112,6 +129,24 @@ export function prepareFlight(
     height,
     k,
   }
+}
+
+// The point of the route at an arc length (and its altitude).
+export function pointAt(flight: Flight, until: number): { x: number; y: number; alt: number } {
+  const { world, cum, alts } = flight
+  for (let i = 1; i < world.length; i++) {
+    if (cum[i] >= until) {
+      const span = cum[i] - cum[i - 1] || 1
+      const f = clamp01((until - cum[i - 1]) / span)
+      return {
+        x: lerp(world[i - 1].x, world[i].x, f),
+        y: lerp(world[i - 1].y, world[i].y, f),
+        alt: lerp(alts[i - 1], alts[i], f),
+      }
+    }
+  }
+  const end = world[world.length - 1]
+  return { x: end.x, y: end.y, alt: alts[alts.length - 1] }
 }
 
 function mixCamera(a: Camera, b: Camera, t: number): Camera {
@@ -126,6 +161,8 @@ export interface Frame {
   // Whole picture's opacity (the loop fades out and in).
   alpha: number
   shot: "departure" | "cruise" | "arrival"
+  // The airport pills: shown while the flight plays, not on the still overview (hover).
+  labels: boolean
 }
 
 // The state of the picture at time t (seconds into the loop).
@@ -140,6 +177,7 @@ export function frameAt(flight: Flight, time: number): Frame {
       drawn: total * easeInOutSine(clamp01(u / PLAIN.drawEnd)),
       alpha: u < 0.35 ? u / 0.35 : u > PLAIN.fadeStart ? clamp01(1 - (u - PLAIN.fadeStart) / (PLAIN_LOOP_SECONDS - PLAIN.fadeStart)) : 1,
       shot: "cruise",
+      labels: true,
     }
   }
 
@@ -167,31 +205,43 @@ export function frameAt(flight: Flight, time: number): Frame {
     cam = cams.over
     shot = "cruise"
   } else if (t < T.overToArrEnd) {
-    cam = mixCamera(cams.over, cams.arr, easeInOutCubic((t - T.overEnd) / (T.overToArrEnd - T.overEnd)))
+    // Down to the arrival by following the flight plan: the camera glides after the aircraft along the line while it
+    // zooms in, instead of cutting straight across to the airport.
+    const u = easeInOutCubic((t - T.overEnd) / (T.overToArrEnd - T.overEnd))
+    // The camera's centre first joins the line (quickly, while the picture is still wide, so it hardly shows), then
+    // slides along it to the aircraft: it never looks at ground beside the route.
+    const along = pointAt(flight, lerp(flight.overFocusLen, drawn, u))
+    const join = 1 - Math.pow(1 - u, 3)
+    cam = {
+      cx: lerp(cams.over.cx, along.x, join),
+      cy: lerp(cams.over.cy, along.y, join),
+      scale: Math.exp(lerp(Math.log(cams.over.scale), Math.log(cams.arr.scale), u)),
+    }
     shot = "arrival"
   } else {
-    // Close on the arrival: the camera settles on the runway end.
-    const settle = 0.6 * easeInOutSine(clamp01((t - T.overToArrEnd) / (T.arrEnd - T.overToArrEnd)))
-    cam = { cx: lerp(cams.arr.cx, last.x, settle), cy: lerp(cams.arr.cy, last.y, settle), scale: cams.arr.scale }
+    // Close on the arrival: the camera keeps following the aircraft and leans further towards the airport as it
+    // gets there, so the end of the line is centred when it lands.
+    const e = easeInOutSine(clamp01((t - T.overToArrEnd) / (T.arrEnd - T.overToArrEnd)))
+    const tip = pointAt(flight, drawn)
+    cam = { cx: lerp(tip.x, last.x, 0.8 * e), cy: lerp(tip.y, last.y, 0.8 * e), scale: cams.arr.scale }
     shot = "arrival"
   }
 
   let alpha = 1
   if (t < 0.35) alpha = t / 0.35
   else if (t > T.fadeStart) alpha = clamp01(1 - (t - T.fadeStart) / (LOOP_SECONDS - T.fadeStart))
-  return { cam, drawn, alpha, shot }
+  return { cam, drawn, alpha, shot, labels: true }
 }
 
 // The whole flight, fully drawn, in the overview: what hovering shows, and what reduced motion gets.
 export function overviewFrame(flight: Flight): Frame {
-  return { cam: flight.cams.over, drawn: flight.total, alpha: 1, shot: "cruise" }
+  return { cam: flight.cams.over, drawn: flight.total, alpha: 1, shot: "cruise", labels: false }
 }
 
 export interface Palette {
   ink: string
-  // The altitude ramp of the homepage globe, low to high (cyan, blue, violet, magenta), and the bright head of the line.
+  // The altitude ramp of the homepage globe, low to high (cyan, blue, violet, magenta).
   ramp: string[]
-  hot: string
   background: string
   // The airport pills, like the homepage's: a soft background, a hairline border.
   labelBg: string
@@ -293,22 +343,6 @@ export function drawFrame(
   ctx.globalAlpha = frame.alpha
   ctx.lineJoin = "round"
   ctx.lineCap = "round"
-  const tipAt = (until: number) => {
-    for (let i = 1; i < world.length; i++) {
-      if (cum[i] >= until) {
-        const span = cum[i] - cum[i - 1] || 1
-        const f = clamp01((until - cum[i - 1]) / span)
-        return {
-          x: lerp(world[i - 1].x, world[i].x, f),
-          y: lerp(world[i - 1].y, world[i].y, f),
-          alt: lerp(flight.alts[i - 1], flight.alts[i], f),
-        }
-      }
-    }
-    const end = world[world.length - 1]
-    return { x: end.x, y: end.y, alt: flight.alts[flight.alts.length - 1] }
-  }
-
   // The whole route, faint, so the viewer sees where it is going.
   ctx.beginPath()
   ctx.moveTo(sx(world[0].x), sy(world[0].y))
@@ -321,7 +355,7 @@ export function drawFrame(
   // The part flown, one segment at a time so each takes the colour of its altitude.
   ctx.globalAlpha = frame.alpha
   ctx.lineWidth = 3.6
-  const tip = tipAt(frame.drawn)
+  const tip = pointAt(flight, frame.drawn)
   const color = (feet: number) => (flight.hasAltitude ? rampColor(palette.ramp, feet) : palette.ramp[1])
   for (let i = 1; i < world.length && cum[i - 1] < frame.drawn; i++) {
     const reached = cum[i] <= frame.drawn
@@ -375,23 +409,22 @@ export function drawFrame(
     ctx.textBaseline = "middle"
     ctx.fillText(label, px + 10, py + ph / 2 + 0.5)
   }
-  pill(world[0], labels.origin, 1)
-  // The destination's pill comes in as the line arrives.
-  pill(world[world.length - 1], labels.destination, clamp01((frame.drawn / flight.total - 0.9) / 0.1))
+  // Still overview (hover): the route alone, no airport pills.
+  if (frame.labels) {
+    pill(world[0], labels.origin, 1)
+    // The destination's pill comes in as the line arrives.
+    pill(world[world.length - 1], labels.destination, clamp01((frame.drawn / flight.total - 0.9) / 0.1))
+  } else {
+    pill(world[0], "", 0)
+    pill(world[world.length - 1], "", 0)
+  }
 
-  // --- The aircraft at the head of the line: a bright core in the ramp's blue with a soft halo.
+  // --- The aircraft at the head of the line: a dot filled with the colour of its altitude (no halo).
   if (frame.drawn < flight.total - 1e-6) {
-    const x = sx(tip.x)
-    const y = sy(tip.y)
     ctx.beginPath()
-    ctx.arc(x, y, 11, 0, Math.PI * 2)
-    ctx.fillStyle = color(tip.alt)
-    ctx.globalAlpha = frame.alpha * 0.25
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(x, y, 5.2, 0, Math.PI * 2)
+    ctx.arc(sx(tip.x), sy(tip.y), 5.6, 0, Math.PI * 2)
     ctx.globalAlpha = frame.alpha
-    ctx.fillStyle = palette.hot
+    ctx.fillStyle = color(tip.alt)
     ctx.fill()
   }
   ctx.globalAlpha = 1
