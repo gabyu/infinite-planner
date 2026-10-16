@@ -254,9 +254,12 @@ export function drawFrame(
     const u = clamp01(Math.log2(Math.max(target, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
     const lower = Math.min(Math.floor(u), SPACINGS.length - 1)
     const mix = u - lower
-    const a = (1 - landAlpha) * 0.5
-    lattice(SPACINGS[lower], null, a * (1 - mix), 2.6)
-    if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], null, a * mix, 2.6)
+    const a = (1 - landAlpha) * 0.38
+    // The closer the shot, the bigger the dots: they grow from the overview's size to more than double it, so the ground
+    // still reads as a texture when the camera is on the climb or the final.
+    const dot = 2.6 + (1 - landAlpha) * 4.2
+    lattice(SPACINGS[lower], null, a * (1 - mix), dot)
+    if (lower + 1 < SPACINGS.length) lattice(SPACINGS[lower + 1], null, a * mix, dot)
   }
 
   // --- The route: the whole line faintly, the part flown so far in full.
