@@ -2,6 +2,7 @@ import { ContributorSearch } from "@/components/admin/contributor-search"
 import { LibraryActionButton } from "@/components/admin/library-actions"
 import { LocalDate } from "@/components/admin/local-date"
 import { PageHeader } from "@/components/admin/page-header"
+import { RoleTag } from "@/components/admin/role-tag"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { getSessionContext, requireAdmin } from "@/lib/admin/auth"
@@ -12,6 +13,7 @@ interface ContributorRow {
   id: string
   discord_username: string | null
   avatar_url: string | null
+  role: string
   contributor_since: string | null
   published_count: number
   downloads_received: number
@@ -32,7 +34,7 @@ export default async function ContributorsPage() {
     <>
       <PageHeader
         title="Contributors"
-        description="Discord members raised to publish flight plans during the soft launch. They keep the badge after the launch."
+        description="Discord members raised to publish flight plans during the soft launch. They keep the badge after the launch. Admins are contributors by default."
       />
 
       <section aria-labelledby="add" className="mb-8">
@@ -75,6 +77,7 @@ export default async function ContributorsPage() {
                         <AvatarFallback className="text-[10px] uppercase">{(contributor.discord_username ?? "?").slice(0, 2)}</AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{contributor.discord_username ?? "Unknown"}</span>
+                      <RoleTag role={contributor.role} />
                     </div>
                   </TableCell>
                   <TableCell>{contributor.contributor_since ? <LocalDate iso={contributor.contributor_since} timezone={timezone} /> : "—"}</TableCell>
@@ -82,13 +85,17 @@ export default async function ContributorsPage() {
                   <TableCell className="font-mono text-sm">{Number(contributor.downloads_received)}</TableCell>
                   <TableCell className="font-mono text-sm">{Number(contributor.likes_received)}</TableCell>
                   <TableCell className="text-right">
-                    <LibraryActionButton
-                      variant="ghost"
-                      action={{ action: "contributor", userId: contributor.id, contributor: false }}
-                      confirm={`Demote ${contributor.discord_username ?? "this account"} back to a regular member? Their published plans stay as they are, but before the launch they lose access to the library.`}
-                    >
-                      Demote
-                    </LibraryActionButton>
+                    {contributor.role === "contributor" ? (
+                      <LibraryActionButton
+                        variant="ghost"
+                        action={{ action: "contributor", userId: contributor.id, contributor: false }}
+                        confirm={`Demote ${contributor.discord_username ?? "this account"} back to a regular member? Their published plans stay as they are, but before the launch they lose access to the library.`}
+                      >
+                        Demote
+                      </LibraryActionButton>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Always, as an admin</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

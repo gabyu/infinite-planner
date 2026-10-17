@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { RoleTag } from "@/components/admin/role-tag"
 import { LocalDate } from "@/components/admin/local-date"
 import { ADMIN_BASE, getSessionContext } from "@/lib/admin/auth"
 
@@ -28,6 +29,7 @@ interface UserRow {
   id: string
   discord_username: string | null
   avatar_url: string | null
+  role: string
   created_at: string
   exported_count: number
   draft_count: number
@@ -172,6 +174,7 @@ export async function UsersSection({
                       </AvatarFallback>
                     </Avatar>
                     <span className="font-medium">{user.discord_username ?? "Unknown"}</span>
+                    <RoleTag role={user.role} />
                   </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
