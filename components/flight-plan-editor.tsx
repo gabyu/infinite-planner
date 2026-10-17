@@ -64,6 +64,7 @@ import { EditorWorkspace } from "@/components/editor/workspace"
 import { WaypointList } from "@/components/editor/waypoint-list"
 import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
+import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { useToast } from "@/hooks/use-toast"
@@ -237,6 +238,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // What the person typed in the Flight number field (a codeshare, a callsign of their own...). undefined = untouched:
   // the number read from the file name (or saved with the draft) stands.
   const [flightNumberEdit, setFlightNumberEdit] = useState<string | undefined>(undefined)
+  // The other numbers of the flight (codeshares), next to the main one above. Saved with the plan.
+  const [extraFlightNumbers, setExtraFlightNumbers] = useState<string[]>([])
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -436,6 +439,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         resetSavedPlan()
         setFlightNumberOverride(null)
         setFlightNumberEdit(undefined)
+        setExtraFlightNumbers([])
         setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -540,6 +544,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // The flight number the plan carries: what was typed in the field when there is something, else the file's. It can be
   // changed until the plan is exported (a flight often has codeshare numbers), and cleared.
   const detectedFlightNumber = flightNumberEdit !== undefined ? flightNumberEdit || null : fileFlightNumber
+  const allFlightNumbers = [detectedFlightNumber, ...extraFlightNumbers].filter((n): n is string => !!n)
+  // The chips field edits the whole list: its first number is the main one, the rest are the extras.
+  const setAllFlightNumbers = (numbers: string[]) => {
+    setFlightNumberEdit(numbers[0] ?? "")
+    setExtraFlightNumbers(numbers.slice(1))
+  }
 
   const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
   const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
@@ -552,6 +562,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       JSON.stringify([
         planSource,
         detectedFlightNumber,
+        extraFlightNumbers,
         originAirport,
         destinationAirport,
         applyBrandingOverlay(waypoints, includeBranding).map(({ name, lat, lng, altitude }) => [
@@ -563,7 +574,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         effectiveBranding,
         flightTimeMinutes,
       ]),
-    [planSource, detectedFlightNumber, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
+    [planSource, detectedFlightNumber, extraFlightNumbers, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
   )
   const isDirty = savedFingerprint !== currentFingerprint
 
@@ -645,6 +656,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       source: planSource,
       status,
       flightNumber: detectedFlightNumber,
+      extraFlightNumbers,
       origin: originAirport,
       destination: destinationAirport,
       waypoints: finalWaypoints.map(({ name, lat, lng, altitude }) => ({ name, lat, lng, altitude })),
@@ -789,6 +801,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
+          setExtraFlightNumbers(Array.isArray(body.extra_flight_numbers) ? body.extra_flight_numbers : [])
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"
@@ -1415,20 +1428,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const flightNumberSection = (inGrid: boolean, always = false) =>
     (canSave || always) && (
         <PanelSection
-          label="Flight number"
+          label={copy.editor.flightNumbersLabel}
           className={inGrid ? exportSectionClass : undefined}
-          help={`Optional. Read from the file name when it carries one; change it if you fly the flight under another number (codeshares). Letters and digits, up to 12. Saved with the plan.`}
+          help={copy.editor.flightNumbersHelp}
         >
-          <Input
-            id="flight-number"
-            value={detectedFlightNumber ?? ""}
-            onChange={(e) => setFlightNumberEdit(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12))}
-            placeholder="e.g. AF69"
-            aria-label="Flight number"
-            autoComplete="off"
-            spellCheck={false}
-            className="h-8 w-full max-w-[9rem] font-mono"
-          />
+          <FlightNumbersField id="flight-number" value={allFlightNumbers} onChange={setAllFlightNumbers} />
         </PanelSection>
     )
 
@@ -1439,7 +1443,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           className={inGrid ? exportSectionClass : undefined}
           help="Optional. How long the flight takes: saved with the plan in your dashboard."
         >
-          <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
+          <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} fill />
         </PanelSection>
     )
 

@@ -26,6 +26,12 @@ export const copy = {
     waypointLimit: "Over the 250 waypoint limit", // PROVISIONAL
     optionsHeading: "Options", // PROVISIONAL
     tabWaypoints: "Waypoints", // PROVISIONAL
+    flightNumbersLabel: "Flight numbers", // PROVISIONAL
+    flightNumberPrimary: "Main flight number", // PROVISIONAL
+    flightNumberRemove: "Remove", // PROVISIONAL
+    flightNumberPlaceholder: "e.g. AF69", // PROVISIONAL
+    flightNumberAddPlaceholder: "Add another", // PROVISIONAL
+    flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.", // PROVISIONAL
     signedOutNote: "Flight number and flight time are saved with the plan once you sign in.", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
 
@@ -34,7 +40,6 @@ export const copy = {
     groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.", // PROVISIONAL
     trimDeparture: "Departure", // PROVISIONAL
     trimArrival: "Arrival", // PROVISIONAL
-    trimmed: "Trimmed", // PROVISIONAL
     trimApply: "Apply", // PROVISIONAL
     trimCancel: "Cancel", // PROVISIONAL
     trimApproximate: "Approximate", // PROVISIONAL

@@ -9,6 +9,8 @@ interface FlightTimeFieldProps {
   onChange: (minutes: number | null) => void
   // Bump this (e.g. when the dialog opens) to reload the inputs from `value`.
   resetKey?: unknown
+  // Stretch the two inputs over the full width of the container.
+  fill?: boolean
 }
 
 const clampDigits = (value: string, max: number) => {
@@ -20,7 +22,7 @@ const clampDigits = (value: string, max: number) => {
 // Hours + minutes inputs for the optional flight time. The value is whole minutes
 // (null = not set); 0 h 0 min means not set too. Typing is kept as strings so a
 // half-typed value ("" or "0") isn't rewritten under the cursor.
-export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightTimeFieldProps) {
+export function FlightTimeField({ idPrefix, value, onChange, resetKey, fill }: FlightTimeFieldProps) {
   const [hours, setHours] = useState("")
   const [minutes, setMinutes] = useState("")
   const minutesRef = useRef<HTMLInputElement>(null)
@@ -54,7 +56,7 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
           }
         }}
         placeholder="0"
-        className="w-14 text-center"
+        className={fill ? "flex-1 text-center" : "w-14 text-center"}
         aria-label="Hours"
       />
       <span className="text-xs text-muted-foreground">h</span>
@@ -65,7 +67,7 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
         value={minutes}
         onChange={(e) => update(hours, clampDigits(e.target.value, 59))}
         placeholder="00"
-        className="w-14 text-center"
+        className={fill ? "flex-1 text-center" : "w-14 text-center"}
         aria-label="Minutes"
       />
       <span className="text-xs text-muted-foreground">min</span>

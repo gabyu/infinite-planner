@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const { data: original } = await supabase
     .from("flight_plans")
     .select(
-      "status, source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes",
+      "status, source, flight_number, extra_flight_numbers, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes",
     )
     .eq("id", params.id)
     .maybeSingle()

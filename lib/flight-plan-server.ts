@@ -36,6 +36,11 @@ export const flightPlanBodySchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z0-9]{1,12}$/)
     .nullable(),
+  // Other numbers the same flight goes by (codeshares), next to the primary one above.
+  extraFlightNumbers: z
+    .array(z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,12}$/))
+    .max(5)
+    .default([]),
   origin: z.string().trim().toUpperCase().regex(/^[A-Z]{4}$/, "Enter a valid origin ICAO code."),
   destination: z.string().trim().toUpperCase().regex(/^[A-Z]{4}$/, "Enter a valid destination ICAO code."),
   waypoints: z.array(waypointSchema).min(2, "A flight plan needs at least 2 waypoints.").max(1000),
@@ -51,6 +56,7 @@ export function flightPlanColumns(body: FlightPlanBody) {
   return {
     status: body.status,
     flight_number: body.flightNumber,
+    extra_flight_numbers: body.extraFlightNumbers,
     origin_airport: body.origin,
     destination_airport: body.destination,
     origin_airport_name: resolveAirportName(body.origin),

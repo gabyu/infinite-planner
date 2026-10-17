@@ -51,7 +51,6 @@ export function GroundMovements({ previewing, busy, trimmed, disabled, onToggle 
             >
               {busy === end ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
               {label}
-              {off && <span className="text-xs font-normal">{copy.editor.trimmed}</span>}
             </button>
           )
         })}

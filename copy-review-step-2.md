@@ -85,7 +85,6 @@ Existing strings the new layout still shows are untouched: "Made with", "Flight 
 | `groundHeading` | Title of the block in Options | Ground movements | Ground movements | Ground | Taxi time |
 | `groundHint` | Line under the title | Removes the waypoints recorded on the ground before take-off and after landing | Remove the taxi before take-off and after landing | Trim taxi and rollout | Skip the taxi, start at the runway |
 | `trimDeparture` / `trimArrival` | The two toggle buttons | Departure / Arrival | Departure / Arrival | Takeoff / Landing | Takeoff / Touchdown |
-| `trimmed` | Small word on a button once applied | Trimmed | Trimmed | Done | Cleared |
 | `trimApply` / `trimCancel` | Bar above the waypoint list during the preview | Apply / Cancel | Apply / Cancel | OK / Cancel | Do it / Never mind |
 | `trimApproximate` | Under the count when no runway matched (estimated from the airport area) | Approximate: no runway data matched, estimated near the airport | Approximate | Approx. | Best guess |
 | `trimNone` | Toast when there is nothing to remove | No ground movements found in this plan | No ground movements found | Nothing to trim | Already on the runway |
@@ -94,3 +93,14 @@ Existing strings the new layout still shows are untouched: "Made with", "Flight 
 | `trimBrandingNote` | Toast text when trimming dropped the plan under the Made with minimum | The plan is now too short for the Made with Infinite Planner waypoints, which were removed | The plan is now too short for Made with Infinite Planner, so it was left out. | Too short for Made with: removed. | Too short to sign: we left our name off. |
 | `trimPreviewText(n, end)` | Count while previewing | 7 waypoints will be removed before take-off | 7 waypoints will be removed before take-off | Remove 7 before take-off | 7 waypoints to shed before take-off |
 | `trimRemovedText(n)` | Toast title after applying | 7 waypoints have been removed | 7 waypoints removed | 7 removed | 7 waypoints gone |
+
+## Flight numbers (several per flight)
+
+| Key | Where / when | Serious | Calm (current) | Short | Fun |
+|---|---|---|---|---|---|
+| `flightNumbersLabel` | Options, title of the field (also its aria-label) | Flight numbers | Flight numbers | Numbers | Callsigns |
+| `flightNumberPrimary` | Tooltip on the first chip | Primary flight number | Main flight number | Main | The one on the ticket |
+| `flightNumberRemove` | aria-label start of each chip's cross ("Remove AF69") | Remove | Remove | Remove | Drop |
+| `flightNumberPlaceholder` | Empty field | e.g. AF69 | e.g. AF69 | AF69 | e.g. AF69 |
+| `flightNumberAddPlaceholder` | Field once there is a number | Add a codeshare | Add another | Add | And its codeshares... |
+| `flightNumbersHelp` | Help tooltip next to the title | Optional. Read from the file name when it carries one. Enter the other numbers this flight operates under, confirming each with Enter. The first is the primary number. Letters and digits, up to 12 characters each, at most 6. Saved with the plan. | Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan. | Optional. Press Enter after each number. First = main. Up to 6, letters and digits. | Same flight, several names? Add the codeshares and press Enter: the first is the star of the show. |
