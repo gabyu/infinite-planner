@@ -28,6 +28,12 @@ export const copy = {
     optionsHint: "Flight number, flight time", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
 
+    // Going back to the Convert start screen
+    leaveTitle: "Are you sure you want to go back?", // PROVISIONAL
+    leaveBody: "This flight plan hasn't been exported or saved. Going back erases everything you created.", // PROVISIONAL
+    leaveStay: "Stay", // PROVISIONAL
+    leaveConfirm: "Go back and erase", // PROVISIONAL
+
     // Map toolbar
     editWaypoints: "Edit waypoints", // PROVISIONAL
     doneEditing: "Done editing", // PROVISIONAL

@@ -51,6 +51,7 @@ import { DrawingBoard } from "@/components/drawing-board"
 import { useHistoryState } from "@/hooks/use-history-state"
 import { useIsTouchPrimary } from "@/hooks/use-is-touch-primary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
@@ -562,6 +563,48 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   )
   const isDirty = savedFingerprint !== currentFingerprint
 
+  // Going back to the Convert start screen throws the plan away. That is only safe when what is on the page has been
+  // saved (draft or export) or downloaded: otherwise the person is asked first.
+  const [exportedFingerprint, setExportedFingerprint] = useState<string | null>(null)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const leavingRef = useRef(false)
+  const hasUnsavedWork =
+    mode === "import" && hasImported && waypoints.length > 0 && savedFingerprint !== currentFingerprint && exportedFingerprint !== currentFingerprint
+  const unsavedRef = useRef(hasUnsavedWork)
+  unsavedRef.current = hasUnsavedWork
+
+  const startOver = () => {
+    leavingRef.current = true
+    window.location.href = `${window.location.pathname}?reset=${Date.now()}`
+  }
+
+  // The Convert link in the header (we are already on /convert) goes back to the first screen; closing or reloading
+  // the tab with unsaved work asks the browser's own question.
+  useEffect(() => {
+    if (mode !== "import" || !hasImported) return
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const link = (e.target as Element | null)?.closest?.('a[href="/convert"]')
+      if (!link) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (unsavedRef.current) setConfirmLeave(true)
+      else startOver()
+    }
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!unsavedRef.current || leavingRef.current) return
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    document.addEventListener("click", onClick, true)
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => {
+      document.removeEventListener("click", onClick, true)
+      window.removeEventListener("beforeunload", onBeforeUnload)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, hasImported])
+
   // Forgets the row this session saved to (a new import, a cleared sketch): what comes next is a new plan.
   const resetSavedPlan = () => {
     savedPlanIdRef.current = null
@@ -782,6 +825,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+      setExportedFingerprint(currentFingerprint)
 
       // The import flow already records flight_number/origin/destination via
       // saveFlightData() at import time (lib/kml-parser.ts), which is both
@@ -1695,6 +1739,22 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           }
           footer={<div className="px-4 py-3">{exportButtons}</div>}
         />
+        <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{copy.editor.leaveTitle}</DialogTitle>
+              <DialogDescription>{copy.editor.leaveBody}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setConfirmLeave(false)}>
+                {copy.editor.leaveStay}
+              </Button>
+              <Button variant="destructive" onClick={startOver}>
+                {copy.editor.leaveConfirm}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         <Toaster />
       </TooltipProvider>
     )

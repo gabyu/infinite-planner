@@ -30,6 +30,17 @@ Character limits: buttons and toolbar labels ≤ 24, tooltips ≤ 40, aria-label
 | `sheetHandle` | Phone only: aria-label of the bottom sheet handle | Drag to resize the panel, or press Enter to change its height | Drag to resize the panel | Resize | Drag to pull the panel up |
 
 
+## Leaving the editor (Convert link in the header, plan not exported or saved)
+
+Shown when the person clicks Convert in the site header while a plan that is neither exported, downloaded nor saved as a draft is on screen. It warns about lost work: **Fun** is not recommended for any of these.
+
+| Key | Where / when | Serious | Calm (current) | Short | Fun (not recommended) |
+|---|---|---|---|---|---|
+| `leaveTitle` | Dialog title | Discard this flight plan? | Are you sure you want to go back? | Go back? | Leaving so soon? |
+| `leaveBody` | Dialog text | This flight plan has not been exported or saved. Going back permanently discards your work. | This flight plan hasn't been exported or saved. Going back erases everything you created. | Unsaved work will be lost. | Your flight plan hasn't landed anywhere yet: going back wipes it. |
+| `leaveStay` | Button that closes the dialog | Keep editing | Stay | Stay | Keep flying |
+| `leaveConfirm` | Destructive button | Discard and go back | Go back and erase | Erase | Scrap the flight |
+
 ## Map toolbar (top right of the map)
 
 | Key | Where / when | Serious | Calm (current) | Short | Fun |
