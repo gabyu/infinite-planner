@@ -33,6 +33,8 @@ interface WaypointListProps {
   onToggleSelectAll: (checked: boolean) => void
   onDeleteSelected: () => void
   onClearAltitudes: () => void
+  /** Waypoints a ground trim would remove (preview): their rows are dimmed. */
+  ghostIds?: Set<string>
 }
 
 // Quiet inputs: they look like text until hovered or focused, so a row stays compact.
@@ -55,6 +57,7 @@ export function WaypointList({
   onToggleSelectAll,
   onDeleteSelected,
   onClearAltitudes,
+  ghostIds,
 }: WaypointListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const anySelected = waypoints.some((wp) => wp.selected)
@@ -117,6 +120,7 @@ export function WaypointList({
               "[content-visibility:auto] [contain-intrinsic-size:auto_52px]",
               hoveredId === waypoint.id && "bg-accent/60",
               waypoint.selected && "bg-accent",
+              ghostIds?.has(waypoint.id) && "opacity-40",
             )}
           >
             <span className="text-right font-mono text-[11px] text-muted-foreground">{index + 1}</span>

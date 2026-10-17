@@ -52,6 +52,8 @@ export interface MapPreviewProps {
   onWaypointClick?: (id: string) => void
   /** The editing buttons (Edit waypoints, Select points...), stacked at the top right above the zoom tools. */
   toolbarLeading?: React.ReactNode
+  /** Waypoints a ground trim would remove (preview): drawn grey, with their stretch of route dashed. */
+  ghostIds?: Set<string>
 }
 
 const escapeHtml = (text: string) =>
@@ -81,6 +83,7 @@ export default function MapPreview({
   onHoverWaypoint,
   onWaypointClick,
   toolbarLeading,
+  ghostIds,
 }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -420,6 +423,32 @@ export default function MapPreview({
     flush()
   }, [waypoints, altColours, L, isMapReady])
 
+  // Ground trim preview: each run of waypoints to be removed, plus the kept point next to it, as a dashed grey line.
+  const ghostLayerRef = useRef<any>(null)
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L) return
+    if (!ghostLayerRef.current) ghostLayerRef.current = L.layerGroup().addTo(map)
+    const layer = ghostLayerRef.current
+    layer.clearLayers()
+    if (!ghostIds || ghostIds.size === 0) return
+    let i = 0
+    while (i < waypoints.length) {
+      if (!ghostIds.has(waypoints[i].id)) {
+        i++
+        continue
+      }
+      let j = i
+      while (j + 1 < waypoints.length && ghostIds.has(waypoints[j + 1].id)) j++
+      const from = Math.max(0, i - 1)
+      const to = Math.min(waypoints.length - 1, j + 1)
+      const points = waypoints.slice(from, to + 1).map((wp) => [wp.lat, wp.lng] as [number, number])
+      L.polyline(points, { className: "ip-route-casing", weight: 6, interactive: false }).addTo(layer)
+      L.polyline(points, { className: "ip-route-ghost", weight: 3, interactive: false }).addTo(layer)
+      i = j + 1
+    }
+  }, [waypoints, ghostIds, L, isMapReady])
+
   // Fit the route when a plan appears or its length changes (not while the person is editing it).
   const fitRoute = useCallback(() => {
     const map = mapInstanceRef.current
@@ -528,9 +557,10 @@ export default function MapPreview({
       const hovered = waypoint.id === hoveredId
       const show = !thin || isAirport || waypoint.selected || hovered || index % step === 0
 
+      const ghost = !!ghostIds?.has(waypoint.id)
       const html = isAirport
-        ? `<div class="ip-airport ${waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
-        : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : ""}"></div>`
+        ? `<div class="ip-airport ${ghost ? "ip-airport--ghost" : waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
+        : `<div class="ip-dot${ghost ? " ip-dot--ghost" : waypoint.selected ? " ip-dot--selected" : ""}"></div>`
       const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${Math.round(waypoint.altitude)} ft` : ""}`
 
       let marker = markersRef.current.get(waypoint.id)
@@ -614,7 +644,7 @@ export default function MapPreview({
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, isEditing, selectMode, zoom, hoveredId, L, isMapReady])
+  }, [waypoints, isEditing, selectMode, zoom, hoveredId, ghostIds, L, isMapReady])
 
   // Lock panning and zooming while the user is selecting points, so a drag on
   // the map background can't be mistaken for a pan and pinch/scroll can't

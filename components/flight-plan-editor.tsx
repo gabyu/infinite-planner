@@ -58,12 +58,16 @@ import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { copy } from "@/lib/copy"
+import { copy, trimPreviewText, trimRemovedText } from "@/lib/copy"
 import { distanceNm, formatAltitude, formatDistanceNm } from "@/lib/route-render"
 import { EditorWorkspace } from "@/components/editor/workspace"
 import { WaypointList } from "@/components/editor/waypoint-list"
 import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
+import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
+import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
+import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -1267,6 +1271,81 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setWaypoints((prev) => applyBrandingOverlay(prev, checked))
   }
 
+
+  // --- Ground trimming (Convert, Options): preview what a trim would remove, then apply it as one undoable step.
+  const { toast } = useToast()
+  const [trimPreview, setTrimPreview] = useState<{ end: TrimEnd; ids: string[]; approximate: boolean } | null>(null)
+  const [trimBusy, setTrimBusy] = useState<TrimEnd | null>(null)
+  const [trimmed, setTrimmed] = useState<Record<TrimEnd, boolean>>({ departure: false, arrival: false })
+  const runwayCache = useRef(new Map<string, TrimAirport | null>())
+  const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
+
+  const loadAirport = async (icao: string): Promise<TrimAirport | null> => {
+    if (runwayCache.current.has(icao)) return runwayCache.current.get(icao) ?? null
+    try {
+      const response = await fetch(`/api/airports/${icao}/runways`)
+      const data = response.ok ? ((await response.json()) as TrimAirport) : null
+      runwayCache.current.set(icao, data)
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  const toggleTrimPreview = async (end: TrimEnd) => {
+    if (trimPreview?.end === end) {
+      setTrimPreview(null)
+      return
+    }
+    setTrimPreview(null)
+    setTrimBusy(end)
+    const icao = end === "departure" ? originAirport : destinationAirport
+    const known = await loadAirport(icao)
+    setTrimBusy(null)
+    // An airport without runway data still gets the fallback, around the plan's own end point.
+    const endPoint = end === "departure" ? waypoints[0] : waypoints[waypoints.length - 1]
+    const airport: TrimAirport = known ?? { elevationFt: null, lat: endPoint.lat, lng: endPoint.lng, runways: [] }
+    const result = planTrim(waypoints, airport, end)
+    if (result.remove.length === 0) {
+      toast({ title: copy.editor.trimNone })
+      return
+    }
+    setTrimPreview({ end, ids: result.remove.map((index) => waypoints[index].id), approximate: result.approximate })
+  }
+
+  const applyTrim = () => {
+    if (!trimPreview) return
+    const { end, ids } = trimPreview
+    const remove = new Set(ids)
+    const kept = waypoints.filter((wp) => !remove.has(wp.id))
+    if (kept.length < 2) return
+    const brandingDropped = includeBranding && waypoints.length >= BRANDING_MIN_WAYPOINTS && kept.length < BRANDING_MIN_WAYPOINTS
+    // One setWaypoints call = one undo step. The naming rules renumber what is left.
+    setWaypoints(applyWaypointNamingRules(kept.map((wp) => ({ ...wp, selected: false })), originAirport, destinationAirport, includeBranding))
+    setTrimmed((current) => ({ ...current, [end]: true }))
+    setTrimPreview(null)
+    toast({
+      title: trimRemovedText(ids.length),
+      description: brandingDropped ? copy.editor.trimBrandingNote : undefined,
+      action: (
+        <ToastAction
+          altText={copy.editor.trimUndo}
+          onClick={() => {
+            waypointsHistory.undo()
+            setTrimmed((current) => ({ ...current, [end]: false }))
+          }}
+        >
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
+  }
+
+  // Edits made while previewing can change what a trim would do: drop the preview.
+  useEffect(() => {
+    if (trimPreview && trimPreview.ids.some((id) => !waypoints.some((wp) => wp.id === id))) setTrimPreview(null)
+  }, [waypoints, trimPreview])
+
   const exportBlockReason =
     waypoints.length < 2
       ? "Add at least 2 waypoints to export."
@@ -1631,6 +1710,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
               onWaypointsMarqueeSelect={handleMarqueeSelect}
               onClearSelection={handleClearMapSelection}
               hoveredId={hoveredId}
+              ghostIds={ghostIds}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}
@@ -1704,6 +1784,17 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 </div>
               )}
 
+              {trimPreview && (
+                <div className="shrink-0 pt-3">
+                  <GroundTrimBar
+                    text={trimPreviewText(trimPreview.ids.length, trimPreview.end)}
+                    approximate={trimPreview.approximate}
+                    onApply={applyTrim}
+                    onCancel={() => setTrimPreview(null)}
+                  />
+                </div>
+              )}
+
               <div className="flex min-h-[200px] flex-1 flex-col pt-2">
                 <WaypointList
                   waypoints={waypoints}
@@ -1718,6 +1809,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   onToggleSelectAll={toggleSelectAll}
                   onDeleteSelected={deleteSelectedWaypoints}
                   onClearAltitudes={clearSelectedAltitudes}
+                  ghostIds={ghostIds}
                 />
               </div>
 
@@ -1730,9 +1822,16 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   </span>
                   <ChevronDown className="ml-auto h-4 w-4 shrink-0 translate-y-0.5 self-center text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
-                <div className="border-t">
+                <div className="max-h-[42vh] overflow-y-auto overscroll-contain border-t">
                   {flightNumberSection(false)}
                   {flightTimeSection(false)}
+                  <GroundMovements
+                    previewing={trimPreview?.end ?? null}
+                    busy={trimBusy}
+                    trimmed={trimmed}
+                    disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
+                    onToggle={toggleTrimPreview}
+                  />
                   {optionsContent}
                   {brandingSection(false)}
                 </div>
