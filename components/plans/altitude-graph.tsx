@@ -46,7 +46,7 @@ export function AltitudeGraph({ waypoints }: { waypoints: StoredWaypoint[] }) {
       <path d={profile.area} fill="url(#alt-fill)" />
       <path d={profile.line} fill="none" stroke="url(#alt-line)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
       <g fontSize="15" fill="currentColor" fontFamily="var(--font-ibm-plex-mono), monospace">
-        <text x={FRAME.pad} y={FRAME.pad - 8}>{`${top.toLocaleString("en-US")} ft`}</text>
+        <text x={FRAME.pad} y={FRAME.pad - 8}>{`${Math.round(top)} ft`}</text>
         <text x={FRAME.pad} y={FRAME.height - 6}>0 NM</text>
         <text x={FRAME.width - FRAME.pad} y={FRAME.height - 6} textAnchor="end">
           {formatDistanceNm(profile.totalNm)}

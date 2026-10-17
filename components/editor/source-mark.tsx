@@ -25,7 +25,7 @@ function FlightAwareMark({ className }: { className?: string }) {
 }
 
 export function SourceMark({ source, className }: { source: FlightPlanSource; className?: string }) {
-  const classes = cn("h-5 w-5 shrink-0", className)
+  const classes = cn("h-3.5 w-3.5 shrink-0", className)
   if (source === "FlightRadar24") return <FlightRadar24Mark className={classes} />
   if (source === "FlightAware") return <FlightAwareMark className={classes} />
   return <span className={className}>{source}</span>

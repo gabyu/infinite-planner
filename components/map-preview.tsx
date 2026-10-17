@@ -467,7 +467,7 @@ export default function MapPreview({
       const html = isAirport
         ? `<div class="ip-airport ${waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
         : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : ""}"></div>`
-      const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${waypoint.altitude.toLocaleString("en-US")} ft` : ""}`
+      const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${Math.round(waypoint.altitude)} ft` : ""}`
 
       let marker = markersRef.current.get(waypoint.id)
       if (!marker) {
