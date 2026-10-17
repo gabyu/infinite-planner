@@ -210,7 +210,7 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
         <button
           type="button"
           onClick={() => setReporting(true)}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground link-quiet"
         >
           <Flag size={12} aria-hidden /> Report this flight plan
         </button>

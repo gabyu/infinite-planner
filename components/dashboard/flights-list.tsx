@@ -297,7 +297,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     flightNumber: favorite.flight_number,
                     publicId: favorite.public_id,
                   })}
-                  className="font-mono text-sm font-medium no-underline hover:underline"
+                  className="link-quiet font-mono text-sm font-medium"
                 >
                   {favorite.origin_airport}
                   <RouteArrow />
@@ -310,7 +310,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
           </ul>
         ) : (
           <p className="py-8 text-sm text-muted-foreground">
-            No favorites yet. Like a flight plan in <Link href="/explore" className="underline underline-offset-2">Explore</Link> and it shows up here.
+            No favorites yet. Like a flight plan in <Link href="/explore" className="link">Explore</Link> and it shows up here.
           </p>
         )
       ) : plans.length === 0 ? (
@@ -373,7 +373,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                               flightNumber: lineage[plan.id].original_flight_number,
                               publicId: lineage[plan.id].original_public_id!,
                             })}
-                            className="underline underline-offset-2"
+                            className="link"
                           >
                             {lineage[plan.id].original_origin}
                             <RouteArrow className="mx-1" />

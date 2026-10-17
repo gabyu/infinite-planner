@@ -151,7 +151,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
             </div>
             {(filtered || sort !== "popular") && (
               <p className="mt-3 text-sm">
-                <Link href={LIBRARY_PATH} className="text-muted-foreground underline underline-offset-2">
+                <Link href={LIBRARY_PATH} className="link text-muted-foreground hover:text-foreground">
                   Clear filters
                 </Link>
               </p>

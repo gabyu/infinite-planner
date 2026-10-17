@@ -206,7 +206,7 @@ export function PlanView({
             <h2 id="more-route" className="font-display text-2xl font-semibold tracking-tight">
               More from {plan.origin} to {plan.destination}
             </h2>
-            <Link href={routeHubPath(plan.origin, plan.destination)} className="text-sm text-muted-foreground underline underline-offset-2">
+            <Link href={routeHubPath(plan.origin, plan.destination)} className="text-sm link text-muted-foreground hover:text-foreground">
               See all
             </Link>
           </div>

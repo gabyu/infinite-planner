@@ -150,7 +150,7 @@ export function UserMenu() {
             Sign-in didn't complete. Please try again.
             {authError && <span className="mt-1 block break-words text-muted-foreground">{authError}</span>}
           </p>
-          <button type="button" onClick={() => setAuthError(null)} className="text-muted-foreground underline">
+          <button type="button" onClick={() => setAuthError(null)} className="link text-muted-foreground hover:text-foreground">
             Dismiss
           </button>
         </div>

@@ -50,7 +50,7 @@ export function CookieConsentBanner() {
               Infinite Planner doesn't set any cookies of its own. If you agree, we'll load{" "}
               <span className="font-medium text-foreground">Google Analytics</span> to see how many people use the
               planner - nothing else changes either way.{" "}
-              <Link href="/cookies" className="underline underline-offset-2 hover:text-foreground">
+              <Link href="/cookies" className="link hover:text-foreground">
                 Learn more
               </Link>
             </p>

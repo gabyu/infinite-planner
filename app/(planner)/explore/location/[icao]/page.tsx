@@ -88,7 +88,7 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
                 Departures
               </h2>
               {departures.next && (
-                <Link href={`${LIBRARY_PATH}?from=${airport.icao}`} className="text-sm text-muted-foreground underline underline-offset-2">
+                <Link href={`${LIBRARY_PATH}?from=${airport.icao}`} className="text-sm link text-muted-foreground hover:text-foreground">
                   See all departures
                 </Link>
               )}
@@ -103,7 +103,7 @@ export default async function AirportHubPage({ params }: { params: { icao: strin
                 Arrivals
               </h2>
               {arrivals.next && (
-                <Link href={`${LIBRARY_PATH}?to=${airport.icao}`} className="text-sm text-muted-foreground underline underline-offset-2">
+                <Link href={`${LIBRARY_PATH}?to=${airport.icao}`} className="text-sm link text-muted-foreground hover:text-foreground">
                   See all arrivals
                 </Link>
               )}

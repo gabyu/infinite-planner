@@ -30,7 +30,7 @@ export function LegalPage({
         </section>
 
         <div className="container mx-auto px-4 py-12">
-          <div className="max-w-3xl mx-auto space-y-10 [&_p]:text-gray-600 [&_p]:dark:text-gray-300 [&_p]:leading-relaxed [&_li]:text-gray-600 [&_li]:dark:text-gray-300 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_p+p]:mt-3 [&_p+ul]:mt-3 [&_ul+p]:mt-3 [&_a]:underline [&_a]:underline-offset-2">
+          <div className="max-w-3xl mx-auto space-y-10 [&_p]:text-gray-600 [&_p]:dark:text-gray-300 [&_p]:leading-relaxed [&_li]:text-gray-600 [&_li]:dark:text-gray-300 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_p+p]:mt-3 [&_p+ul]:mt-3 [&_ul+p]:mt-3 [&_a]:link">
             {children}
           </div>
         </div>

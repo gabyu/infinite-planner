@@ -9,7 +9,7 @@ export function AuthorLink({ name, profilePublicId }: { name: string; profilePub
   const { user } = useAuthUser()
   if (!user) return <span>{name}</span>
   return (
-    <Link href={`/pilots/${profilePublicId}`} className="underline-offset-2 hover:underline">
+    <Link href={`/pilots/${profilePublicId}`} className="link-quiet">
       {name}
     </Link>
   )

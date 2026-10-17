@@ -1337,7 +1337,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       return (
         <>
           Exported and saved: this plan is locked. Duplicate it from your{" "}
-          <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+          <Link href="/dashboard" className="link hover:text-foreground">
             dashboard
           </Link>{" "}
           to change it.
@@ -1421,7 +1421,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         <p className="mt-3 max-w-lg text-balance text-xs text-muted-foreground">
           <span>
             Signed in: your plans are saved as drafts while you edit, and kept in your{" "}
-            <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+            <Link href="/dashboard" className="link hover:text-foreground">
               dashboard
             </Link>
             .

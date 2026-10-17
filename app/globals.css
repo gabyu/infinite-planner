@@ -243,6 +243,52 @@
 }
 
 @layer components {
+  /*
+   * Text links, without the 2000s underline. .link (links in running text) keeps a hairline at 30% of the
+   * text colour and a solid line sweeps over it on hover; .link-quiet (footer, muted links) shows no line
+   * at rest, and the line draws in on hover while the text warms up to the foreground. The line is a
+   * background so it wraps with the text; it enters from the left and leaves to the right.
+   */
+  .link,
+  .link-quiet {
+    --link-rest: 100%;
+    background-image:
+      linear-gradient(currentColor, currentColor),
+      linear-gradient(color-mix(in srgb, currentColor 30%, transparent), color-mix(in srgb, currentColor 30%, transparent));
+    background-repeat: no-repeat;
+    background-size: 0% 1px, var(--link-rest) 1px;
+    background-position: 100% calc(100% - 0.04em), 0 calc(100% - 0.04em);
+    text-decoration: none;
+    padding-bottom: 0.08em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    transition:
+      background-size 0.45s cubic-bezier(0.65, 0, 0.35, 1),
+      color 0.2s ease;
+  }
+  .link:hover,
+  .link:focus-visible,
+  .link-quiet:hover,
+  .link-quiet:focus-visible {
+    background-size: 100% 1px, var(--link-rest) 1px;
+    background-position: 0 calc(100% - 0.04em), 0 calc(100% - 0.04em);
+  }
+  .link-quiet {
+    --link-rest: 0%;
+  }
+  .link-quiet:hover,
+  .link-quiet:focus-visible {
+    color: hsl(var(--foreground));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .link,
+    .link-quiet {
+      transition: none;
+    }
+  }
+}
+
+@layer components {
   /* Small mono uppercase caption used for section and field labels in the Studio theme. */
   .studio-label {
     @apply font-mono text-[11px] font-medium uppercase leading-none tracking-wider text-muted-foreground;

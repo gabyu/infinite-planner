@@ -164,7 +164,7 @@ export const faqData = [
                 href="https://www.flightaware.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className="link-quiet text-primary hover:text-primary"
               >
                 FlightAware.com
               </a>
@@ -185,7 +185,7 @@ export const faqData = [
               href="https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary hover:underline break-all"
+              className="link-quiet text-primary hover:text-primary break-all"
             >
               https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO
             </a>

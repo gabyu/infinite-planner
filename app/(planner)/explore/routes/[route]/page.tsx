@@ -108,11 +108,11 @@ export default async function RouteHubPage({
           )}
         </div>
         <p className="mt-12 text-sm text-muted-foreground">
-          <Link href={locationPath(ends.from)} className="underline underline-offset-2">
+          <Link href={locationPath(ends.from)} className="link">
             More from {from.city ?? ends.from}
           </Link>
           {" · "}
-          <Link href={locationPath(ends.to)} className="underline underline-offset-2">
+          <Link href={locationPath(ends.to)} className="link">
             More to {to.city ?? ends.to}
           </Link>
         </p>

@@ -150,7 +150,7 @@ function RankList({
               <span className="font-mono text-sm tabular-nums text-muted-foreground">{index + 1}</span>
               <span title={row.title} className={cn("min-w-0 truncate", row.title ? "font-medium" : "font-mono font-medium tabular-nums")}>
                 {row.href ? (
-                  <Link href={row.href} className="text-primary hover:underline" title={row.title ? `${row.title}: flight plans in Explore` : "Flight plans in Explore"}>
+                  <Link href={row.href} className="link-quiet text-primary hover:text-primary" title={row.title ? `${row.title}: flight plans in Explore` : "Flight plans in Explore"}>
                     {row.label}
                   </Link>
                 ) : (
