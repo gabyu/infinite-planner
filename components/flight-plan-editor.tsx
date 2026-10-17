@@ -1292,6 +1292,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [trimmed, setTrimmed] = useState<Record<TrimEnd, boolean>>({ departure: false, arrival: false })
   const runwayCache = useRef(new Map<string, TrimAirport | null>())
   // What each trim took away, so switching the toggle back on can put it back.
+  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
   const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
   const [panelTab, setPanelTab] = useState<"waypoints" | "options">("waypoints")
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
@@ -1339,7 +1340,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       return
     }
     setPanelTab("waypoints")
-    setTrimPreview({ end, ids: result.remove.map((index) => waypoints[index].id), approximate: result.approximate })
+    const ids = result.remove.map((index) => waypoints[index].id)
+    setTrimPreview({ end, ids, approximate: result.approximate })
+    // Straight to the waypoints that would go; the view stays there after Apply.
+    setMapFocus((current) => ({ ids, nonce: (current?.nonce ?? 0) + 1 }))
   }
 
   const applyTrim = () => {
@@ -1733,6 +1737,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
               onClearSelection={handleClearMapSelection}
               hoveredId={hoveredId}
               ghostIds={ghostIds}
+              focus={mapFocus}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}

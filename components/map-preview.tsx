@@ -54,6 +54,9 @@ export interface MapPreviewProps {
   toolbarLeading?: React.ReactNode
   /** Waypoints a ground trim would remove (preview): drawn grey, with their stretch of route dashed. */
   ghostIds?: Set<string>
+  /** Zoom to these waypoints (and the kept ones next to them). A new `nonce` asks again. The view then stays where it is
+   *  (no refit when the plan changes) until "Fit route" is pressed. */
+  focus?: { ids: string[]; nonce: number } | null
 }
 
 const escapeHtml = (text: string) =>
@@ -84,6 +87,7 @@ export default function MapPreview({
   onWaypointClick,
   toolbarLeading,
   ghostIds,
+  focus,
 }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -116,6 +120,8 @@ export default function MapPreview({
   }, [])
   const basemap = resolveBasemap(basemapChoice, isDark)
   const lastFitCountRef = useRef(0)
+  // Set when the editor zoomed somewhere on purpose (a ground trim): the route is not refitted behind its back.
+  const viewLockedRef = useRef(false)
 
   // Handlers bound once on marker creation read the latest callbacks from here.
   const callbacksRef = useRef({ onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd })
@@ -449,6 +455,25 @@ export default function MapPreview({
     }
   }, [waypoints, ghostIds, L, isMapReady])
 
+  // Zoom to the waypoints of a ground trim (and the kept one beside them), like the Departure / Arrival buttons do.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !focus || focus.ids.length === 0) return
+    const wanted = new Set(focus.ids)
+    const indices = waypoints.map((wp, i) => (wanted.has(wp.id) ? i : -1)).filter((i) => i >= 0)
+    if (indices.length === 0) return
+    const from = Math.max(0, indices[0] - 1)
+    const to = Math.min(waypoints.length - 1, indices[indices.length - 1] + 1)
+    const phone = window.innerWidth < 1024
+    viewLockedRef.current = true
+    map.fitBounds(L.latLngBounds(waypoints.slice(from, to + 1).map((wp) => [wp.lat, wp.lng])), {
+      paddingTopLeft: [phone ? 24 : 392, phone ? 80 : 64],
+      paddingBottomRight: [phone ? 24 : 80, phone ? 260 : 64],
+      maxZoom: 17,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce, L, isMapReady])
+
   // Fit the route when a plan appears or its length changes (not while the person is editing it).
   const fitRoute = useCallback(() => {
     const map = mapInstanceRef.current
@@ -466,6 +491,7 @@ export default function MapPreview({
     if (!isMapReady || !mapInstanceRef.current || isEditing) return
     if (lastFitCountRef.current === waypoints.length) return
     lastFitCountRef.current = waypoints.length
+    if (viewLockedRef.current) return
     fitRouteRef.current()
   }, [waypoints.length, isEditing, isMapReady, zoom])
 
@@ -867,7 +893,10 @@ export default function MapPreview({
         {toolbarLeading}
         {!selectMode && waypoints.length > 0 && (
           <div className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-md">
-            <button type="button" className={toolButton} onClick={() => fitRoute()} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
+            <button type="button" className={toolButton} onClick={() => {
+                viewLockedRef.current = false
+                fitRoute()
+              }} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
               <Globe className="h-4 w-4" />
             </button>
             <DropdownMenu>
