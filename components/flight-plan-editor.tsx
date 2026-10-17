@@ -11,9 +11,7 @@ import {
   Download,
   Upload,
   Trash2,
-  Map,
   CheckCircle2,
-  Layers,
   Pencil,
   ChevronLeft,
   HelpCircle,
@@ -52,26 +50,25 @@ import { DrawingBoard } from "@/components/drawing-board"
 import { useHistoryState } from "@/hooks/use-history-state"
 import { useIsTouchPrimary } from "@/hooks/use-is-touch-primary"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
 import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { copy } from "@/lib/copy"
+import { distanceNm, formatAltitude, formatDistanceNm } from "@/lib/route-render"
+import { EditorWorkspace } from "@/components/editor/workspace"
+import { WaypointList } from "@/components/editor/waypoint-list"
+import { AltitudeStrip } from "@/components/editor/altitude-strip"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">Loading map...</div>
+    <div className="flex h-full min-h-[280px] w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+      {copy.editor.mapLoading}
+    </div>
   ),
 })
 
@@ -189,7 +186,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
-  const [showMapPreview, setShowMapPreview] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [waypointPrefix, setWaypointPrefix] = useState("")
   const [importedFileName, setImportedFileName] = useState<string | null>(null)
@@ -242,9 +238,15 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     destination: false,
   })
   const [hasImported, setHasImported] = useState(false)
-  const [showOptionsPanel, setShowOptionsPanel] = useState(false)
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
-  const [showOptions, setShowOptions] = useState(false) // Added state for options panel visibility
+  // The waypoint under the pointer in the list, on the map or in the altitude strip (all three highlight it).
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  // A map point was clicked: the list scrolls to its row.
+  const [scrollTarget, setScrollTarget] = useState<{ id: string; nonce: number } | null>(null)
+  const handleMapPointClick = useCallback(
+    (id: string) => setScrollTarget((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 })),
+    [],
+  )
 
   // Check if device is mobile
   useEffect(() => {
@@ -435,12 +437,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           source: result.source,
         })
 
-        // Set hasImported to true to reveal the rest of the UI
+        // Set hasImported to true to reveal the rest of the UI (the workspace: map first, panel beside it)
         setHasImported(true)
-
-        if (renamedWaypoints.length > 0) {
-          setShowMapPreview(true)
-        }
+        // The draft starts saving right away: there is no map to close any more.
+        setDraftArmed(true)
 
         setSuccessMessage(
           `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source || "KML file"}`,
@@ -659,14 +659,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     return () => clearInterval(timer)
   }, [authUser, draftArmed])
 
-  // Convert: the plan is generated on import and the map opens; closing it for the first time starts the draft.
-  const mapWasOpenRef = useRef(false)
-  useEffect(() => {
-    if (mapWasOpenRef.current && !showMapPreview && mode === "import" && hasImported) setDraftArmed(true)
-    mapWasOpenRef.current = showMapPreview
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMapPreview])
-
   // Sketch has no map to close: the draft starts once there is a route and both airports are filled in.
   useEffect(() => {
     if (mode === "draw" && authUser && waypoints.length >= 2 && icaoReady) setDraftArmed(true)
@@ -748,8 +740,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
-          // Straight from the library: map first, editing tools at hand (the same view a fresh conversion opens).
-          if (new URLSearchParams(window.location.search).get("fork") === "1") setShowMapPreview(true)
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"
@@ -1255,8 +1245,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // panel sections: the branding checkbox (ticked by default) and, when signed in, the optional
   // flight time that is saved with the plan.
   const exportSectionClass = "sm:border-b-0 sm:border-r"
-  const exportOptions = (inGrid: boolean) => (
-    <>
+  const brandingSection = (inGrid: boolean) => (
       <PanelSection
         label="Made with"
         className={inGrid ? exportSectionClass : undefined}
@@ -1278,8 +1267,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           </Label>
         </div>
       </PanelSection>
+  )
 
-      {canSave && (
+  const flightNumberSection = (inGrid: boolean) =>
+    canSave && (
         <PanelSection
           label="Flight number"
           className={inGrid ? exportSectionClass : undefined}
@@ -1296,9 +1287,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             className="h-8 w-full max-w-[9rem] font-mono"
           />
         </PanelSection>
-      )}
+    )
 
-      {canSave && (
+  const flightTimeSection = (inGrid: boolean) =>
+    canSave && (
         <PanelSection
           label="Flight time"
           className={inGrid ? exportSectionClass : undefined}
@@ -1306,7 +1298,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         >
           <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
         </PanelSection>
-      )}
+    )
+
+  const exportOptions = (inGrid: boolean) => (
+    <>
+      {brandingSection(inGrid)}
+      {flightNumberSection(inGrid)}
+      {flightTimeSection(inGrid)}
     </>
   )
 
@@ -1346,7 +1344,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
     if (!draftArmed) {
       return mode === "import"
-        ? "Your draft starts saving once you close the map."
+        ? "Your draft starts saving as soon as the plan is imported."
         : "Your draft starts saving once the route has two points and both airports are set."
     }
     if (isSaving) return "Saving..."
@@ -1516,6 +1514,188 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // Before the import Convert is a short form: keep it narrow, but left-aligned like every other page.
   const narrowPage = false
 
+  // Convert after an import (and a plan opened from the library): the workspace. A full-height map with the
+  // panel floating over its left side (a bottom sheet on a phone); no page title, no pop-up map.
+  if (mode === "import" && hasImported) {
+    const selectedAny = waypoints.some((wp) => wp.selected)
+    const totalNm = waypoints.reduce((sum, wp, i) => (i === 0 ? 0 : sum + distanceNm(waypoints[i - 1], wp)), 0)
+    const maxAltitude = Math.max(0, ...waypoints.map((wp) => wp.altitude))
+    const stats: { label: string; value: string }[] = [
+      { label: copy.editor.statsDistance, value: formatDistanceNm(totalNm) },
+      { label: copy.editor.statsWaypoints, value: String(waypoints.length) },
+      { label: copy.editor.statsMaxAltitude, value: maxAltitude > 0 ? formatAltitude(maxAltitude) : "-" },
+    ]
+    if (flightTimeMinutes) {
+      stats.push({
+        label: copy.editor.statsFlightTime,
+        value: `${Math.floor(flightTimeMinutes / 60)}h ${String(flightTimeMinutes % 60).padStart(2, "0")}`,
+      })
+    }
+
+    const toolbar = waypoints.length > 0 && (
+      <div className="flex flex-wrap justify-end gap-2">
+        {isEditingMap && selectMode && selectedAny && (
+          <Button onClick={deleteSelectedWaypoints} variant="destructive" size="sm" className="shadow-md">
+            <Trash2 />
+            {copy.editor.deleteWaypoints}
+          </Button>
+        )}
+        {isEditingMap && (
+          <Button
+            onClick={toggleSelectMode}
+            variant={selectMode ? "default" : "outline"}
+            size="sm"
+            className={cn("shadow-md", !selectMode && "bg-card")}
+          >
+            <LassoSelect />
+            {selectMode ? copy.editor.doneSelecting : copy.editor.selectPoints}
+          </Button>
+        )}
+        {/* Hidden while selecting - the only way out of select mode is "Done selecting" */}
+        {!selectMode && (
+          <Button
+            onClick={toggleMapEditing}
+            variant={isEditingMap ? "default" : "outline"}
+            size="sm"
+            className={cn("shadow-md", !isEditingMap && "bg-card")}
+          >
+            <Pencil />
+            {isEditingMap ? copy.editor.doneEditing : copy.editor.editWaypoints}
+          </Button>
+        )}
+      </div>
+    )
+
+    const hasAlerts = !!error || !!successMessage || !!simplificationInfo
+
+    return (
+      <TooltipProvider>
+        <EditorWorkspace
+          isMobile={isMobile}
+          map={
+            <MapPreview
+              waypoints={waypoints}
+              isEditing={isEditingMap}
+              onWaypointDragEnd={handleWaypointDragEnd}
+              onWaypointInsert={handleWaypointInsert}
+              selectMode={selectMode}
+              onToggleWaypointSelect={toggleWaypointSelection}
+              onWaypointsMarqueeSelect={handleMarqueeSelect}
+              onClearSelection={handleClearMapSelection}
+              hoveredId={hoveredId}
+              onHoverWaypoint={setHoveredId}
+              onWaypointClick={handleMapPointClick}
+              toolbarLeading={toolbar}
+            />
+          }
+          strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} />}
+          header={
+            <div className="px-4 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-base font-medium text-primary">
+                    {originAirport || "ORIG"}
+                    <RouteArrow />
+                    {destinationAirport || "DEST"}
+                  </p>
+                  {flightSummary}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2 -mt-1 h-8 w-8 shrink-0 text-muted-foreground"
+                  title={copy.editor.resetPlanner}
+                  aria-label={copy.editor.resetPlanner}
+                  onClick={() => {
+                    window.location.href = `${window.location.pathname}?reset=${Date.now()}`
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </div>
+              <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+                {stats.map((stat) => (
+                  <div key={stat.label}>
+                    <dt className="studio-label">{stat.label}</dt>
+                    <dd className="font-mono text-sm">{stat.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          }
+          body={
+            <>
+              {hasAlerts && (
+                <div className="shrink-0 px-4 pt-3">
+                  {alerts}
+                  {simplificationInfo && (
+                    <details className="mb-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
+                        <Info className="h-3.5 w-3.5 text-primary" />
+                        Waypoint simplification applied
+                        <span className="ml-auto font-mono font-normal text-muted-foreground">
+                          {simplificationInfo.originalCount} → {simplificationInfo.simplifiedCount}
+                        </span>
+                      </summary>
+                      <div className="mt-2 space-y-0.5">
+                        <p>
+                          Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
+                          {simplificationInfo.source && (
+                            <>
+                              {" "}
+                              from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
+                            </>
+                          )}
+                        </p>
+                        <p>{simplificationInfo.reason}</p>
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
+
+              {canSave && (
+                <div className="shrink-0 border-b">
+                  {flightNumberSection(false)}
+                  {flightTimeSection(false)}
+                </div>
+              )}
+
+              <div className="flex min-h-[240px] flex-1 flex-col">
+                <WaypointList
+                  waypoints={waypoints}
+                  isLoading={isLoading}
+                  hoveredId={hoveredId}
+                  onHover={setHoveredId}
+                  scrollTarget={scrollTarget}
+                  onRowClick={handleRowClick}
+                  onUpdateWaypoint={updateWaypoint}
+                  onTabKeyNavigation={handleTabKeyNavigation}
+                  onInputFocus={handleInputFocus}
+                  onToggleSelectAll={toggleSelectAll}
+                  onDeleteSelected={deleteSelectedWaypoints}
+                  onClearAltitudes={clearSelectedAltitudes}
+                />
+              </div>
+
+              <div className="shrink-0 border-t">
+                {brandingSection(false)}
+                <details className="group border-b">
+                  <summary className="studio-label cursor-pointer list-none px-4 py-3 hover:text-foreground">
+                    {copy.editor.namesHeading}
+                  </summary>
+                  {optionsContent}
+                </details>
+              </div>
+            </>
+          }
+          footer={<div className="p-4">{exportButtons}</div>}
+        />
+        <Toaster />
+      </TooltipProvider>
+    )
+  }
+
   return (
     <TooltipProvider>
       <PageShell title={pageTitle} description={pageDescription} actions={resetAction} width={narrowPage ? "narrow" : "full"}>
@@ -1628,204 +1808,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             />
           </div>
         )}
-
-        {mode === "import" && hasImported && (
-          <div className={cn(!isMobile && "flex items-start gap-4")}>
-            <div className={cn(!isMobile ? "min-w-0 flex-1" : "w-full")}>
-              <Card className="shadow-none">
-                <CardContent className="p-4">
-                  {alerts}
-
-                  {simplificationInfo && (
-                    <Alert className="mb-3 p-3 [&>svg]:left-3 [&>svg]:top-3 [&>svg~*]:pl-6">
-                      <Info className="h-4 w-4 text-primary" />
-                      <AlertTitle className="text-sm">Waypoint simplification applied</AlertTitle>
-                      <AlertDescription className="space-y-0.5 text-xs text-muted-foreground">
-                        <p>
-                          Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
-                          {simplificationInfo.source && (
-                            <>
-                              {" "}
-                              from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
-                            </>
-                          )}
-                        </p>
-                        <p>
-                          {simplificationInfo.originalCount} waypoints before simplification, {simplificationInfo.simplifiedCount} after.
-                        </p>
-                        <p>{simplificationInfo.reason}</p>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <WaypointTable
-                    waypoints={waypoints}
-                    isMobile={isMobile}
-                    isLoading={isLoading}
-                    onRowClick={handleRowClick}
-                    onUpdateWaypoint={updateWaypoint}
-                    onTabKeyNavigation={handleTabKeyNavigation}
-                    onInputFocus={handleInputFocus}
-                    onToggleSelectAll={toggleSelectAll}
-                    onDeleteSelected={deleteSelectedWaypoints}
-                    onClearAltitudes={clearSelectedAltitudes}
-                    onExport={handleExportFPL}
-                    exportDisabled={waypoints.length === 0}
-                    onShowMap={() => setShowMapPreview(true)}
-                    emptyStateMessage="No waypoints added. Import a KML file to get started."
-                    leftActions={
-                      <Button
-                        onClick={() => {
-                          setShowOptions(!showOptions)
-                          setTimeout(() => {
-                            document
-                              .getElementById("options-section")
-                              ?.scrollIntoView({ behavior: "smooth", block: "start" })
-                          }, 100)
-                        }}
-                        variant="outline"
-                        size="icon"
-                        className="lg:hidden"
-                        title="Show options"
-                      >
-                        <Layers />
-                      </Button>
-                    }
-                  />
-
-                  {isMobile && waypoints.length > 0 && (
-                    <div className="mt-4 overflow-hidden rounded-md border">
-                      <div className="border-b p-4">
-                        <p className="studio-label">Your flight plan</p>
-                        <p className="mt-2 font-mono text-base font-medium text-primary">
-                          {originAirport || "ORIG"}
-                          <RouteArrow />
-                          {destinationAirport || "DEST"}
-                        </p>
-                        {flightSummary}
-                      </div>
-                      {exportOptions(false)}
-                      <div className="p-4">{exportButtons}</div>
-                    </div>
-                  )}
-
-                  {/* Options - below the table on mobile/tablet */}
-                  {showOptions && waypoints.length > 0 && (
-                    <div id="options-section" className="mt-4 overflow-hidden rounded-md border lg:hidden">
-                      {optionsContent}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Options panel - desktop only, right side */}
-            {!isMobile && waypoints.length > 0 && (
-              <aside className="w-72 flex-shrink-0">
-                <Card className="sticky top-6 overflow-hidden shadow-none">
-                  <div className="border-b p-4">
-                    <p className="studio-label">Your flight plan</p>
-                    <p className="mt-2 font-mono text-base font-medium text-primary">
-                      {originAirport || "ORIG"}
-                      <RouteArrow />
-                      {destinationAirport || "DEST"}
-                    </p>
-                    {flightSummary}
-                  </div>
-
-                  <PanelSection label="Flight plan editor">
-                    <Button
-                      onClick={() => setShowMapPreview(true)}
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      disabled={waypoints.length === 0 || isLoading}
-                    >
-                      <Map />
-                      Open the editor
-                    </Button>
-                  </PanelSection>
-
-                  {optionsContent}
-
-                  {exportOptions(false)}
-
-                  <div className="p-4">{exportButtons}</div>
-                </Card>
-              </aside>
-            )}
-          </div>
-        )}
-
-
-        {/* Map Preview Dialog */}
-        <Dialog
-          open={showMapPreview}
-          onOpenChange={(open) => {
-            if (!isEditingMap) {
-              setShowMapPreview(open)
-            }
-          }}
-        >
-          <DialogContent
-            className="max-w-6xl w-[95vw] sm:w-full p-4 sm:p-6 flex flex-col"
-            onEscapeKeyDown={(e) => isEditingMap && e.preventDefault()}
-            onPointerDownOutside={(e) => isEditingMap && e.preventDefault()}
-          >
-            <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
-              <div>
-                <DialogTitle>Flight plan editor</DialogTitle>
-                <DialogDescription>
-                  <span className="hidden lg:inline">Edit your flight plan: {waypoints.length} waypoints</span>
-                  <span className="lg:hidden">{waypoints.length} waypoints</span>
-                </DialogDescription>
-              </div>
-              {waypoints.length > 0 && (
-                <div className="flex items-center gap-2 ml-auto mr-8">
-                  {isEditingMap && selectMode && waypoints.some((wp) => wp.selected) && (
-                    <Button onClick={deleteSelectedWaypoints} variant="destructive" size="sm">
-                      <Trash2 />
-                      <span className="hidden sm:inline">Delete waypoint(s)</span>
-                      <span className="sm:hidden">Delete</span>
-                    </Button>
-                  )}
-                  {isEditingMap && (
-                    <Button onClick={toggleSelectMode} variant={selectMode ? "default" : "outline"} size="sm">
-                      <LassoSelect />
-                      <span className="hidden sm:inline">{selectMode ? "Done Selecting" : "Select Points"}</span>
-                      <span className="sm:hidden">{selectMode ? "Done" : "Select"}</span>
-                    </Button>
-                  )}
-                  {/* Hidden while selecting - the only way out of select mode is "Done Selecting" */}
-                  {!selectMode && (
-                    <Button onClick={toggleMapEditing} variant={isEditingMap ? "default" : "outline"} size="sm">
-                      <Pencil />
-                      <span className="hidden sm:inline">{isEditingMap ? "Done Editing" : "Edit Waypoints"}</span>
-                      <span className="sm:hidden">{isEditingMap ? "Done" : "Edit"}</span>
-                    </Button>
-                  )}
-                </div>
-              )}
-            </DialogHeader>
-            <div className="h-[70dvh] max-h-[500px] min-h-[280px] w-full relative">
-              <MapPreview
-                waypoints={waypoints}
-                isEditing={isEditingMap}
-                onWaypointDragEnd={handleWaypointDragEnd}
-                onWaypointInsert={handleWaypointInsert}
-                selectMode={selectMode}
-                onToggleWaypointSelect={toggleWaypointSelection}
-                onWaypointsMarqueeSelect={handleMarqueeSelect}
-                onClearSelection={handleClearMapSelection}
-              />
-            </div>
-            <DialogFooter>
-              <Button onClick={() => setShowMapPreview(false)} disabled={isEditingMap}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         <Toaster />
       </PageShell>

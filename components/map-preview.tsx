@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import type React from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
+import { Crosshair, Minus, Plane, Plus } from "lucide-react"
 import { setBasemap } from "@/lib/map-tiles"
-import { Button } from "@/components/ui/button"
+import { copy } from "@/lib/copy"
 import { Lock, X } from "lucide-react"
 
 interface Waypoint {
@@ -15,7 +17,7 @@ interface Waypoint {
   selected?: boolean
 }
 
-interface MapPreviewProps {
+export interface MapPreviewProps {
   waypoints: Waypoint[]
   isEditing: boolean
   onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
@@ -24,12 +26,28 @@ interface MapPreviewProps {
   onToggleWaypointSelect?: (id: string) => void
   onWaypointsMarqueeSelect?: (ids: string[], additive: boolean) => void
   onClearSelection?: () => void
+  /** The waypoint under the pointer in the list or the altitude strip, highlighted on the map. */
+  hoveredId?: string | null
+  onHoverWaypoint?: (id: string | null) => void
+  /** A point was clicked on the map (not in edit or select mode): the editor scrolls its list to the row. */
+  onWaypointClick?: (id: string) => void
+  /** The editing buttons (Edit waypoints, Select points...), stacked at the top right above the zoom tools. */
+  toolbarLeading?: React.ReactNode
 }
 
-// Muted, on-brand orange for the selection state - deliberately calmer than
-// Tailwind's default orange-500 (too flashy) while staying clearly orange
-// rather than drifting toward brown, and keeping enough contrast in both themes.
+const escapeHtml = (text: string) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+
+// Selection state of the select-mode marquee. Calmer than Tailwind's orange-500; the dots take their colour
+// from the --route-* tokens in globals.css, this one is for the rubber band drawn in script.
 const SELECTION_COLOR = "#ea580c"
+
+// With many waypoints, a zoomed-out map draws only every Nth dot (first, last, selected and hovered always stay).
+// Only the rendering is thinned: the data is untouched, and editing always shows every point.
+const DECLUTTER_MIN_POINTS = 60
+const dotStep = (zoom: number) => (zoom >= 10 ? 1 : zoom >= 8 ? 2 : zoom >= 6 ? 4 : 8)
+const CHEVRON_MIN_ZOOM = 6
+const CHEVRON_SPACING_PX = 150
 
 export default function MapPreview({
   waypoints,
@@ -40,13 +58,18 @@ export default function MapPreview({
   onToggleWaypointSelect,
   onWaypointsMarqueeSelect,
   onClearSelection,
+  hoveredId = null,
+  onHoverWaypoint,
+  onWaypointClick,
+  toolbarLeading,
 }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const routeLineRef = useRef<any>(null)
+  const routeCasingRef = useRef<any>(null)
+  const chevronLayerRef = useRef<any>(null)
   const hoverLineRef = useRef<any>(null)
   const markersRef = useRef<Map<string, any>>(new Map())
-  const legendRef = useRef<any>(null)
   const insertMarkerRef = useRef<any>(null)
   const [hoverSegmentIndex, setHoverSegmentIndex] = useState<number | null>(null)
   const [hoverPoint, setHoverPoint] = useState<any>(null)
@@ -55,6 +78,12 @@ export default function MapPreview({
   const isDark = resolvedTheme === "dark"
   const [L, setL] = useState<any>(null)
   const [isMapReady, setIsMapReady] = useState(false)
+  const [zoom, setZoom] = useState(2)
+  const lastFitCountRef = useRef(0)
+
+  // Handlers bound once on marker creation read the latest callbacks from here.
+  const callbacksRef = useRef({ onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd })
+  callbacksRef.current = { onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd }
 
   // Refs mirroring latest props so marker event handlers (bound once, on marker
   // creation) never read stale closures when select mode or selection changes.
@@ -67,6 +96,11 @@ export default function MapPreview({
   useEffect(() => {
     waypointsRef.current = waypoints
   }, [waypoints])
+
+  const editingRef = useRef(isEditing)
+  useEffect(() => {
+    editingRef.current = isEditing
+  }, [isEditing])
 
   // Leaflet fires a "click" right after "dragend" on the marker that was just
   // dragged (even though the pointer moved) - without this guard that phantom
@@ -107,21 +141,11 @@ export default function MapPreview({
     }
   }, [])
 
-  // Custom icon SVG data for rounded pins
-  const getCustomIconSvg = (color: string, size: number) => {
-    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24' fill='${encodeURIComponent(color)}' stroke='white' strokeWidth='1.5' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3C/svg%3E`
-  }
-
-  // Custom icon for the insert waypoint indicator - perfect circle
-  const getInsertIconSvg = (size: number) => {
-    return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${size}' height='${size}' viewBox='0 0 24 24' fill='%2310b981' stroke='white' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cline x1='12' y1='8' x2='12' y2='16'/%3E%3Cline x1='8' y1='12' x2='16' y2='12'/%3E%3C/svg%3E`
-  }
-
   // Zoom to departure airport (first waypoint)
   const zoomToDeparture = () => {
     if (waypoints.length > 0 && mapInstanceRef.current) {
       const firstWaypoint = waypoints[0]
-      mapInstanceRef.current.setView([firstWaypoint.lat, firstWaypoint.lng], 14)
+      mapInstanceRef.current.setView([firstWaypoint.lat, firstWaypoint.lng], 13)
     }
   }
 
@@ -129,7 +153,7 @@ export default function MapPreview({
   const zoomToArrival = () => {
     if (waypoints.length > 0 && mapInstanceRef.current) {
       const lastWaypoint = waypoints[waypoints.length - 1]
-      mapInstanceRef.current.setView([lastWaypoint.lat, lastWaypoint.lng], 14)
+      mapInstanceRef.current.setView([lastWaypoint.lat, lastWaypoint.lng], 13)
     }
   }
 
@@ -282,266 +306,241 @@ export default function MapPreview({
     }
   }
 
+  // Create the map once: no built-in zoom control (the toolbar has its own), attribution kept visible
+  // (top left on a phone, where the bottom sheet covers the bottom edge).
   useEffect(() => {
-    if (!mapRef.current || !L || !isMapReady) return
-
-    // Initialize map if it doesn't exist
-    if (!mapInstanceRef.current) {
-      mapInstanceRef.current = L.map(mapRef.current).setView([0, 0], 2)
-
-      setBasemap(L, mapInstanceRef.current, isDark)
-
-      // Add legend only once during initial map setup
-      const legend = L.control({ position: "bottomright" })
-      legend.onAdd = () => {
-        const div = L.DomUtil.create("div", "info legend")
-        div.style.backgroundColor = isDark ? "#1f2937" : "white"
-        div.style.color = isDark ? "#e5e7eb" : "#374151"
-        div.style.padding = "6px 8px"
-        div.style.border = isDark ? "1px solid #374151" : "1px solid #ccc"
-        div.style.borderRadius = "4px"
-        div.style.lineHeight = "18px"
-        div.style.fontFamily = "Arial, sans-serif"
-        div.style.fontSize = "12px"
-
-        div.innerHTML = `
-        <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px">
-          <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px">
-          <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
-        </div>
-        <div style="display: flex; align-items: center">
-          <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Waypoint</span>
-        </div>
-      `
-        return div
-      }
-      legend.addTo(mapInstanceRef.current)
-      legendRef.current = legend
-    }
-
-    const map = mapInstanceRef.current
-    if (!map) return
-
-    // Keep the basemap in sync with the theme
+    if (!mapRef.current || !L || !isMapReady || mapInstanceRef.current) return
+    const map = L.map(mapRef.current, { zoomControl: false, attributionControl: false, worldCopyJump: true }).setView(
+      [20, 0],
+      2,
+    )
+    const attribution = L.control.attribution({ position: "bottomright", prefix: false }).addTo(map)
+    const placeAttribution = () => attribution.setPosition(window.innerWidth < 1024 ? "topleft" : "bottomright")
+    placeAttribution()
+    window.addEventListener("resize", placeAttribution)
+    map.on("zoomend", () => setZoom(map.getZoom()))
+    chevronLayerRef.current = L.layerGroup().addTo(map)
+    mapInstanceRef.current = map
     setBasemap(L, map, isDark)
+    setZoom(map.getZoom())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [L, isMapReady])
 
-    // Update polyline
+  // Light or dark basemap
+  useEffect(() => {
+    if (!L || !mapInstanceRef.current) return
+    setBasemap(L, mapInstanceRef.current, isDark)
+  }, [L, isDark, isMapReady])
+
+  // The route line: a casing under it so it reads on any background (tokens in globals.css).
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L) return
     const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
     if (routeLineRef.current) {
+      routeCasingRef.current.setLatLngs(routePoints)
       routeLineRef.current.setLatLngs(routePoints)
-      routeLineRef.current.setStyle({ interactive: false, weight: 5 })
     } else {
+      routeCasingRef.current = L.polyline(routePoints, {
+        className: "ip-route-casing",
+        weight: 6,
+        smoothFactor: 1,
+        interactive: false,
+      }).addTo(map)
       routeLineRef.current = L.polyline(routePoints, {
-        color: "#3B82F6",
-        weight: 5,
-        opacity: 0.8,
+        className: "ip-route-line",
+        weight: 3,
         smoothFactor: 1,
         interactive: false,
       }).addTo(map)
     }
+  }, [waypoints, L, isMapReady, zoom])
 
-    // Setup hover detection ONLY for edit mode, and not while selecting points
-    if (isEditing && !selectMode && waypoints.length > 1) {
-      // Remove old hover line if it exists
-      if (hoverLineRef.current) {
-        map.removeLayer(hoverLineRef.current)
+  // Fit the route when a plan appears or its length changes (not while the person is editing it).
+  const fitRoute = useCallback(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || waypoints.length === 0) return
+    const phone = window.innerWidth < 1024
+    map.fitBounds(L.latLngBounds(waypoints.map((wp) => [wp.lat, wp.lng])), {
+      paddingTopLeft: [phone ? 24 : 392, phone ? 80 : 64],
+      paddingBottomRight: [phone ? 24 : 80, phone ? 220 : 48],
+      maxZoom: 12,
+    })
+  }, [L, waypoints])
+  const fitRouteRef = useRef(fitRoute)
+  fitRouteRef.current = fitRoute
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current || isEditing) return
+    if (lastFitCountRef.current === waypoints.length) return
+    lastFitCountRef.current = waypoints.length
+    fitRouteRef.current()
+  }, [waypoints.length, isEditing, isMapReady, zoom])
+
+  // Direction chevrons along the line, from a medium zoom up.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    const layer = chevronLayerRef.current
+    if (!map || !L || !layer) return
+    layer.clearLayers()
+    if (zoom < CHEVRON_MIN_ZOOM || waypoints.length < 2) return
+    let carry = CHEVRON_SPACING_PX / 2
+    let count = 0
+    for (let i = 0; i < waypoints.length - 1 && count < 400; i++) {
+      const a = map.latLngToLayerPoint([waypoints[i].lat, waypoints[i].lng])
+      const b = map.latLngToLayerPoint([waypoints[i + 1].lat, waypoints[i + 1].lng])
+      const length = a.distanceTo(b)
+      if (length === 0) continue
+      const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
+      for (let d = carry; d < length && count < 400; d += CHEVRON_SPACING_PX) {
+        const at = map.layerPointToLatLng(L.point(a.x + ((b.x - a.x) * d) / length, a.y + ((b.y - a.y) * d) / length))
+        L.marker(at, {
+          interactive: false,
+          keyboard: false,
+          icon: L.divIcon({
+            className: "ip-marker",
+            iconSize: [0, 0],
+            html: `<div class="ip-chevron" style="transform:translate(-50%,-50%) rotate(${angle}deg)"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 1.5 L7 5 L2.5 8.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`,
+          }),
+        }).addTo(layer)
+        count++
+        carry = d + CHEVRON_SPACING_PX - length
       }
+      if (carry > length) carry -= length
+      else carry = Math.max(0, carry)
+    }
+  }, [waypoints, zoom, L, isMapReady])
 
+  // Edit mode: a wide invisible line to find the segment under the pointer, for the insert marker.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L) return
+    const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])
+
+    if (isEditing && !selectMode && waypoints.length > 1) {
+      if (hoverLineRef.current) map.removeLayer(hoverLineRef.current)
       hoverLineRef.current = L.polyline(routePoints, {
         color: "transparent",
         weight: 40,
         opacity: 0,
         interactive: true,
       }).addTo(map)
-
-      // Add mousemove event to the map ONLY in edit mode
       map.on("mousemove", handleMapMouseMove)
-
-      // Also add mouseleave to clear hover state when leaving the map
       map.on("mouseout", () => {
         setHoverSegmentIndex(null)
         setHoverPoint(null)
       })
     } else {
-      // Remove hover line when not in editing mode
       if (hoverLineRef.current) {
         map.removeLayer(hoverLineRef.current)
         hoverLineRef.current = null
       }
-
-      // Remove mousemove event
       map.off("mousemove", handleMapMouseMove)
       map.off("mouseout")
-
-      // Clear hover state when not editing
       setHoverSegmentIndex(null)
       setHoverPoint(null)
     }
 
-    // Update markers
-    const currentMarkerIds = new Set<string>()
+    return () => {
+      map.off("mousemove", handleMapMouseMove)
+      map.off("mouseout")
+      if (mouseMoveTimeoutRef.current) clearTimeout(mouseMoveTimeoutRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waypoints, isEditing, selectMode, L, isMapReady])
+
+  // The points: airports are large pills with their ICAO code, the rest small dots. Names show on hover or selection.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L) return
+    const thin = !isEditing && !selectMode && waypoints.length > DECLUTTER_MIN_POINTS
+    const step = dotStep(zoom)
+    const currentIds = new Set<string>()
+
     waypoints.forEach((waypoint, index) => {
-      currentMarkerIds.add(waypoint.id)
+      currentIds.add(waypoint.id)
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
-      const isMilestone = index % Math.max(1, Math.floor(waypoints.length / 10)) === 0
+      const isAirport = isFirst || isLast
+      const hovered = waypoint.id === hoveredId
+      const show = !thin || isAirport || waypoint.selected || hovered || index % step === 0
 
-      let iconUrl: string
-      let iconSize: [number, number]
-
-      if (waypoint.selected) {
-        iconUrl = getCustomIconSvg(SELECTION_COLOR, 28)
-        iconSize = [28, 28]
-      } else if (isFirst) {
-        iconUrl = getCustomIconSvg("#22c55e", 32)
-        iconSize = [32, 32]
-      } else if (isLast) {
-        iconUrl = getCustomIconSvg("#ef4444", 32)
-        iconSize = [32, 32]
-      } else if (isMilestone) {
-        iconUrl = getCustomIconSvg("#3B82F6", 20)
-        iconSize = [20, 20]
-      } else {
-        iconUrl = getCustomIconSvg("#3B82F6", 16)
-        iconSize = [16, 16]
-      }
-
-      const icon = L.icon({
-        iconUrl,
-        iconSize,
-        iconAnchor: [iconSize[0] / 2, iconSize[1] / 2],
-        popupAnchor: [0, -iconSize[1] / 2],
-      })
+      const html = isAirport
+        ? `<div class="ip-airport ${waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
+        : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : hovered ? " ip-dot--hover" : ""}"></div>`
+      const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${waypoint.altitude.toLocaleString("en-US")} ft` : ""}`
 
       let marker = markersRef.current.get(waypoint.id)
-      if (marker) {
-        marker.setLatLng([waypoint.lat, waypoint.lng])
-        marker.setIcon(icon)
+      if (!marker) {
+        marker = L.marker([waypoint.lat, waypoint.lng], {
+          icon: L.divIcon({ className: "ip-marker", iconSize: [0, 0], html }),
+          draggable: isEditing && !selectMode,
+          zIndexOffset: isAirport ? 500 : 0,
+        })
+        marker._ipHtml = html
 
-        // Handle popup based on editing mode
-        if (!isEditing) {
-          marker.bindPopup(
-            `<strong>${waypoint.name}</strong><br>
-             Lat: ${waypoint.lat.toFixed(6)}<br>
-             Lng: ${waypoint.lng.toFixed(6)}<br>
-             Alt: ${waypoint.altitude} ft`,
-          )
-        } else {
-          marker.unbindPopup()
-        }
-
-        // Dragging is only for repositioning single waypoints - in select
-        // mode markers can only be selected (click / marquee), not moved.
-        if (isEditing && !selectMode) {
-          marker.dragging?.enable()
-        } else {
-          marker.dragging?.disable()
-        }
-      } else {
-        marker = L.marker([waypoint.lat, waypoint.lng], { icon, draggable: isEditing && !selectMode }).addTo(map)
-
-        // Only bind popup when NOT in editing mode
-        if (!isEditing) {
-          marker.bindPopup(
-            `<strong>${waypoint.name}</strong><br>
-             Lat: ${waypoint.lat.toFixed(6)}<br>
-             Lng: ${waypoint.lng.toFixed(6)}<br>
-             Alt: ${waypoint.altitude} ft`,
-          )
-        }
-
-        const currentWaypointIndex = index
-
-        // In select mode, clicking a marker toggles its selection instead of
-        // relying on the table checkboxes. Leaflet only fires "click" when the
-        // pointer didn't actually drag, so this coexists with dragging below.
         marker.on("click", () => {
           if (justDraggedIdRef.current === waypoint.id) {
             justDraggedIdRef.current = null
             return
           }
-          if (selectModeRef.current && onToggleWaypointSelect) {
-            onToggleWaypointSelect(waypoint.id)
-          }
+          if (selectModeRef.current) callbacksRef.current.onToggleWaypointSelect?.(waypoint.id)
+          else if (!editingRef.current) callbacksRef.current.onWaypointClick?.(waypoint.id)
         })
+        marker.on("mouseover", () => callbacksRef.current.onHoverWaypoint?.(waypoint.id))
+        marker.on("mouseout", () => callbacksRef.current.onHoverWaypoint?.(null))
 
         marker.on("drag", (e: any) => {
-          const draggedLatLng = e.latlng
-          const currentPolylineLatLngs = routeLineRef.current?.getLatLngs()
-          if (currentPolylineLatLngs) {
-            const updatedPolylineLatLngs = [...currentPolylineLatLngs]
-            updatedPolylineLatLngs[currentWaypointIndex] = draggedLatLng
-            routeLineRef.current?.setLatLngs(updatedPolylineLatLngs)
-
-            // Also update hover line
-            if (hoverLineRef.current) {
-              hoverLineRef.current.setLatLngs(updatedPolylineLatLngs)
-            }
-          }
+          const live = waypointsRef.current
+          const at = live.findIndex((wp) => wp.id === waypoint.id)
+          const latlngs = routeLineRef.current?.getLatLngs()
+          if (at < 0 || !latlngs) return
+          const next = [...latlngs]
+          next[at] = e.latlng
+          routeLineRef.current.setLatLngs(next)
+          routeCasingRef.current?.setLatLngs(next)
+          hoverLineRef.current?.setLatLngs(next)
         })
-
         marker.on("dragend", (e: any) => {
           const newLatLng = e.target.getLatLng()
-          onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
+          callbacksRef.current.onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
           justDraggedIdRef.current = waypoint.id
         })
         markersRef.current.set(waypoint.id, marker)
+      } else {
+        marker.setLatLng([waypoint.lat, waypoint.lng])
+        if (marker._ipHtml !== html) {
+          marker.setIcon(L.divIcon({ className: "ip-marker", iconSize: [0, 0], html }))
+          marker._ipHtml = html
+        }
       }
+
+      // Dragging repositions single waypoints; in select mode markers can only be selected, not moved.
+      if (isEditing && !selectMode) marker.dragging?.enable()
+      else marker.dragging?.disable()
+
+      if (tip && !selectMode) {
+        if (marker._ipTip !== tip) {
+          marker.unbindTooltip()
+          marker.bindTooltip(tip, { direction: "top", offset: [0, -10], className: "ip-tip" })
+          marker._ipTip = tip
+        }
+      } else if (marker._ipTip) {
+        marker.unbindTooltip()
+        marker._ipTip = ""
+      }
+
+      if (show && !map.hasLayer(marker)) marker.addTo(map)
+      else if (!show && map.hasLayer(marker)) map.removeLayer(marker)
     })
 
-    // Remove markers that are no longer in the waypoints array
     markersRef.current.forEach((marker, id) => {
-      if (!currentMarkerIds.has(id)) {
+      if (!currentIds.has(id)) {
         map.removeLayer(marker)
         markersRef.current.delete(id)
       }
     })
-
-    // Update legend content if waypoints change
-    if (legendRef.current && waypoints.length > 0) {
-      const legendDiv = legendRef.current.getContainer()
-      if (legendDiv) {
-        legendDiv.innerHTML = `
-        <div style="margin-bottom: 5px"><strong>Flight Plan</strong></div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px">
-          <div style="background-color: #22c55e; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Departure (${waypoints[0]?.name || "N/A"})</span>
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 3px">
-          <div style="background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Arrival (${waypoints[waypoints.length - 1]?.name || "N/A"})</span>
-        </div>
-        <div style="display: flex; align-items: center">
-          <div style="background-color: #3B82F6; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px"></div>
-          <span>Waypoint</span>
-        </div>
-      `
-      }
-    }
-
-    // Fit the map to show all waypoints with padding only on initial load or when not editing
-    if (waypoints.length > 0 && !isEditing) {
-      const bounds = L.latLngBounds(routePoints)
-      map.fitBounds(bounds, { padding: [50, 50] })
-    }
-
-    // Cleanup function
-    return () => {
-      if (map) {
-        map.off("mousemove", handleMapMouseMove)
-        map.off("mouseout")
-      }
-      if (mouseMoveTimeoutRef.current) {
-        clearTimeout(mouseMoveTimeoutRef.current)
-      }
-    }
-  }, [waypoints, isDark, isEditing, selectMode, onWaypointDragEnd, onToggleWaypointSelect, L, isMapReady])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waypoints, isEditing, selectMode, zoom, hoveredId, L, isMapReady])
 
   // Lock panning and zooming while the user is selecting points, so a drag on
   // the map background can't be mistaken for a pan and pinch/scroll can't
@@ -556,12 +555,10 @@ export default function MapPreview({
       interactionHandlers.forEach((handler) => handler?.disable())
       map.tap?.disable()
       map.getContainer().style.cursor = "crosshair"
-      map.zoomControl?.remove()
     } else {
       interactionHandlers.forEach((handler) => handler?.enable())
       map.tap?.enable()
       map.getContainer().style.cursor = ""
-      map.zoomControl?.addTo(map)
     }
   }, [selectMode, isMapReady])
 
@@ -687,10 +684,10 @@ export default function MapPreview({
 
     // Add new insert marker ONLY if we're in edit mode and have a hover point
     if (isEditing && hoverPoint && hoverSegmentIndex !== null) {
-      const insertIcon = L.icon({
-        iconUrl: getInsertIconSvg(24),
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+      const insertIcon = L.divIcon({
+        className: "ip-marker",
+        iconSize: [0, 0],
+        html: `<div style="display:flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:9999px;background:#10b981;color:#fff;box-shadow:0 0 0 2px #fff,0 2px 6px rgb(0 0 0/.3);cursor:pointer"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>`,
       })
 
       insertMarkerRef.current = L.marker(hoverPoint, {
@@ -723,13 +720,15 @@ export default function MapPreview({
 
   if (!isMapReady || !L) {
     return (
-      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-        Loading map...
+      <div className="flex h-full min-h-[280px] w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+        {copy.editor.mapLoading}
       </div>
     )
   }
 
   const selectedCount = waypoints.filter((wp) => wp.selected).length
+  const toolButton =
+    "flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 
   return (
     <div className="relative h-full w-full">
@@ -759,25 +758,33 @@ export default function MapPreview({
         </div>
       )}
 
-      {/* Zoom Controls - hidden in select mode since pan/zoom is locked */}
-      {waypoints.length > 1 && !selectMode && (
-        <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-2 z-[1000] sm:bottom-4 sm:left-4 sm:right-auto">
-          <Button
-            onClick={zoomToDeparture}
-            size="sm"
-            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
-          >
-            🛫 <span className="hidden sm:inline">Departure</span>
-          </Button>
-          <Button
-            onClick={zoomToArrival}
-            size="sm"
-            className="bg-white hover:bg-gray-100 text-gray-900 shadow-lg border border-gray-200"
-          >
-            🛬 <span className="hidden sm:inline">Arrival</span>
-          </Button>
-        </div>
-      )}
+      {/* Toolbar, top right: the editing buttons, then the zoom tools (pan and zoom are locked in select mode) */}
+      <div className="absolute right-3 top-3 z-[1000] flex flex-col items-end gap-2 sm:right-4 sm:top-4">
+        {toolbarLeading}
+        {!selectMode && waypoints.length > 0 && (
+          <div className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-md">
+            <button type="button" className={toolButton} onClick={() => fitRoute()} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
+              <Crosshair className="h-4 w-4" />
+            </button>
+            <button type="button" className={toolButton} onClick={() => mapInstanceRef.current?.zoomIn()} title={copy.editor.zoomIn} aria-label={copy.editor.zoomIn}>
+              <Plus className="h-4 w-4" />
+            </button>
+            <button type="button" className={toolButton} onClick={() => mapInstanceRef.current?.zoomOut()} title={copy.editor.zoomOut} aria-label={copy.editor.zoomOut}>
+              <Minus className="h-4 w-4" />
+            </button>
+            {waypoints.length > 1 && (
+              <>
+                <button type="button" className={toolButton} onClick={zoomToDeparture} title={copy.editor.zoomToDeparture} aria-label={copy.editor.zoomToDeparture}>
+                  <Plane className="h-4 w-4 -rotate-45" />
+                </button>
+                <button type="button" className={toolButton} onClick={zoomToArrival} title={copy.editor.zoomToArrival} aria-label={copy.editor.zoomToArrival}>
+                  <Plane className="h-4 w-4 rotate-45" />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
