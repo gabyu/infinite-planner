@@ -1676,12 +1676,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
               {/* Options: closed, but clearly a row you open (label, a hint of what is inside, a chevron) */}
               <details className="group shrink-0 border-t">
-                <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-baseline gap-2 px-4 py-2.5 text-sm hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
                   <span className="font-medium">{copy.editor.optionsHeading}</span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground group-open:hidden">
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground group-open:hidden">
                     {copy.editor.optionsHint}
                   </span>
-                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 translate-y-0.5 self-center text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="border-t">
                   {flightNumberSection(false)}
