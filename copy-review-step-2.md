@@ -25,8 +25,8 @@ Character limits: buttons and toolbar labels ≤ 24, tooltips ≤ 40, aria-label
 | `waypointAltitude` | aria-label of a row's altitude field | Altitude in feet | Altitude in feet | Alt. (ft) | How high? (ft) |
 | `waypointLatitude` / `waypointLongitude` | aria-labels of the coordinate fields | Latitude / Longitude | Latitude / Longitude | Lat / Lng | Latitude / Longitude |
 | `waypointLimit` | Reserved (warning past 250 waypoints, not shown yet) | The plan exceeds the 250 waypoint limit | Over the 250 waypoint limit | Max 250 waypoints | That's a lot of waypoints: 250 is the limit |
-| `optionsHeading` | Collapsible row above "Made with" and Export, holding flight number, flight time, TXT import and the prefix tool | More settings | Options | Options | Under the hood |
-| `optionsHint` | Grey text on that row while it is closed, so it is clear it opens | Flight number, flight time and waypoint names | Flight number, flight time, names | Details and names | Flight number, flight time, name tags |
+| `optionsHeading` | Collapsible row above Export, holding flight number, flight time, TXT import, the prefix tool and the Made with option | More settings | Options | Options | Under the hood |
+| `optionsHint` | Grey text on that row while it is closed, so it is clear it opens | Flight number, flight time, waypoint names and the Made with option | Flight number, flight time, names, Made with | Details, names, Made with | Flight number, flight time, name tags, our signature |
 | `sheetHandle` | Phone only: aria-label of the bottom sheet handle | Drag to resize the panel, or press Enter to change its height | Drag to resize the panel | Resize | Drag to pull the panel up |
 
 

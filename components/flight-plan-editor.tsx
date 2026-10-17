@@ -1687,32 +1687,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {flightNumberSection(false)}
                   {flightTimeSection(false)}
                   {optionsContent}
+                  {brandingSection(false)}
                 </div>
               </details>
 
-              <div className="flex shrink-0 items-center gap-2.5 border-t px-4 py-2.5">
-                <Checkbox
-                  id="include-branding"
-                  checked={includeBranding && brandingAvailable}
-                  disabled={!brandingAvailable}
-                  onCheckedChange={(checked) => handleBrandingChange(!!checked)}
-                />
-                <Label htmlFor="include-branding" className="text-sm font-normal">
-                  Add &ldquo;Made with Infinite Planner&rdquo;
-                </Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <p>
-                      {brandingAvailable
-                        ? "Names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER. Untick it to leave them out."
-                        : `Needs at least ${BRANDING_MIN_WAYPOINTS} waypoints, so it isn't applied to this plan.`}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
             </>
           }
           footer={<div className="px-4 py-3">{exportButtons}</div>}
