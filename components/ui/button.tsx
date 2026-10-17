@@ -17,7 +17,7 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
-        link: "link-quiet text-primary hover:text-primary",,
+        link: 'link-quiet text-primary hover:text-primary',,
       },
       size: {
         // Heights/padding come from --control-* so the Studio theme can tighten them
