@@ -15,9 +15,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const fields =
     "status, source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes"
   const read = (list: string) => supabase.from("flight_plans").select(list).eq("id", params.id).maybeSingle()
-  let { data: original, error: readError } = await read(`${fields}, extra_flight_numbers`)
+  let { data: found, error: readError } = await read(`${fields}, extra_flight_numbers`)
   // A database without the extra_flight_numbers column yet: copy without it.
-  if (isMissingExtraColumn(readError)) ({ data: original, error: readError } = await read(fields))
+  if (isMissingExtraColumn(readError)) ({ data: found, error: readError } = await read(fields))
+  const original = found as (Record<string, unknown> & { status: string }) | null
   if (!original) return json({ error: "Flight plan not found." }, 404)
   if (original.status !== "exported") {
     return json({ error: "Only exported flight plans can be duplicated. Drafts can be edited." }, 409)
