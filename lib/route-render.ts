@@ -138,7 +138,7 @@ export function altitudeProfile(waypoints: Required<RoutePoint>[], frame: Frame)
 // "FL370" at and above 18,000 ft, "8,500 ft" below.
 export function formatAltitude(feet: number): string {
   if (feet >= 18000) return `FL${String(Math.round(feet / 100)).padStart(3, "0")}`
-  return `${feet.toLocaleString("en-US")} ft`
+  return `${Math.round(feet)} ft`
 }
 
 export function formatDistanceNm(nm: number): string {

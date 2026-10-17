@@ -3,27 +3,9 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 
-interface Waypoint {
-  id: string
-  name: string
-  lat: number
-  lng: number
-  altitude: number
-  selected?: boolean
-}
+import type { MapPreviewProps } from "@/components/map-preview"
 
-interface MapPreviewWrapperProps {
-  waypoints: Waypoint[]
-  isEditing: boolean
-  onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
-  onWaypointInsert?: (afterIndex: number, lat: number, lng: number) => void
-  selectMode?: boolean
-  onToggleWaypointSelect?: (id: string) => void
-  onWaypointsMarqueeSelect?: (ids: string[], additive: boolean) => void
-  onClearSelection?: () => void
-}
-
-export default function MapPreviewWrapper(props: MapPreviewWrapperProps) {
+export default function MapPreviewWrapper(props: MapPreviewProps) {
   const [MapComponent, setMapComponent] = useState<React.ComponentType<any> | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -47,7 +29,7 @@ export default function MapPreviewWrapper(props: MapPreviewWrapperProps) {
 
   if (isLoading || !MapComponent) {
     return (
-      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+      <div className="flex h-full min-h-[280px] w-full items-center justify-center bg-muted text-sm text-muted-foreground">
         Loading map...
       </div>
     )

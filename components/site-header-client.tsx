@@ -72,7 +72,7 @@ export function SiteHeaderClient({ showExplore }: { showExplore: boolean }) {
           <NavLink href="/help" hideOnMobile>
             Help
           </NavLink>
-          <NavLink href="/convert" icon={<Upload size={16} />}>
+          <NavLink href="/convert" icon={<Upload size={16} />} alwaysLink>
             <span className="hidden sm:inline">Convert</span>
           </NavLink>
           <NavLink href="/sketch" icon={<PencilRuler size={16} />}>

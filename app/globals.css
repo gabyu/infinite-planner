@@ -431,3 +431,164 @@ html body[data-scroll-locked] .right-scroll-bar-position {
     animation: none;
   }
 }
+
+/*
+ * Editor map: every colour of the route, the airport pills and the waypoint dots is a token here, so the
+ * light and dark looks (and a future custom basemap style) change in one place.
+ */
+.ip-map {
+  --route-line: var(--primary);
+  --route-casing: 0 0% 100%;
+  --route-dot: var(--primary);
+  --route-dot-ring: 0 0% 100%;
+  --route-selected: 21 90% 48%;
+  --route-departure: 142 71% 38%;
+  --route-arrival: 0 72% 50%;
+  --route-ghost: 220 9% 56%;
+}
+.ip-map[data-basemap="dark"] {
+  --route-casing: 222 47% 8%;
+  --route-dot-ring: 222 47% 8%;
+  --route-departure: 142 69% 50%;
+  --route-arrival: 0 84% 64%;
+}
+.ip-map .ip-route-casing {
+  stroke: hsl(var(--route-casing));
+  stroke-opacity: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ip-map .ip-route-line {
+  stroke: hsl(var(--route-line));
+  stroke-opacity: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ip-map .ip-route-ghost {
+  stroke: hsl(var(--route-ghost));
+  stroke-dasharray: 3 6;
+  stroke-opacity: 0.9;
+}
+/* Marker boxes are zero-size anchors: the visible element is centred on the coordinate. */
+.ip-map .ip-marker {
+  background: none;
+  border: 0;
+}
+.ip-map .ip-marker > * {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+.ip-map .ip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: hsl(var(--route-dot));
+  box-shadow: 0 0 0 1.5px hsl(var(--route-dot-ring));
+  transition: width 0.12s ease-out, height 0.12s ease-out, box-shadow 0.12s ease-out;
+}
+.ip-map .ip-dot--hover,
+.ip-map .ip-dot--active {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2px hsl(var(--route-dot-ring)), 0 0 0 4px hsl(var(--route-dot) / 0.45);
+}
+.ip-map .ip-dot--selected {
+  width: 10px;
+  height: 10px;
+  background: hsl(var(--route-selected));
+  box-shadow: 0 0 0 2px hsl(var(--route-dot-ring)), 0 0 0 4px hsl(var(--route-selected) / 0.45);
+}
+.ip-map .ip-dot--ghost {
+  background: hsl(var(--route-ghost));
+}
+.ip-map .ip-airport {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font: 600 12px/1 var(--font-ibm-plex-mono, ui-monospace, monospace);
+  letter-spacing: 0.04em;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px hsl(var(--route-dot-ring)), 0 2px 8px rgb(0 0 0 / 0.25);
+}
+.ip-map .ip-airport--departure {
+  background: hsl(var(--route-departure));
+}
+.ip-map .ip-airport--arrival {
+  background: hsl(var(--route-arrival));
+}
+.ip-map .ip-airport--selected {
+  background: hsl(var(--route-selected));
+}
+.ip-map .ip-chevron {
+  width: 10px;
+  height: 10px;
+  color: hsl(var(--route-casing));
+  pointer-events: none;
+}
+.ip-map .ip-chevron svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+.ip-map .ip-tip {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  font: 500 11px/1.2 var(--font-ibm-plex-mono, ui-monospace, monospace);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+.ip-map .ip-tip::before {
+  display: none;
+}
+.ip-map .leaflet-container {
+  font-family: inherit;
+}
+/* A 6px dot is too small to grab: its hit area is wider than what is drawn. */
+.ip-map .ip-dot::after {
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 9999px;
+}
+.ip-map .ip-marker.leaflet-interactive > * {
+  cursor: inherit;
+}
+
+/* The altitude ramp on the editor map follows the basemap's tone, not the site theme (a dark map in light mode, and back). */
+.ip-map[data-basemap="dark"] .alt-0 { stroke: #22d3ee; }
+.dark .ip-map[data-basemap="light"] .alt-0 { stroke: #06b6d4; }
+.ip-map[data-basemap="dark"] .alt-1 { stroke: #2ecaf0; }
+.dark .ip-map[data-basemap="light"] .alt-1 { stroke: #0ca5d9; }
+.ip-map[data-basemap="dark"] .alt-2 { stroke: #3bc1f3; }
+.dark .ip-map[data-basemap="light"] .alt-2 { stroke: #1295dd; }
+.ip-map[data-basemap="dark"] .alt-3 { stroke: #47b7f5; }
+.dark .ip-map[data-basemap="light"] .alt-3 { stroke: #1984e2; }
+.ip-map[data-basemap="dark"] .alt-4 { stroke: #54aef8; }
+.dark .ip-map[data-basemap="light"] .alt-4 { stroke: #1f74e6; }
+.ip-map[data-basemap="dark"] .alt-5 { stroke: #60a5fa; }
+.dark .ip-map[data-basemap="light"] .alt-5 { stroke: #2563eb; }
+.ip-map[data-basemap="dark"] .alt-6 { stroke: #6b9ff9; }
+.dark .ip-map[data-basemap="light"] .alt-6 { stroke: #335cea; }
+.ip-map[data-basemap="dark"] .alt-7 { stroke: #7598f8; }
+.dark .ip-map[data-basemap="light"] .alt-7 { stroke: #4155e9; }
+.ip-map[data-basemap="dark"] .alt-8 { stroke: #8092f8; }
+.dark .ip-map[data-basemap="light"] .alt-8 { stroke: #4e4de8; }
+.ip-map[data-basemap="dark"] .alt-9 { stroke: #8a8bf7; }
+.dark .ip-map[data-basemap="light"] .alt-9 { stroke: #5c46e7; }
+.ip-map[data-basemap="dark"] .alt-10 { stroke: #9585f6; }
+.dark .ip-map[data-basemap="light"] .alt-10 { stroke: #6a3fe6; }
+.ip-map[data-basemap="dark"] .alt-11 { stroke: #9e83f7; }
+.dark .ip-map[data-basemap="light"] .alt-11 { stroke: #753ce5; }
+.ip-map[data-basemap="dark"] .alt-12 { stroke: #a781f8; }
+.dark .ip-map[data-basemap="light"] .alt-12 { stroke: #8039e4; }
+.ip-map[data-basemap="dark"] .alt-13 { stroke: #b07ff8; }
+.dark .ip-map[data-basemap="light"] .alt-13 { stroke: #8c35e2; }
+.ip-map[data-basemap="dark"] .alt-14 { stroke: #b97df9; }
+.dark .ip-map[data-basemap="light"] .alt-14 { stroke: #9732e1; }
+.ip-map[data-basemap="dark"] .alt-15 { stroke: #c27bfa; }
+.dark .ip-map[data-basemap="light"] .alt-15 { stroke: #a22fe0; }

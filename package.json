@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node -e \"process.env.VERCEL_ENV==='production'&&process.exit(1)\" || node scripts/check-copy.mjs",
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "check:seo": "esbuild scripts/check-seo.ts --bundle --platform=node --format=cjs --alias:@=. | node"
+    "check:seo": "esbuild scripts/check-seo.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "check:copy": "node scripts/check-copy.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
