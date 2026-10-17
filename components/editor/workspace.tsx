@@ -72,7 +72,7 @@ export function EditorWorkspace({ map, strip, header, body, footer, isMobile }: 
               aria-label={collapsed ? copy.editor.panelExpand : copy.editor.panelCollapse}
               title={collapsed ? copy.editor.panelExpand : copy.editor.panelCollapse}
               className={cn(
-                "absolute top-[22px] z-[1001] flex h-8 w-8 items-center justify-center rounded-full border bg-card text-foreground",
+                "absolute top-[25px] z-[1001] flex h-8 w-8 items-center justify-center rounded-full border bg-card text-foreground",
                 "shadow-md transition-[left] duration-200 ease-out hover:bg-accent motion-reduce:transition-none",
                 collapsed ? "left-4" : "left-[328px]",
               )}
