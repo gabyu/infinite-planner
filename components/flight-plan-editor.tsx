@@ -1519,8 +1519,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         </Button>
       </div>
       {libraryOpen && (
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <span className="text-muted-foreground">Visibility</span>
+        <div>
           <VisibilitySwitch
             planId={savedPlanId ?? ""}
             origin={originAirport || "ORIG"}
@@ -1528,8 +1527,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             flightNumber={detectedFlightNumber}
             share={planShare}
             onShareChange={setPlanShare}
-            featured={planFeatured}
-            onFeaturedChange={setPlanFeatured}
             disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty}
             disabledReason={
               !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
