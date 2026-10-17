@@ -10,6 +10,7 @@ import { getLibraryLaunched } from "@/lib/library"
 import { requireLibraryAccess } from "@/lib/library-access"
 import { decodeCursor, encodeCursor, listPlans } from "@/lib/library-listing"
 import { flightNumberPath } from "@/lib/plan-slug"
+import { buildMetadata } from "@/lib/seo"
 
 // /explore/flight_number/AF69: every public plan of one flight number. Indexable while it has at least one plan;
 // an empty one is a 404.
@@ -28,15 +29,15 @@ export async function generateMetadata({
   const flight = params.flight.toUpperCase()
   const { plans } = await listPlans({ filters: { flight }, limit: 1 })
   const title = `${flight} flight plans | ${BRAND_NAME}`
-  const description = `Flight plans of ${flight} for Infinite Flight, from real flights and hand-drawn routes. Download one, or import it and adjust the route.`
+  const description = `Want to fly ${flight}? Browse flight plans of ${flight} shared by pilots, from real flights and hand-drawn routes, and download them for Infinite Flight.`
   const launched = await getLibraryLaunched()
-  return {
-    title: { absolute: title },
+  return buildMetadata({
+    title,
     description,
-    alternates: { canonical: flightNumberPath(flight) },
-    robots: launched && plans.length > 0 && !searchParams.cursor ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { type: "website", title, description, siteName: BRAND_NAME },
-  }
+    path: flightNumberPath(flight),
+    indexable: launched && plans.length > 0 && !searchParams.cursor,
+    follow: true,
+  })
 }
 
 export default async function FlightNumberPage({

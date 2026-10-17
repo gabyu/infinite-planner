@@ -2,15 +2,14 @@ import Link from "next/link"
 import { ScrollText } from "lucide-react"
 import { LegalPage } from "@/components/legal-page"
 import { CONTACT_EMAIL, LEGAL_LAST_UPDATED } from "@/lib/legal"
+import { pageMetadata } from "@/lib/seo"
 
-export const metadata = {
-  title: "Terms of Service - Infinite Planner",
-  description: "The terms for using Infinite Planner, the flight plan hub for Infinite Flight.",
-}
+export const metadata = pageMetadata("terms")
 
 export default function TermsPage() {
   return (
     <LegalPage
+      seo="terms"
       icon={<ScrollText className="h-6 w-6" />}
       title="Terms of Service"
       intro="Short version: this is a free tool for the Infinite Flight community. Use it reasonably, don't abuse it, and don't treat generated flight plans as real-world navigation data."

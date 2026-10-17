@@ -6,10 +6,14 @@ import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
 import { FlightStatistics } from "@/components/flight-statistics"
 import { Hero } from "@/components/home/hero"
+import { JsonLd } from "@/components/seo/json-ld"
 import { getRecentFlights } from "@/lib/recent-flights"
+import { pageJsonLd, pageMetadata } from "@/lib/seo"
 
 // The globe shows the latest flight plans: rebuild the page in the background at most every hour.
 export const revalidate = 3600
+
+export const metadata = pageMetadata("home")
 
 const STEPS = [
   {
@@ -40,6 +44,7 @@ export default async function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <JsonLd data={pageJsonLd("home")} />
       <SiteHeader />
 
       <Hero flights={flights} />

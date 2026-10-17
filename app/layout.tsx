@@ -11,6 +11,9 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { GoogleAnalytics } from "@/components/google-analytics"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
+import { BRAND_NAME } from "@/lib/brand"
+import { SITE_URL } from "@/lib/site-url"
+import { DEFAULT_OG_IMAGE, PAGES, SITE_TAGLINE } from "@/lib/seo"
 
 // Type system. Text: Geist (light, clean; ships with the geist package, served from our own domain).
 // Headlines: Funnel Display, self-hosted from app/fonts (SIL OFL; not in Next's Google list).
@@ -31,45 +34,28 @@ const ibmPlexMono = IBM_Plex_Mono({
 })
 
 const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
-const siteUrl = isStaging ? "https://staging830921-infiniteplanner.gabyu.com/" : "https://infiniteplanner.gabyu.com/"
 
+// Site-wide defaults. Every page sets its own title, description, canonical URL and social card through
+// lib/seo.ts; this is only what they inherit (and the fallback for routes that set nothing, like not-found).
 export const metadata: Metadata = {
   // Makes every relative og:image / canonical URL absolute on the right domain (crawlers need that).
-  metadataBase: new URL(siteUrl),
-  title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
-  description:
-    "The Flight Plan Hub for Infinite Flight. Import KML files from FlightRadar24 or FlightAware, or draw a route from scratch, and export it as an Infinite Flight flight plan.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${BRAND_NAME} - ${SITE_TAGLINE}`, template: `%s | ${BRAND_NAME}` },
+  description: PAGES.home.description,
+  applicationName: BRAND_NAME,
   icons: {
     icon: "/favicon.svg",
     apple: "/favicon.svg",
   },
   // Staging must not be indexed since it has no password protection
   ...(isStaging ? { robots: { index: false, follow: false } } : {}),
-  // Add OpenGraph metadata for social media sharing
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: siteUrl,
-    title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
-    description: "The Flight Plan Hub for Infinite Flight.",
-    siteName: "Infinite Planner",
-    images: [
-      {
-        url: "/images/infinite-planner-og.webp",
-        width: 1200,
-        height: 630,
-        alt: "Infinite Planner",
-      },
-    ],
+    siteName: BRAND_NAME,
+    images: [DEFAULT_OG_IMAGE],
   },
-  // Add Twitter card metadata
-  twitter: {
-    card: "summary_large_image",
-    title: "Infinite Planner - The Flight Plan Hub for Infinite Flight",
-    description: "The Flight Plan Hub for Infinite Flight.",
-    images: ["/images/infinite-planner-og.webp"],
-  },
-  generator: "v0.dev",
+  twitter: { card: "summary_large_image", images: [DEFAULT_OG_IMAGE.url] },
 }
 
 export default function RootLayout({

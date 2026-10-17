@@ -10,11 +10,9 @@ import { FLIGHT_PLAN_SUMMARY_COLUMNS, HISTORY_PAGE_SIZE, type FlightPlanSummary 
 import { LibraryOverview } from "@/components/dashboard/library-overview"
 import { getViewer, isLibraryOpenFor } from "@/lib/library"
 import { getServerSupabase } from "@/lib/supabase/server"
+import { privatePageMetadata } from "@/lib/seo"
 
-export const metadata: Metadata = {
-  title: "Dashboard - Infinite Planner",
-  robots: { index: false, follow: false },
-}
+export const metadata: Metadata = privatePageMetadata("Dashboard")
 
 // Per-user and cookie-dependent: never cached.
 export const dynamic = "force-dynamic"

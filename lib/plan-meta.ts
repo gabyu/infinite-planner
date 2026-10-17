@@ -6,6 +6,7 @@ import { formatFlightTime } from "@/lib/flight-plans"
 import { formatDistanceNm } from "@/lib/route-render"
 import { planPath } from "@/lib/plan-slug"
 import type { PublicPlan } from "@/lib/public-plans"
+import { buildMetadata, clip } from "@/lib/seo"
 
 // Text about a plan, built once for the page, its metadata and its preview image. People search
 // "CDG to LAX" and city names as much as ICAO codes, so all three are used.
@@ -36,9 +37,11 @@ export function describeEnd(icao: string, storedName: string | null): PlanEnd {
 
 export function planTitle(plan: PublicPlan) {
   const flight = plan.flightNumber ? ` – ${plan.flightNumber}` : ""
-  return `${plan.origin} to ${plan.destination} flight plan${flight} | ${BRAND_NAME}`
+  return `${plan.origin} to ${plan.destination} flight plan${flight} by ${plan.authorName} | ${BRAND_NAME}`
 }
 
+// Two plans of the same route and flight number still differ by author, date, source and the numbers, so no
+// two plan pages share a description.
 export function planDescription(plan: PublicPlan) {
   const from = describeEnd(plan.origin, plan.originName)
   const to = describeEnd(plan.destination, plan.destinationName)
@@ -48,19 +51,26 @@ export function planDescription(plan: PublicPlan) {
     `${plan.waypoints.length} waypoints`,
   ].filter(Boolean)
   const flight = plan.flightNumber ? `Flight ${plan.flightNumber}: ` : ""
-  return `${flight}flight plan from ${from.name ?? from.label} (${from.iata ? `${from.iata}/` : ""}${from.icao}) to ${to.name ?? to.label} (${to.iata ? `${to.iata}/` : ""}${to.icao}), ${facts.join(", ")}. Download it for Infinite Flight.`
+  const published = new Date(plan.publishedAt ?? plan.createdAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+  const source = plan.source === "Sketch" ? "Hand-drawn route" : `${plan.source} track`
+  return clip(
+    `${flight}flight plan from ${from.label} to ${to.label}, ${facts.join(", ")}. ${source} shared by ${plan.authorName} on ${published}. Grab the FPL for Infinite Flight.`,
+    200,
+  )
 }
 
 export function planMetadata(plan: PublicPlan, options: { indexable: boolean }): Metadata {
-  const title = planTitle(plan)
-  const description = planDescription(plan)
-  const path = planPath(plan)
-  return {
-    title: { absolute: title },
-    description,
-    alternates: { canonical: path },
-    robots: options.indexable ? { index: true, follow: true } : { index: false, follow: false },
-    openGraph: { type: "website", title, description, siteName: BRAND_NAME, url: path },
-    twitter: { card: "summary_large_image", title, description },
-  }
+  return buildMetadata({
+    title: planTitle(plan),
+    description: planDescription(plan),
+    path: planPath(plan),
+    indexable: options.indexable,
+    // The page has its own generated preview image (opengraph-image.tsx).
+    image: false,
+  })
 }

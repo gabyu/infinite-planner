@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { FAQ_TEXT } from "@/lib/faq"
 
 // FAQ data with consistent structure
 export const faqData = [
   {
     id: "file-formats",
-    question: "What file formats are supported?",
+    question: FAQ_TEXT["file-formats"].question,
     answer: (
       <div className="space-y-4">
         <p>Infinite Planner currently supports KML files from two major flight tracking services:</p>
@@ -28,7 +29,7 @@ export const faqData = [
   },
   {
     id: "waypoint-limit",
-    question: "Why are my waypoints limited to 250?",
+    question: FAQ_TEXT["waypoint-limit"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -48,7 +49,7 @@ export const faqData = [
   },
   {
     id: "accuracy",
-    question: "How accurate are the converted flight plans?",
+    question: FAQ_TEXT["accuracy"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -80,7 +81,7 @@ export const faqData = [
   },
   {
     id: "import-issue",
-    question: "My KML file won't import. What should I do?",
+    question: FAQ_TEXT["import-issue"].question,
     answer: (
       <div className="space-y-4">
         <p>If you're having trouble importing your KML file, try these troubleshooting steps:</p>
@@ -110,7 +111,7 @@ export const faqData = [
   },
   {
     id: "export-usage",
-    question: "How do I use the exported flight plan in Infinite Flight?",
+    question: FAQ_TEXT["export-usage"].question,
     answer: (
       <div className="space-y-4">
         <p>Once you've exported your flight plan as an FPL file, follow these steps to use it in Infinite Flight:</p>
@@ -143,8 +144,7 @@ export const faqData = [
   },
   {
     id: "subscription",
-    question:
-      "I can't download KML file from FlightRadar24. Must I purchase a subscription plan to use Infinite Planner?",
+    question: FAQ_TEXT["subscription"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -206,7 +206,7 @@ export const faqData = [
   },
   {
     id: "fpl-import",
-    question: "I cannot import the flight plan in Infinite Flight",
+    question: FAQ_TEXT["fpl-import"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -240,7 +240,7 @@ export const faqData = [
   },
   {
     id: "atc-compatible",
-    question: "Will ATC accept our custom flight plan?",
+    question: FAQ_TEXT["atc-compatible"].question,
     answer: (
       <div className="space-y-4">
         <p>Yes, landing with ATC is absolutely fine — but it's important to know how Infinite Planner works.</p>
@@ -281,7 +281,7 @@ export const faqData = [
   },
   {
     id: "explore",
-    question: "What is Explore, and who can see my flight plans?",
+    question: FAQ_TEXT["explore"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -299,7 +299,7 @@ export const faqData = [
   },
   {
     id: "download-import",
-    question: "Can I download or adapt someone else's flight plan?",
+    question: FAQ_TEXT["download-import"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -314,7 +314,7 @@ export const faqData = [
   },
   {
     id: "report",
-    question: "How do I report a flight plan?",
+    question: FAQ_TEXT["report"].question,
     answer: (
       <div className="space-y-4">
         <p>

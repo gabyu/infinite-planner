@@ -3,12 +3,13 @@ import { unstable_cache } from "next/cache"
 import { getLibraryLaunched } from "@/lib/library"
 import { LIBRARY_PATH } from "@/lib/brand"
 import { flightNumberPath, locationPath, planPath } from "@/lib/plan-slug"
+import { PAGES, absoluteUrl } from "@/lib/seo"
 import { SITE_URL } from "@/lib/site-url"
 import { getCachedServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // The library's public pages. Refreshed hourly and whenever a plan is published or unpublished
-// (tag `library-index`) or the library is launched (tag `library`). Before the launch it is empty:
-// nothing from the library may be discoverable.
+// (tag `library-index`) or the library is launched (tag `library`). Before the launch it lists the site's
+// own pages only: nothing from the library may be discoverable.
 export const revalidate = 3600
 
 interface Stub {
@@ -31,10 +32,16 @@ const loadStubs = unstable_cache(
   { tags: ["library-index", "library"], revalidate: 3600 },
 )
 
+// Every indexable page of the registry. The library's front page is listed with the library's pages below,
+// and only once it is launched.
+const staticPages: MetadataRoute.Sitemap = Object.values(PAGES)
+  .filter((page) => page.indexable && page.path !== LIBRARY_PATH)
+  .map((page) => ({ url: absoluteUrl(page.path) }))
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  if (!(await getLibraryLaunched())) return []
+  if (!(await getLibraryLaunched())) return staticPages
   const stubs = await loadStubs()
-  if (stubs.length === 0) return []
+  if (stubs.length === 0) return staticPages
 
   // The library's front page and the hubs that have at least one public plan.
   const routes = new Set(stubs.map((stub) => `${stub.origin_airport}-${stub.destination_airport}`))
@@ -47,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...[...flights].map((flight) => ({ url: `${SITE_URL}${flightNumberPath(flight)}` })),
   ]
 
-  return [...hubs, ...stubs.map((stub) => ({
+  return [...staticPages, ...hubs, ...stubs.map((stub) => ({
     url: `${SITE_URL}${planPath({
       origin: stub.origin_airport,
       destination: stub.destination_airport,

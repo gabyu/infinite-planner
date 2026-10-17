@@ -12,6 +12,7 @@ import { getLibraryLaunched } from "@/lib/library"
 import { decodeCursor, encodeCursor, listPlans } from "@/lib/library-listing"
 import { describeEnd } from "@/lib/plan-meta"
 import { locationPath, routeHubPath } from "@/lib/plan-slug"
+import { buildMetadata } from "@/lib/seo"
 
 // /explore/routes/lfpg-klax: every public plan of one origin-destination pair. Indexable only while it has
 // at least one plan; an empty hub is a 404 with noindex.
@@ -38,16 +39,16 @@ export async function generateMetadata({
   const from = describeEnd(ends.from, null)
   const to = describeEnd(ends.to, null)
   const title = `${from.city ?? ends.from} (${from.iata ?? ends.from}) to ${to.city ?? ends.to} (${to.iata ?? ends.to}) flight plans | ${BRAND_NAME}`
-  const description = `Flight plans from ${from.name ?? ends.from} (${ends.from}) to ${to.name ?? ends.to} (${ends.to}) for Infinite Flight. Download one, or import it and adjust the route.`
+  const description = `Fly ${from.name ?? ends.from} (${ends.from}) to ${to.name ?? ends.to} (${ends.to}) with flight plans shared by the community. Download one for Infinite Flight, or import it and adjust the route.`
   const launched = await getLibraryLaunched()
   const indexable = launched && plans.length > 0 && !searchParams.cursor
-  return {
-    title: { absolute: title },
+  return buildMetadata({
+    title,
     description,
-    alternates: { canonical: routeHubPath(ends.from, ends.to) },
-    robots: indexable ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { type: "website", title, description, siteName: BRAND_NAME },
-  }
+    path: routeHubPath(ends.from, ends.to),
+    indexable,
+    follow: true,
+  })
 }
 
 export default async function RouteHubPage({

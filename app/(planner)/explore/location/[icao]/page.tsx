@@ -12,6 +12,7 @@ import { getLibraryLaunched } from "@/lib/library"
 import { listPlans } from "@/lib/library-listing"
 import { describeEnd } from "@/lib/plan-meta"
 import { flightNumberPath, locationPath } from "@/lib/plan-slug"
+import { buildMetadata } from "@/lib/seo"
 
 // /explore/location/KPHX: the departures and arrivals of one airport. Same indexing rule as the route hubs.
 export const dynamic = "force-dynamic"
@@ -30,15 +31,15 @@ export async function generateMetadata({ params }: { params: { icao: string } })
   const place = airport.city.replace(/\s*\(.*$/, "").split(",")[0].trim()
   const codes = airport.iata ? `${airport.icao}/${airport.iata}` : airport.icao
   const title = `Flight plans from and to ${place} (${codes}) | ${BRAND_NAME}`
-  const description = `Flight plans departing from and arriving at ${airport.name} (${codes}) for Infinite Flight.`
+  const description = `Departing from or arriving at ${airport.name} (${codes})? Find flight plans shared by fellow pilots and download them for Infinite Flight.`
   const launched = await getLibraryLaunched()
-  return {
-    title: { absolute: title },
+  return buildMetadata({
+    title,
     description,
-    alternates: { canonical: locationPath(airport.icao) },
-    robots: launched && plans.length > 0 ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { type: "website", title, description, siteName: BRAND_NAME },
-  }
+    path: locationPath(airport.icao),
+    indexable: launched && plans.length > 0,
+    follow: true,
+  })
 }
 
 export default async function AirportHubPage({ params }: { params: { icao: string } }) {

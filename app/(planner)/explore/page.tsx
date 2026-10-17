@@ -7,7 +7,7 @@ import { PlanGrid } from "@/components/explore/plan-card"
 import { PrelaunchBanner } from "@/components/explore/prelaunch-banner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { BRAND_NAME, LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
+import { LIBRARY_NAME, LIBRARY_PATH } from "@/lib/brand"
 import { getLibraryLaunched } from "@/lib/library"
 import { requireLibraryAccess } from "@/lib/library-access"
 import {
@@ -22,6 +22,8 @@ import {
   type ExploreParams,
 } from "@/lib/library-listing"
 import { flightNumberPath } from "@/lib/plan-slug"
+import { JsonLd } from "@/components/seo/json-ld"
+import { buildMetadata, PAGES, pageJsonLd, pageTitle } from "@/lib/seo"
 
 // Read per request (the search form is plain GET parameters); the listing itself comes from the data
 // cache, tagged so a publish or unpublish shows up within a minute at most.
@@ -37,22 +39,19 @@ function paramsOf(searchParams: SearchParams): ExploreParams {
   return { q: one("q"), from: one("from"), to: one("to"), flight: one("flight"), sort: one("sort"), cursor: one("cursor") }
 }
 
-const TITLE = `${LIBRARY_NAME}: flight plans for Infinite Flight | ${BRAND_NAME}`
-const DESCRIPTION =
-  "Browse flight plans built from real flights and hand-drawn routes. Download them for Infinite Flight, or import one and make it yours."
-
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
   const hasVariant = Object.values(paramsOf(searchParams)).some(Boolean)
   // Nothing of the library is indexable before the launch.
   const launched = await getLibraryLaunched()
   // Page 1 of the default listing is the indexable one; every filtered, sorted or paginated variant points back at it.
-  return {
-    title: { absolute: TITLE },
-    description: DESCRIPTION,
-    alternates: { canonical: LIBRARY_PATH },
-    robots: !launched ? { index: false, follow: false } : hasVariant ? { index: false, follow: true } : undefined,
-    openGraph: { type: "website", title: TITLE, description: DESCRIPTION, siteName: BRAND_NAME, url: LIBRARY_PATH },
-  }
+  return buildMetadata({
+    title: pageTitle(PAGES.explore),
+    description: PAGES.explore.description,
+    path: LIBRARY_PATH,
+    indexable: launched && !hasVariant,
+    // A filtered or paginated variant stays out of the index but its plan links are still followed.
+    follow: launched,
+  })
 }
 
 // A ruled section heading, like the section label of a magazine.
@@ -104,6 +103,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
   return (
     <>
       {prelaunch && <PrelaunchBanner />}
+      {!prelaunch && <JsonLd data={pageJsonLd("explore")} />}
       <div className="container mx-auto max-w-6xl px-4 pb-24 pt-8 sm:pt-12">
         <header className="border-b pb-8">
           <h1 className="font-display text-[clamp(3rem,9vw,7rem)] font-semibold leading-[0.95] tracking-[-0.04em]">

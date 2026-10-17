@@ -1,14 +1,19 @@
 import type React from "react"
 import { SiteHeader } from "@/components/site-header"
 import { SiteFooter } from "@/components/site-footer"
+import { JsonLd } from "@/components/seo/json-ld"
+import { pageJsonLd, type PageKey } from "@/lib/seo"
 
 // Shared shell for the legal pages (/terms, /privacy, /cookies): hero + readable prose column.
 export function LegalPage({
+  seo,
   icon,
   title,
   intro,
   children,
 }: {
+  // The page's entry in lib/seo.ts, for its structured data.
+  seo: PageKey
   icon: React.ReactNode
   title: string
   intro: string
@@ -16,6 +21,7 @@ export function LegalPage({
 }) {
   return (
     <div className="flex flex-col min-h-screen">
+      <JsonLd data={pageJsonLd(seo)} />
       <SiteHeader />
 
       <main className="flex-grow">

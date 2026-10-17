@@ -8,7 +8,7 @@ import { PageShell } from "@/components/ds/page-shell"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
 import { Button } from "@/components/ui/button"
 import { getAirportInfo } from "@/lib/airports"
-import { BRAND_NAME } from "@/lib/brand"
+import { privatePageMetadata } from "@/lib/seo"
 import { requireLibraryAccess } from "@/lib/library-access"
 import { decodeCursor, encodeCursor, listPlans } from "@/lib/library-listing"
 import { isPublicId } from "@/lib/plan-slug"
@@ -19,10 +19,7 @@ import { getServerSupabase } from "@/lib/supabase/server"
 // (fixed public facts and aggregates; the favorite airport and flight numbers are counted over all the
 // pilot's exported plans, private ones included, but only the result is shown) and from the public listing.
 export const dynamic = "force-dynamic"
-export const metadata: Metadata = {
-  title: `Pilot profile | ${BRAND_NAME}`,
-  robots: { index: false, follow: false },
-}
+export const metadata: Metadata = privatePageMetadata("Pilot profile")
 
 interface Profile {
   public_id: string

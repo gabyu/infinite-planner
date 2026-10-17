@@ -2,15 +2,14 @@ import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 import { LegalPage } from "@/components/legal-page"
 import { CONTACT_EMAIL, LEGAL_LAST_UPDATED } from "@/lib/legal"
+import { pageMetadata } from "@/lib/seo"
 
-export const metadata = {
-  title: "Privacy Policy - Infinite Planner",
-  description: "What data Infinite Planner collects, why, and your rights over it.",
-}
+export const metadata = pageMetadata("privacy")
 
 export default function PrivacyPage() {
   return (
     <LegalPage
+      seo="privacy"
       icon={<ShieldCheck className="h-6 w-6" />}
       title="Privacy Policy"
       intro="Short version: today, we don't collect anything tied to you personally — just anonymous flight plan stats. If you sign in with Discord (a feature we're currently rolling out), we store your Discord username and avatar to run your account, nothing more."

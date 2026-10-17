@@ -3,18 +3,16 @@ import { SiteFooter } from "@/components/site-footer"
 import { SiteHeader } from "@/components/site-header"
 import FAQSelector from "@/components/faq-selector"
 import { HowItWorksContent } from "@/components/help/how-it-works-content"
+import { JsonLd } from "@/components/seo/json-ld"
+import { pageJsonLd, pageMetadata } from "@/lib/seo"
 
-export const metadata: Metadata = {
-  title: "Help - Infinite Planner",
-  description:
-    "How Infinite Planner works, step by step, and answers to the questions people ask most: file formats, waypoints, ATC, Explore and sharing.",
-  alternates: { canonical: "/help" },
-}
+export const metadata: Metadata = pageMetadata("help")
 
 // One page for the guide and the FAQ (they used to be /how-it-works and /faq, which now redirect here).
 export default function HelpPage() {
   return (
     <div className="flex min-h-screen flex-col">
+      <JsonLd data={pageJsonLd("help")} />
       <SiteHeader />
 
       <main className="flex-grow">
