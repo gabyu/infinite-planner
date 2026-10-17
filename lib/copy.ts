@@ -101,6 +101,7 @@ export function altitudeLabel(cruise: string, distance: string) {
 /** The visibility switch (editor, plan page, dashboard): the label says what the switch does, it sits on the left. */
 export const visibilityCopy = {
   label: `Publish on ${LIBRARY_NAV_LABEL}`, // PROVISIONAL
+  labelShort: "Public", // PROVISIONAL
   helperPrivate: "Only you can see this plan.", // PROVISIONAL
   helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`, // PROVISIONAL
   copyLink: "Copy link", // PROVISIONAL
