@@ -446,7 +446,7 @@ html body[data-scroll-locked] .right-scroll-bar-position {
   --route-arrival: 0 72% 50%;
   --route-ghost: 220 9% 56%;
 }
-.dark .ip-map {
+.ip-map[data-basemap="dark"] {
   --route-casing: 222 47% 8%;
   --route-dot-ring: 222 47% 8%;
   --route-departure: 142 69% 50%;
@@ -558,3 +558,37 @@ html body[data-scroll-locked] .right-scroll-bar-position {
 .ip-map .ip-marker.leaflet-interactive > * {
   cursor: inherit;
 }
+
+/* The altitude ramp on the editor map follows the basemap's tone, not the site theme (a dark map in light mode, and back). */
+.ip-map[data-basemap="dark"] .alt-0 { stroke: #22d3ee; }
+.dark .ip-map[data-basemap="light"] .alt-0 { stroke: #06b6d4; }
+.ip-map[data-basemap="dark"] .alt-1 { stroke: #2ecaf0; }
+.dark .ip-map[data-basemap="light"] .alt-1 { stroke: #0ca5d9; }
+.ip-map[data-basemap="dark"] .alt-2 { stroke: #3bc1f3; }
+.dark .ip-map[data-basemap="light"] .alt-2 { stroke: #1295dd; }
+.ip-map[data-basemap="dark"] .alt-3 { stroke: #47b7f5; }
+.dark .ip-map[data-basemap="light"] .alt-3 { stroke: #1984e2; }
+.ip-map[data-basemap="dark"] .alt-4 { stroke: #54aef8; }
+.dark .ip-map[data-basemap="light"] .alt-4 { stroke: #1f74e6; }
+.ip-map[data-basemap="dark"] .alt-5 { stroke: #60a5fa; }
+.dark .ip-map[data-basemap="light"] .alt-5 { stroke: #2563eb; }
+.ip-map[data-basemap="dark"] .alt-6 { stroke: #6b9ff9; }
+.dark .ip-map[data-basemap="light"] .alt-6 { stroke: #335cea; }
+.ip-map[data-basemap="dark"] .alt-7 { stroke: #7598f8; }
+.dark .ip-map[data-basemap="light"] .alt-7 { stroke: #4155e9; }
+.ip-map[data-basemap="dark"] .alt-8 { stroke: #8092f8; }
+.dark .ip-map[data-basemap="light"] .alt-8 { stroke: #4e4de8; }
+.ip-map[data-basemap="dark"] .alt-9 { stroke: #8a8bf7; }
+.dark .ip-map[data-basemap="light"] .alt-9 { stroke: #5c46e7; }
+.ip-map[data-basemap="dark"] .alt-10 { stroke: #9585f6; }
+.dark .ip-map[data-basemap="light"] .alt-10 { stroke: #6a3fe6; }
+.ip-map[data-basemap="dark"] .alt-11 { stroke: #9e83f7; }
+.dark .ip-map[data-basemap="light"] .alt-11 { stroke: #753ce5; }
+.ip-map[data-basemap="dark"] .alt-12 { stroke: #a781f8; }
+.dark .ip-map[data-basemap="light"] .alt-12 { stroke: #8039e4; }
+.ip-map[data-basemap="dark"] .alt-13 { stroke: #b07ff8; }
+.dark .ip-map[data-basemap="light"] .alt-13 { stroke: #8c35e2; }
+.ip-map[data-basemap="dark"] .alt-14 { stroke: #b97df9; }
+.dark .ip-map[data-basemap="light"] .alt-14 { stroke: #9732e1; }
+.ip-map[data-basemap="dark"] .alt-15 { stroke: #c27bfa; }
+.dark .ip-map[data-basemap="light"] .alt-15 { stroke: #a22fe0; }

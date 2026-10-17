@@ -6,7 +6,15 @@
  * Label-free variants: airports get their own labels on the map.
  */
 
-export type BasemapTheme = "light" | "dark"
+export type BasemapTheme = "light" | "dark" | "colour"
+
+/** What a person picks: Auto follows the site theme (light or dark). */
+export type BasemapChoice = "auto" | BasemapTheme
+
+export const BASEMAP_CHOICES: BasemapChoice[] = ["auto", "light", "dark", "colour"]
+
+/** The palette family of a tile style, for the route colours drawn over it. */
+export const basemapTone = (theme: BasemapTheme): "light" | "dark" => (theme === "dark" ? "dark" : "light")
 
 const CARTO_BASE = "https://basemaps.cartocdn.com/rastertiles"
 // Free key from https://www.carto.com/basemaps/apikey/ (no account; 1M requests/month for commercial use).
@@ -22,6 +30,7 @@ export const BASEMAP_MAX_ZOOM = 19
 const TILE_URLS: Record<BasemapTheme, string> = {
   light: `${CARTO_BASE}/light_nolabels/{z}/{x}/{y}{r}.png${KEY_QUERY}`,
   dark: `${CARTO_BASE}/dark_nolabels/{z}/{x}/{y}{r}.png${KEY_QUERY}`,
+  colour: `${CARTO_BASE}/voyager_nolabels/{z}/{x}/{y}{r}.png${KEY_QUERY}`,
 }
 
 // Minimal structural types so this module does not depend on how Leaflet is loaded.
@@ -30,12 +39,35 @@ interface LeafletLike {
   TileLayer: new (...args: any[]) => unknown
 }
 
-/** Replaces any existing tile layer on the map with the basemap for the theme. */
-export function setBasemap(L: LeafletLike, map: any, isDark: boolean) {
+export const resolveBasemap = (choice: BasemapChoice, siteIsDark: boolean): BasemapTheme =>
+  choice === "auto" ? (siteIsDark ? "dark" : "light") : choice
+
+const STORAGE_KEY = "infinite-planner:basemap"
+
+export function loadBasemapChoice(): BasemapChoice {
+  try {
+    const value = window.localStorage.getItem(STORAGE_KEY)
+    return BASEMAP_CHOICES.includes(value as BasemapChoice) ? (value as BasemapChoice) : "auto"
+  } catch {
+    return "auto"
+  }
+}
+
+export function saveBasemapChoice(choice: BasemapChoice) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, choice)
+  } catch {
+    // Storage unavailable: the choice just lasts for this visit.
+  }
+}
+
+/** Replaces any existing tile layer on the map with the basemap for the theme. A boolean means light or dark. */
+export function setBasemap(L: LeafletLike, map: any, theme: BasemapTheme | boolean) {
   map.eachLayer((layer: unknown) => {
     if (layer instanceof L.TileLayer) map.removeLayer(layer)
   })
-  L.tileLayer(TILE_URLS[isDark ? "dark" : "light"], {
+  const resolved: BasemapTheme = typeof theme === "boolean" ? (theme ? "dark" : "light") : theme
+  L.tileLayer(TILE_URLS[resolved], {
     attribution: BASEMAP_ATTRIBUTION,
     maxZoom: BASEMAP_MAX_ZOOM,
   }).addTo(map)

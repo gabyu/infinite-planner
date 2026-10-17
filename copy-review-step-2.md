@@ -44,6 +44,11 @@ Character limits: buttons and toolbar labels ≤ 24, tooltips ≤ 40, aria-label
 | `zoomToDeparture` | Icon tooltip | Zoom to the departure airport | Zoom to departure | To departure | Back to the gate |
 | `zoomToArrival` | Icon tooltip | Zoom to the arrival airport | Zoom to arrival | To arrival | Straight to touchdown |
 | `mapLoading` | While the map library loads | Loading the map | Loading map... | Loading... | Warming up the engines... |
+| `mapStyle` | Menu button (layers icon), tooltip + aria-label, and the menu's title | Choose the map style | Map style | Style | Pick your scenery |
+| `styleAuto` | Menu choice: follows the site's light or dark theme | Automatic (follows the site theme) | Auto | Auto | Follow the sun |
+| `styleLight` / `styleDark` | Menu choices | Light / Dark | Light / Dark | Light / Dark | Daylight / Night flight |
+| `styleColour` | Menu choice: the soft-colour map | Colour | Colour | Colour | Full colour |
+| `altitudeColours` | Menu switch: colour the route by altitude | Colour the route by altitude | Altitude colours | Altitude | Paint the climb |
 
 The "Drag to select" banner, "N selected", "Clear" and the edit-mode messages are existing copy and were not touched.
 

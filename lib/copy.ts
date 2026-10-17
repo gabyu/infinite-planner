@@ -40,6 +40,12 @@ export const copy = {
     zoomToDeparture: "Zoom to departure", // PROVISIONAL
     zoomToArrival: "Zoom to arrival", // PROVISIONAL
     mapLoading: "Loading map...", // PROVISIONAL
+    mapStyle: "Map style", // PROVISIONAL
+    styleAuto: "Auto", // PROVISIONAL
+    styleLight: "Light", // PROVISIONAL
+    styleDark: "Dark", // PROVISIONAL
+    styleColour: "Colour", // PROVISIONAL
+    altitudeColours: "Altitude colours", // PROVISIONAL
 
     // Altitude strip
     altitudeHeading: "Altitude profile", // PROVISIONAL

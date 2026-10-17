@@ -3,8 +3,27 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import { Globe, Minus, PlaneLanding, PlaneTakeoff, Plus } from "lucide-react"
-import { setBasemap } from "@/lib/map-tiles"
+import { Globe, Layers, Minus, PlaneLanding, PlaneTakeoff, Plus } from "lucide-react"
+import {
+  BASEMAP_CHOICES,
+  basemapTone,
+  loadBasemapChoice,
+  resolveBasemap,
+  saveBasemapChoice,
+  setBasemap,
+  type BasemapChoice,
+} from "@/lib/map-tiles"
+import { altitudeBucket, hasAltitudeData } from "@/lib/route-render"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { copy } from "@/lib/copy"
 import { Lock, X } from "lucide-react"
 
@@ -79,6 +98,20 @@ export default function MapPreview({
   const [L, setL] = useState<any>(null)
   const [isMapReady, setIsMapReady] = useState(false)
   const [zoom, setZoom] = useState(2)
+  // What the person picked for the background (Auto follows the site theme) and whether the route is coloured
+  // by altitude. Both are remembered in the browser.
+  const [basemapChoice, setBasemapChoice] = useState<BasemapChoice>("auto")
+  const [altColours, setAltColours] = useState(false)
+  const altLayerRef = useRef<any>(null)
+  useEffect(() => {
+    setBasemapChoice(loadBasemapChoice())
+    try {
+      setAltColours(window.localStorage.getItem("infinite-planner:alt-colours") === "1")
+    } catch {
+      // ignore
+    }
+  }, [])
+  const basemap = resolveBasemap(basemapChoice, isDark)
   const lastFitCountRef = useRef(0)
 
   // Handlers bound once on marker creation read the latest callbacks from here.
@@ -321,16 +354,18 @@ export default function MapPreview({
     map.on("zoomend", () => setZoom(map.getZoom()))
     chevronLayerRef.current = L.layerGroup().addTo(map)
     mapInstanceRef.current = map
-    setBasemap(L, map, isDark)
+    altLayerRef.current = L.layerGroup().addTo(map)
+    setBasemap(L, map, basemap)
     setZoom(map.getZoom())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [L, isMapReady])
 
-  // Light or dark basemap
+  // The chosen basemap
   useEffect(() => {
     if (!L || !mapInstanceRef.current) return
-    setBasemap(L, mapInstanceRef.current, isDark)
-  }, [L, isDark, isMapReady])
+    setBasemap(L, mapInstanceRef.current, basemap)
+  }, [L, basemap, isMapReady])
+
 
   // The route line: a casing under it so it reads on any background (tokens in globals.css).
   useEffect(() => {
@@ -355,6 +390,35 @@ export default function MapPreview({
       }).addTo(map)
     }
   }, [waypoints, L, isMapReady, zoom])
+
+  // Route coloured by altitude: the same 16-step ramp as the plan page and the globe (.alt-N in globals.css),
+  // drawn over the plain line, which is hidden while it is on.
+  useEffect(() => {
+    const layer = altLayerRef.current
+    if (!layer || !L) return
+    layer.clearLayers()
+    const on = altColours && hasAltitudeData(waypoints)
+    const base = routeLineRef.current?.getElement?.()
+    if (base) base.style.display = on ? "none" : ""
+    if (!on) return
+    let run: [number, number][] = []
+    let runBucket = -1
+    const flush = () => {
+      if (run.length > 1) L.polyline(run, { className: `alt-${runBucket}`, weight: 3, interactive: false }).addTo(layer)
+    }
+    for (let i = 1; i < waypoints.length; i++) {
+      const bucket = altitudeBucket((waypoints[i - 1].altitude + waypoints[i].altitude) / 2)
+      const a: [number, number] = [waypoints[i - 1].lat, waypoints[i - 1].lng]
+      const b: [number, number] = [waypoints[i].lat, waypoints[i].lng]
+      if (bucket !== runBucket) {
+        flush()
+        run = [a]
+        runBucket = bucket
+      }
+      run.push(b)
+    }
+    flush()
+  }, [waypoints, altColours, L, isMapReady])
 
   // Fit the route when a plan appears or its length changes (not while the person is editing it).
   const fitRoute = useCallback(() => {
@@ -741,7 +805,7 @@ export default function MapPreview({
     "flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
 
   return (
-    <div className="relative h-full w-full">
+    <div className="ip-map relative h-full w-full" data-basemap={basemapTone(basemap)}>
       <div ref={mapRef} className="h-full w-full" />
 
       {/* Select mode status banner - explains the locked pan/zoom and current selection */}
@@ -776,6 +840,43 @@ export default function MapPreview({
             <button type="button" className={toolButton} onClick={() => fitRoute()} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
               <Globe className="h-4 w-4" />
             </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={toolButton} title={copy.editor.mapStyle} aria-label={copy.editor.mapStyle}>
+                  <Layers className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="z-[1100] w-52">
+                <DropdownMenuLabel>{copy.editor.mapStyle}</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={basemapChoice}
+                  onValueChange={(value) => {
+                    setBasemapChoice(value as BasemapChoice)
+                    saveBasemapChoice(value as BasemapChoice)
+                  }}
+                >
+                  {BASEMAP_CHOICES.map((choice) => (
+                    <DropdownMenuRadioItem key={choice} value={choice}>
+                      {{ auto: copy.editor.styleAuto, light: copy.editor.styleLight, dark: copy.editor.styleDark, colour: copy.editor.styleColour }[choice]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={altColours}
+                  onCheckedChange={(checked) => {
+                    setAltColours(!!checked)
+                    try {
+                      window.localStorage.setItem("infinite-planner:alt-colours", checked ? "1" : "0")
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  {copy.editor.altitudeColours}
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button type="button" className={toolButton} onClick={() => mapInstanceRef.current?.zoomIn()} title={copy.editor.zoomIn} aria-label={copy.editor.zoomIn}>
               <Plus className="h-4 w-4" />
             </button>
