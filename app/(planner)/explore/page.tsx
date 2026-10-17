@@ -106,8 +106,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Sear
       {prelaunch && <PrelaunchBanner />}
       <div className="container mx-auto max-w-6xl px-4 pb-24 pt-8 sm:pt-12">
         <header className="border-b pb-8">
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{BRAND_NAME} · The library</p>
-          <h1 className="mt-3 font-display text-[clamp(3rem,9vw,7rem)] font-semibold leading-[0.95] tracking-[-0.04em]">
+          <h1 className="font-display text-[clamp(3rem,9vw,7rem)] font-semibold leading-[0.95] tracking-[-0.04em]">
             {LIBRARY_NAME}
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-muted-foreground">
