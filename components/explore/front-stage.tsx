@@ -187,17 +187,22 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
 
   if (!item) return null
 
+  // One box for the stage and its list, so it reads as one thing; it lifts a little on hover like the other cards.
   return (
-    <div ref={rootRef} className="grid gap-8 lg:grid-cols-12" aria-label="Featured flight plans">
+    <div
+      ref={rootRef}
+      className="grid gap-8 rounded-[2rem] bg-card p-4 ring-1 ring-border transition-shadow duration-200 hover:shadow-lg motion-reduce:transition-none sm:p-5 lg:grid-cols-12 lg:gap-10"
+      aria-label="Featured flight plans"
+    >
       <div className="lg:col-span-8">
         <article
-          className="group relative overflow-hidden rounded-[2rem] bg-card p-4 ring-1 ring-border sm:p-5"
+          className="group relative"
           onPointerEnter={() => {
             arrivedRef.current = performance.now()
           }}
         >
           {/* The whole card opens the plan (the button below stays the accessible link): what looks clickable is. */}
-          <Link href={item.href} tabIndex={-1} aria-hidden className="absolute inset-0 z-10 rounded-[2rem]" />
+          <Link href={item.href} tabIndex={-1} aria-hidden className="absolute inset-0 z-10 rounded-2xl" />
           {/* The picture: the plain SVG is in the HTML, the canvas takes over once it is drawing. */}
           <div ref={frameRef} className="relative aspect-[760/360] w-full overflow-hidden rounded-2xl bg-muted/50">
             <div className={cn("transition-opacity duration-300", ready && "opacity-0")}>
@@ -257,8 +262,8 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
         <h2 id="front-list" className="mb-5 border-t-2 border-foreground pt-3 text-xs font-semibold uppercase tracking-[0.16em]">
           On the front
         </h2>
-        {/* The plans are tabs of one folder: a single bordered block, the current one inverted. */}
-        <ol className="flex overflow-x-auto rounded-2xl ring-1 ring-border lg:block lg:overflow-hidden">
+        {/* The plans are tabs on hairlines, no frame of their own: the current one is tinted. */}
+        <ol className="flex overflow-x-auto border-y border-border lg:block lg:overflow-hidden">
           {items.map((entry, index) => (
             <li key={entry.id} className="relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:border-t lg:first:border-t-0">
               <a
