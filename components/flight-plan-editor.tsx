@@ -1636,12 +1636,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
               toolbarLeading={toolbar}
             />
           }
-          strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} />}
+          strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} stats={stats} />}
           header={
-            <div className="px-4 py-2.5">
+            <div className="px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                  <p className="font-mono text-base font-medium text-primary">
+                  <p className="font-mono text-xl font-semibold text-primary">
                     {originAirport || "ORIG"}
                     <RouteArrow />
                     {destinationAirport || "DEST"}
@@ -1649,14 +1649,17 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {flightSummary}
                 </div>
               </div>
-              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-                {stats.map((stat) => (
-                  <div key={stat.label}>
-                    <dt className="studio-label">{stat.label}</dt>
-                    <dd className="font-mono text-sm">{stat.value}</dd>
-                  </div>
-                ))}
-              </dl>
+              {/* On a phone there is no bar under the map, so the figures stay here */}
+              {isMobile && (
+                <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+                  {stats.map((stat) => (
+                    <div key={stat.label}>
+                      <dt className="studio-label">{stat.label}</dt>
+                      <dd className="font-mono text-sm">{stat.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </div>
           }
           body={
