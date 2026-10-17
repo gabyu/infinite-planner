@@ -260,9 +260,17 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
 
       <aside className="lg:col-span-4" aria-label="On the front">
         {/* The plans are tabs on hairlines, no frame of their own: the current one is tinted. */}
-        <ol className="flex overflow-x-auto border-y border-border lg:block lg:overflow-hidden">
+        <ol className="flex overflow-x-auto border-y border-border lg:block lg:overflow-hidden lg:border-y-0">
           {items.map((entry, index) => (
-            <li key={entry.id} className="relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:border-t lg:px-2 lg:py-1.5 lg:first:border-t-0">
+            <li
+              key={entry.id}
+              className={cn(
+                "relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:px-2 lg:py-1.5",
+                // On a desktop the dividers sit between the plans and line up with the tinted block (same inset), so the
+                // lines and the rounded active / hover shape share the same edges.
+                index > 0 && "lg:before:absolute lg:before:inset-x-2 lg:before:top-0 lg:before:h-px lg:before:bg-border",
+              )}
+            >
               <a
                 href={entry.href}
                 aria-current={index === active ? "true" : undefined}
