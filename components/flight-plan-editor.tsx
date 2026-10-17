@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Pencil,
   ChevronLeft,
+  ChevronDown,
   HelpCircle,
   LassoSelect,
   AlertCircle,
@@ -1593,7 +1594,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           }
           strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} />}
           header={
-            <div className="px-4 py-3">
+            <div className="px-4 py-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="font-mono text-base font-medium text-primary">
@@ -1604,7 +1605,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {flightSummary}
                 </div>
               </div>
-              <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
                 {stats.map((stat) => (
                   <div key={stat.label}>
                     <dt className="studio-label">{stat.label}</dt>
@@ -1617,10 +1618,21 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           body={
             <>
               {hasAlerts && (
-                <div className="shrink-0 px-4 pt-3">
-                  {alerts}
+                <div className="shrink-0 space-y-1.5 px-4 pt-3">
+                  {error && (
+                    <p className="flex items-start gap-1.5 text-xs text-destructive">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      {error}
+                    </p>
+                  )}
+                  {successMessage && (
+                    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      {successMessage}
+                    </p>
+                  )}
                   {simplificationInfo && (
-                    <details className="mb-3 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                    <details className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
                       <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
                         <Info className="h-3.5 w-3.5 text-primary" />
                         Waypoint simplification applied
@@ -1645,14 +1657,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 </div>
               )}
 
-              {canSave && (
-                <div className="shrink-0 border-b">
-                  {flightNumberSection(false)}
-                  {flightTimeSection(false)}
-                </div>
-              )}
-
-              <div className="flex min-h-[240px] flex-1 flex-col">
+              <div className="flex min-h-[200px] flex-1 flex-col pt-2">
                 <WaypointList
                   waypoints={waypoints}
                   isLoading={isLoading}
@@ -1669,18 +1674,48 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 />
               </div>
 
-              <div className="shrink-0 border-t">
-                {brandingSection(false)}
-                <details className="group border-b">
-                  <summary className="studio-label cursor-pointer list-none px-4 py-3 hover:text-foreground">
-                    {copy.editor.namesHeading}
-                  </summary>
+              {/* Options: closed, but clearly a row you open (label, a hint of what is inside, a chevron) */}
+              <details className="group shrink-0 border-t">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
+                  <span className="font-medium">{copy.editor.optionsHeading}</span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground group-open:hidden">
+                    {copy.editor.optionsHint}
+                  </span>
+                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="border-t">
+                  {flightNumberSection(false)}
+                  {flightTimeSection(false)}
                   {optionsContent}
-                </details>
+                </div>
+              </details>
+
+              <div className="flex shrink-0 items-center gap-2.5 border-t px-4 py-2.5">
+                <Checkbox
+                  id="include-branding"
+                  checked={includeBranding && brandingAvailable}
+                  disabled={!brandingAvailable}
+                  onCheckedChange={(checked) => handleBrandingChange(!!checked)}
+                />
+                <Label htmlFor="include-branding" className="text-sm font-normal">
+                  Add &ldquo;Made with Infinite Planner&rdquo;
+                </Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <p>
+                      {brandingAvailable
+                        ? "Names the last four waypoints before the destination MADE, WITH, INFINITE and PLANNER. Untick it to leave them out."
+                        : `Needs at least ${BRANDING_MIN_WAYPOINTS} waypoints, so it isn't applied to this plan.`}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </>
           }
-          footer={<div className="p-4">{exportButtons}</div>}
+          footer={<div className="px-4 py-3">{exportButtons}</div>}
         />
         <Toaster />
       </TooltipProvider>

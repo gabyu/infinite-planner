@@ -24,7 +24,8 @@ export const copy = {
     waypointLatitude: "Latitude", // PROVISIONAL
     waypointLongitude: "Longitude", // PROVISIONAL
     waypointLimit: "Over the 250 waypoint limit", // PROVISIONAL
-    namesHeading: "Names", // PROVISIONAL
+    optionsHeading: "Options", // PROVISIONAL
+    optionsHint: "Flight number, flight time, names", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
 
     // Map toolbar

@@ -25,7 +25,7 @@ interface AltitudeStripProps {
 const FRAME = { width: 1000, height: 100, pad: 6 }
 
 export function AltitudeStrip({ waypoints, hoveredId, onHover }: AltitudeStripProps) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const profile = altitudeProfile(waypoints, FRAME)
   const hasData = hasAltitudeData(waypoints)
   const hoveredIndex = hoveredId ? waypoints.findIndex((wp) => wp.id === hoveredId) : -1

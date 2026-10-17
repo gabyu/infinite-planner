@@ -466,7 +466,7 @@ export default function MapPreview({
 
       const html = isAirport
         ? `<div class="ip-airport ${waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
-        : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : hovered ? " ip-dot--hover" : ""}"></div>`
+        : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : ""}"></div>`
       const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${waypoint.altitude.toLocaleString("en-US")} ft` : ""}`
 
       let marker = markersRef.current.get(waypoint.id)
@@ -509,6 +509,8 @@ export default function MapPreview({
       } else {
         marker.setLatLng([waypoint.lat, waypoint.lng])
         if (marker._ipHtml !== html) {
+          // A new element replaces the old one: close its tooltip, or it would stay open with no mouseout to end it.
+          marker.closeTooltip()
           marker.setIcon(L.divIcon({ className: "ip-marker", iconSize: [0, 0], html }))
           marker._ipHtml = html
         }
@@ -530,11 +532,19 @@ export default function MapPreview({
       }
 
       if (show && !map.hasLayer(marker)) marker.addTo(map)
-      else if (!show && map.hasLayer(marker)) map.removeLayer(marker)
+      else if (!show && map.hasLayer(marker)) {
+        marker.closeTooltip()
+        map.removeLayer(marker)
+      }
+
+      // Hover is a class on the live element (not part of the icon), so the element under the pointer is never replaced.
+      const dot = marker.getElement()?.querySelector(".ip-dot")
+      if (dot) dot.classList.toggle("ip-dot--hover", hovered && !waypoint.selected)
     })
 
     markersRef.current.forEach((marker, id) => {
       if (!currentIds.has(id)) {
+        marker.closeTooltip()
         map.removeLayer(marker)
         markersRef.current.delete(id)
       }
