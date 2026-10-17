@@ -61,6 +61,7 @@ import { distanceNm, formatAltitude, formatDistanceNm } from "@/lib/route-render
 import { EditorWorkspace } from "@/components/editor/workspace"
 import { WaypointList } from "@/components/editor/waypoint-list"
 import { AltitudeStrip } from "@/components/editor/altitude-strip"
+import { SourceMark } from "@/components/editor/source-mark"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -1311,7 +1312,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // Where the plan came from and the flight number its filename carried (Convert only).
   const flightSummary =
     mode === "import" && importSource ? (
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {detectedFlightNumber ? (
           <span className="rounded border bg-muted/50 px-1.5 py-0.5 font-mono text-foreground">
             {detectedFlightNumber}
@@ -1319,7 +1320,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         ) : (
           <span>No flight number in the file name{canSave ? ": you can add one below" : ""}</span>
         )}
-        <span>{importSource}</span>
+        <SourceMark source={importSource} />
       </div>
     ) : null
 
@@ -1592,7 +1593,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           header={
             <div className="px-4 py-3">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="font-mono text-base font-medium text-primary">
                     {originAirport || "ORIG"}
                     <RouteArrow />
