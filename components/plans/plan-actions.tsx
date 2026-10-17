@@ -153,8 +153,7 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
                 destination={destination}
                 flightNumber={flightNumber}
                 share={share}
-                featured={featured}
-                onFeaturedChange={setFeatured}
+                layout="inline"
                 onShareChange={(next) => {
                   setShare(next)
                   // A private plan has no page any more.

@@ -5,6 +5,8 @@
  * production build runs it.
  */
 
+import { LIBRARY_NAV_LABEL } from "@/lib/brand"
+
 export const copy = {
   editor: {
     // Panel
@@ -94,4 +96,13 @@ export function trimRemovedText(count: number) {
 /** "Altitude profile: cruises at FL370 over 5,420 NM" for the screen reader label of the strip. */
 export function altitudeLabel(cruise: string, distance: string) {
   return `Altitude profile: cruises at ${cruise} over ${distance}` // PROVISIONAL
+}
+
+/** The visibility switch (editor, plan page, dashboard): the label says what the switch does, it sits on the left. */
+export const visibilityCopy = {
+  label: `Publish on ${LIBRARY_NAV_LABEL}`, // PROVISIONAL
+  helperPrivate: "Only you can see this plan.", // PROVISIONAL
+  helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`, // PROVISIONAL
+  copyLink: "Copy link", // PROVISIONAL
+  copied: "Link copied", // PROVISIONAL
 }

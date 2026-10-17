@@ -104,3 +104,18 @@ Existing strings the new layout still shows are untouched: "Made with", "Flight 
 | `flightNumberPlaceholder` | Empty field | e.g. AF69 | e.g. AF69 | AF69 | e.g. AF69 |
 | `flightNumberAddPlaceholder` | Field once there is a number | Add a codeshare | Add another | Add | And its codeshares... |
 | `flightNumbersHelp` | Help tooltip next to the title | Optional. Read from the file name when it carries one. Enter the other numbers this flight operates under, confirming each with Enter. The first is the primary number. Letters and digits, up to 12 characters each, at most 6. Saved with the plan. | Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan. | Optional. Press Enter after each number. First = main. Up to 6, letters and digits. | Same flight, several names? Add the codeshares and press Enter: the first is the star of the show. |
+
+## Visibility switch (editor footer, plan page, dashboard)
+
+The label says what the switch does and sits on the left; the switch is always on the right. One sentence under it says the current state, and "Copy link" sits at the end of that same line once the plan is public, so nothing moves. Keep the two sentences short enough to share a line with "Copy link" in the 328 px panel (about 32 characters).
+
+| Key | Where / when | Serious | Calm (current) | Short | Fun |
+|---|---|---|---|---|---|
+| `label` | Next to the switch | Publish on Explore | Publish on Explore | Share on Explore | Put it on the map (Explore) |
+| `helperPrivate` | Under the label, switch off | Visible only to you | Only you can see this plan. | Only you | Just between us |
+| `helperPublic` | Under the label, switch on | Visible to everyone on Explore | Everyone can see it on Explore. | Public on Explore | The whole hangar can see it |
+| `copyLink` | End of that line, once public | Copy the link | Copy link | Copy | Grab the link |
+| `copied` | Same, for 2 seconds after copying | Link copied to the clipboard | Link copied | Copied | Link on board |
+
+Removed from this place: the star ("feature on my profile"). It stays in the dashboard row menu.
+Existing and untouched: the consent dialog on the first publication, and the error messages.

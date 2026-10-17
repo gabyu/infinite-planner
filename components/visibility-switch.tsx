@@ -1,12 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Check, Link2, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import type { PlanShare, PlanVisibility } from "@/lib/flight-plans"
 import { planPath } from "@/lib/plan-slug"
+import { visibilityCopy } from "@/lib/copy"
 import { cn } from "@/lib/utils"
 
 interface VisibilitySwitchProps {
@@ -17,11 +17,10 @@ interface VisibilitySwitchProps {
   share: PlanShare
   // Called with the new state once the server has applied it.
   onShareChange: (share: PlanShare) => void
-  // Shown first on the author's profile (offered while the plan is public).
-  featured?: boolean
-  onFeaturedChange?: (featured: boolean) => void
-  // The copy-link and feature buttons next to the switch. The dashboard puts them in the row's menu instead.
-  showExtras?: boolean
+  // "field": the label and the switch on one line, a sentence under them that says what the switch does now, and
+  // "Copy link" at the end of that sentence once public. "inline": just the label and the switch (table rows and
+  // the plan page, where the link and the sentence are elsewhere).
+  layout?: "field" | "inline"
   disabled?: boolean
   disabledReason?: string
   className?: string
@@ -38,9 +37,7 @@ export function VisibilitySwitch({
   flightNumber,
   share,
   onShareChange,
-  featured = false,
-  onFeaturedChange,
-  showExtras = true,
+  layout = "field",
   disabled,
   disabledReason,
   className,
@@ -93,20 +90,6 @@ export function VisibilitySwitch({
     await choose("public")
   }
 
-  async function toggleFeatured() {
-    setBusy(true)
-    setError(null)
-    const response = await fetch(`/api/plans/${planId}/featured`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ featured: !featured }),
-    }).catch(() => null)
-    const body = await response?.json().catch(() => null)
-    setBusy(false)
-    if (!response?.ok) return setError(body?.error ?? "Couldn't update your profile. Please try again.")
-    onFeaturedChange?.(!featured)
-  }
-
   async function copy() {
     try {
       await navigator.clipboard.writeText(link)
@@ -117,37 +100,41 @@ export function VisibilitySwitch({
     }
   }
 
-  return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)} title={disabled ? disabledReason : undefined}>
-      <Switch
-        checked={isPublic}
-        disabled={disabled || busy}
-        onCheckedChange={(checked) => choose(checked ? "public" : "private")}
-        aria-label={`Visibility of ${from} to ${to}: ${isPublic ? "public" : "private"}`}
-      />
-      <span className="text-sm">{isPublic ? "Public" : "Private"}</span>
+  const t = visibilityCopy
+  const helper = disabled && disabledReason ? disabledReason : isPublic ? t.helperPublic : t.helperPrivate
 
-      {showExtras && isPublic && link && (
-        <>
-          <Button variant="ghost" size="icon" onClick={copy} title="Copy the link" aria-label="Copy the link">
-            {copied ? <Check /> : <Link2 />}
-          </Button>
-          {onFeaturedChange && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleFeatured}
-              disabled={busy}
-              aria-pressed={featured}
-              title={featured ? "Remove from my profile's featured plans" : "Feature on my profile"}
-              aria-label={featured ? "Remove from featured" : "Feature on my profile"}
+  return (
+    <div className={cn(layout === "field" ? "w-full" : "flex flex-wrap items-center gap-2", className)}>
+      {/* The label says what turning the switch on does; the switch is always on the right, in the same place. */}
+      <div className={cn("flex items-center gap-3", layout === "field" && "justify-between")}>
+        <label htmlFor={`visibility-${planId}`} className="text-sm font-medium">
+          {t.label}
+        </label>
+        <Switch
+          id={`visibility-${planId}`}
+          checked={isPublic}
+          disabled={disabled || busy}
+          onCheckedChange={(checked) => choose(checked ? "public" : "private")}
+          aria-describedby={layout === "field" ? `visibility-help-${planId}` : undefined}
+        />
+      </div>
+
+      {layout === "field" && (
+        // One line, always there, so the panel never moves when the plan goes public.
+        <div className="mt-1 flex min-h-[1.25rem] items-center justify-between gap-3 text-xs text-muted-foreground">
+          <span id={`visibility-help-${planId}`}>{helper}</span>
+          {isPublic && link && (
+            <button
+              type="button"
+              onClick={copy}
+              className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline"
             >
-              <Star className={cn(featured && "fill-primary text-primary")} />
-            </Button>
+              {copied ? t.copied : t.copyLink}
+            </button>
           )}
-        </>
+        </div>
       )}
-      {error && <span className="basis-full text-xs text-destructive">{error}</span>}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
 
       <Dialog open={askConsent} onOpenChange={setAskConsent}>
         <DialogContent className="max-w-sm">
