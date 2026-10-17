@@ -43,3 +43,4 @@ pnpm-workspace.yaml
 
 # local Claude Code dev-server launch config (machine-specific)
 .claude/
+*.local.sql
