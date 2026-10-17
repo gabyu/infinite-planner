@@ -93,6 +93,17 @@
   }
 }
 
+/* Radix locks the page scroll while a menu or dialog is open and pads the body by the scrollbar's width so
+   nothing jumps. The scrollbar gutter above is already always reserved, so that padding would double up and
+   shift the whole page; switch the compensation off. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+html body[data-scroll-locked] .right-scroll-bar-position {
+  right: 0 !important;
+}
+
 /* Added high-contrast dark mode filter for map tiles */
 .dark-map-tiles {
   /* Updated filter for "High Detail Blue HUD": invert standard OSM to black, rotate hue to blue, boost brightness/contrast */
