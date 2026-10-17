@@ -414,6 +414,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         flightNumber={plan.flight_number}
                         share={shareOf(plan)}
                         layout="inline"
+                        short
                         onShareChange={(share) =>
                           patchPlan(plan.id, {
                             visibility: share.visibility,

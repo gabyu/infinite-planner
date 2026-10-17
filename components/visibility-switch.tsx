@@ -21,6 +21,8 @@ interface VisibilitySwitchProps {
   // "Copy link" at the end of that sentence once public. "inline": just the label and the switch (table rows and
   // the plan page, where the link and the sentence are elsewhere).
   layout?: "field" | "inline"
+  // A shorter label where the column already says "Visibility" (the dashboard table).
+  short?: boolean
   disabled?: boolean
   disabledReason?: string
   className?: string
@@ -38,6 +40,7 @@ export function VisibilitySwitch({
   share,
   onShareChange,
   layout = "field",
+  short = false,
   disabled,
   disabledReason,
   className,
@@ -107,8 +110,8 @@ export function VisibilitySwitch({
     <div className={cn(layout === "field" ? "w-full" : "flex flex-wrap items-center gap-2", className)}>
       {/* The label says what turning the switch on does; the switch is always on the right, in the same place. */}
       <div className={cn("flex items-center gap-3", layout === "field" && "justify-between")}>
-        <label htmlFor={`visibility-${planId}`} className="text-sm font-medium">
-          {t.label}
+        <label htmlFor={`visibility-${planId}`} className="whitespace-nowrap text-sm font-medium">
+          {short ? t.labelShort : t.label}
         </label>
         <Switch
           id={`visibility-${planId}`}

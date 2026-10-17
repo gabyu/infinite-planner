@@ -112,6 +112,7 @@ The label says what the switch does and sits on the left; the switch is always o
 | Key | Where / when | Serious | Calm (current) | Short | Fun |
 |---|---|---|---|---|---|
 | `label` | Next to the switch | Publish on Explore | Publish on Explore | Share on Explore | Put it on the map (Explore) |
+| `labelShort` | Dashboard table only (the column is already titled Visibility) | Public | Public | Public | On the map |
 | `helperPrivate` | Under the label, switch off | Visible only to you | Only you can see this plan. | Only you | Just between us |
 | `helperPublic` | Under the label, switch on | Visible to everyone on Explore | Everyone can see it on Explore. | Public on Explore | The whole hangar can see it |
 | `copyLink` | End of that line, once public | Copy the link | Copy link | Copy | Grab the link |
