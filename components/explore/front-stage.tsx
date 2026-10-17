@@ -262,7 +262,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
         {/* The plans are tabs on hairlines, no frame of their own: the current one is tinted. */}
         <ol className="flex overflow-x-auto border-y border-border lg:block lg:overflow-hidden">
           {items.map((entry, index) => (
-            <li key={entry.id} className="relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:border-t lg:first:border-t-0">
+            <li key={entry.id} className="relative min-w-[15rem] shrink-0 border-l border-border first:border-l-0 lg:min-w-0 lg:border-l-0 lg:border-t lg:px-2 lg:py-1.5 lg:first:border-t-0">
               <a
                 href={entry.href}
                 aria-current={index === active ? "true" : undefined}
@@ -275,7 +275,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   select(index)
                 }}
                 className={cn(
-                  "flex items-baseline gap-4 px-4 py-4 no-underline transition-colors motion-reduce:transition-none",
+                  "flex items-baseline gap-4 px-4 py-4 no-underline transition-colors motion-reduce:transition-none lg:rounded-xl lg:py-5",
                   index === active ? "bg-primary/15 text-primary" : "hover:bg-muted/60",
                 )}
               >
@@ -291,7 +291,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
                   <span className={cn("mt-1 block truncate font-mono text-xs", index === active ? "text-primary/70" : "text-muted-foreground")}>{entry.facts || `${entry.codeFrom} · ${entry.codeTo}`}</span>
                 </span>
               </a>
-              <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] bg-transparent">
+              <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-transparent lg:inset-x-6 lg:bottom-3 lg:rounded-full">
                 <span
                   ref={(el) => {
                     barRefs.current[index] = el
