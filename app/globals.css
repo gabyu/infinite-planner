@@ -104,13 +104,6 @@ html body[data-scroll-locked] .right-scroll-bar-position {
   right: 0 !important;
 }
 
-/* Added high-contrast dark mode filter for map tiles */
-.dark-map-tiles {
-  /* Updated filter for "High Detail Blue HUD": invert standard OSM to black, rotate hue to blue, boost brightness/contrast */
-  filter: invert(100%) hue-rotate(180deg) brightness(1.1) contrast(130%) saturate(200%);
-  transition: filter 0.3s ease-in-out;
-}
-
 /*
  * Admin dashboard theme: neutral Supabase-Studio-like surfaces (the layout and density, not its colour) with Infinite Planner's blue accent.
  * Scoped to .admin-theme (set on the dashboard wrapper AND on <body> by AdminThemeScope,

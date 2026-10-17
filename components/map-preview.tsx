@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
+import { setBasemap } from "@/lib/map-tiles"
 import { Button } from "@/components/ui/button"
 import { Lock, X } from "lucide-react"
 
@@ -288,18 +289,7 @@ export default function MapPreview({
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = L.map(mapRef.current).setView([0, 0], 2)
 
-      // Use a dark theme map if in dark mode
-      const tileLayer = isDark
-        ? L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19,
-            className: "dark-map-tiles",
-          })
-        : L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          })
-
-      tileLayer.addTo(mapInstanceRef.current)
+      setBasemap(L, mapInstanceRef.current, isDark)
 
       // Add legend only once during initial map setup
       const legend = L.control({ position: "bottomright" })
@@ -338,47 +328,8 @@ export default function MapPreview({
     const map = mapInstanceRef.current
     if (!map) return
 
-    // Update tile layer based on theme
-    // If we are in dark mode but don't have the dark tiles (or we have the old CartoDB ones)
-    if (isDark) {
-      // Remove any existing layers to be safe
-      map.eachLayer((layer: any) => {
-        if (layer instanceof L.TileLayer) {
-          map.removeLayer(layer)
-        }
-      })
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-        className: "dark-map-tiles",
-      }).addTo(map)
-    } else if (!isDark) {
-      // If we are in light mode, ensure we use standard tiles without class
-      map.eachLayer((layer: any) => {
-        if (layer instanceof L.TileLayer) {
-          const options = layer.options as any
-          // If it has the dark class, remove it
-          if (options.className === "dark-map-tiles") {
-            map.removeLayer(layer)
-          }
-        }
-      })
-
-      // Check if we already have a clean tile layer
-      let hasLightLayer = false
-      map.eachLayer((layer: any) => {
-        if (layer instanceof L.TileLayer && !layer.options.className) {
-          hasLightLayer = true
-        }
-      })
-
-      if (!hasLightLayer) {
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(map)
-      }
-    }
+    // Keep the basemap in sync with the theme
+    setBasemap(L, map, isDark)
 
     // Update polyline
     const routePoints = waypoints.map((wp) => [wp.lat, wp.lng] as [number, number])

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
+import { setBasemap } from "@/lib/map-tiles"
 import { sampleCubicBezier } from "@/lib/bezier"
 
 interface LatLngPoint {
@@ -150,16 +151,7 @@ export default function DrawMap({
 
     const map = mapInstanceRef.current
 
-    const tileLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      className: isDark ? "dark-map-tiles" : "",
-    })
-
-    map.eachLayer((layer: any) => {
-      if (layer instanceof L.TileLayer) map.removeLayer(layer)
-    })
-    tileLayer.addTo(map)
+    setBasemap(L, map, isDark)
   }, [L, isMapReady, isDark])
 
   // Canvas navigation belongs to the Select tool only - Line/Pen reserve
