@@ -592,3 +592,16 @@ html body[data-scroll-locked] .right-scroll-bar-position {
 .dark .ip-map[data-basemap="light"] .alt-14 { stroke: #9732e1; }
 .ip-map[data-basemap="dark"] .alt-15 { stroke: #c27bfa; }
 .dark .ip-map[data-basemap="light"] .alt-15 { stroke: #a22fe0; }
+
+/* Ground trimming preview: the waypoints that would be removed turn grey, and their stretch of route goes dashed. */
+.ip-map .ip-dot--ghost {
+  background: hsl(var(--route-ghost));
+}
+.ip-map .ip-airport--ghost {
+  background: hsl(var(--route-ghost));
+}
+.ip-map .ip-route-ghost {
+  stroke: hsl(var(--route-ghost));
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+}

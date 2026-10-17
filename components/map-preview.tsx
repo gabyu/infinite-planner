@@ -52,6 +52,11 @@ export interface MapPreviewProps {
   onWaypointClick?: (id: string) => void
   /** The editing buttons (Edit waypoints, Select points...), stacked at the top right above the zoom tools. */
   toolbarLeading?: React.ReactNode
+  /** Waypoints a ground trim would remove (preview): drawn grey, with their stretch of route dashed. */
+  ghostIds?: Set<string>
+  /** Zoom to these waypoints (and the kept ones next to them). A new `nonce` asks again. The view then stays where it is
+   *  (no refit when the plan changes) until "Fit route" is pressed. */
+  focus?: { ids: string[]; nonce: number } | null
 }
 
 const escapeHtml = (text: string) =>
@@ -81,6 +86,8 @@ export default function MapPreview({
   onHoverWaypoint,
   onWaypointClick,
   toolbarLeading,
+  ghostIds,
+  focus,
 }: MapPreviewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -113,6 +120,8 @@ export default function MapPreview({
   }, [])
   const basemap = resolveBasemap(basemapChoice, isDark)
   const lastFitCountRef = useRef(0)
+  // Set when the editor zoomed somewhere on purpose (a ground trim): the route is not refitted behind its back.
+  const viewLockedRef = useRef(false)
 
   // Handlers bound once on marker creation read the latest callbacks from here.
   const callbacksRef = useRef({ onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd })
@@ -420,6 +429,51 @@ export default function MapPreview({
     flush()
   }, [waypoints, altColours, L, isMapReady])
 
+  // Ground trim preview: each run of waypoints to be removed, plus the kept point next to it, as a dashed grey line.
+  const ghostLayerRef = useRef<any>(null)
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L) return
+    if (!ghostLayerRef.current) ghostLayerRef.current = L.layerGroup().addTo(map)
+    const layer = ghostLayerRef.current
+    layer.clearLayers()
+    if (!ghostIds || ghostIds.size === 0) return
+    let i = 0
+    while (i < waypoints.length) {
+      if (!ghostIds.has(waypoints[i].id)) {
+        i++
+        continue
+      }
+      let j = i
+      while (j + 1 < waypoints.length && ghostIds.has(waypoints[j + 1].id)) j++
+      const from = Math.max(0, i - 1)
+      const to = Math.min(waypoints.length - 1, j + 1)
+      const points = waypoints.slice(from, to + 1).map((wp) => [wp.lat, wp.lng] as [number, number])
+      L.polyline(points, { className: "ip-route-casing", weight: 6, interactive: false }).addTo(layer)
+      L.polyline(points, { className: "ip-route-ghost", weight: 3, interactive: false }).addTo(layer)
+      i = j + 1
+    }
+  }, [waypoints, ghostIds, L, isMapReady])
+
+  // Zoom to the waypoints of a ground trim (and the kept one beside them), like the Departure / Arrival buttons do.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !focus || focus.ids.length === 0) return
+    const wanted = new Set(focus.ids)
+    const indices = waypoints.map((wp, i) => (wanted.has(wp.id) ? i : -1)).filter((i) => i >= 0)
+    if (indices.length === 0) return
+    const from = Math.max(0, indices[0] - 1)
+    const to = Math.min(waypoints.length - 1, indices[indices.length - 1] + 1)
+    const phone = window.innerWidth < 1024
+    viewLockedRef.current = true
+    map.fitBounds(L.latLngBounds(waypoints.slice(from, to + 1).map((wp) => [wp.lat, wp.lng])), {
+      paddingTopLeft: [phone ? 24 : 392, phone ? 80 : 64],
+      paddingBottomRight: [phone ? 24 : 80, phone ? 260 : 64],
+      maxZoom: 17,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce, L, isMapReady])
+
   // Fit the route when a plan appears or its length changes (not while the person is editing it).
   const fitRoute = useCallback(() => {
     const map = mapInstanceRef.current
@@ -437,6 +491,7 @@ export default function MapPreview({
     if (!isMapReady || !mapInstanceRef.current || isEditing) return
     if (lastFitCountRef.current === waypoints.length) return
     lastFitCountRef.current = waypoints.length
+    if (viewLockedRef.current) return
     fitRouteRef.current()
   }, [waypoints.length, isEditing, isMapReady, zoom])
 
@@ -528,9 +583,10 @@ export default function MapPreview({
       const hovered = waypoint.id === hoveredId
       const show = !thin || isAirport || waypoint.selected || hovered || index % step === 0
 
+      const ghost = !!ghostIds?.has(waypoint.id)
       const html = isAirport
-        ? `<div class="ip-airport ${waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
-        : `<div class="ip-dot${waypoint.selected ? " ip-dot--selected" : ""}"></div>`
+        ? `<div class="ip-airport ${ghost ? "ip-airport--ghost" : waypoint.selected ? "ip-airport--selected" : isFirst ? "ip-airport--departure" : "ip-airport--arrival"}">${escapeHtml(waypoint.name)}</div>`
+        : `<div class="ip-dot${ghost ? " ip-dot--ghost" : waypoint.selected ? " ip-dot--selected" : ""}"></div>`
       const tip = isAirport ? "" : `${escapeHtml(waypoint.name)}${waypoint.altitude > 0 ? ` · ${Math.round(waypoint.altitude)} ft` : ""}`
 
       let marker = markersRef.current.get(waypoint.id)
@@ -614,7 +670,7 @@ export default function MapPreview({
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, isEditing, selectMode, zoom, hoveredId, L, isMapReady])
+  }, [waypoints, isEditing, selectMode, zoom, hoveredId, ghostIds, L, isMapReady])
 
   // Lock panning and zooming while the user is selecting points, so a drag on
   // the map background can't be mistaken for a pan and pinch/scroll can't
@@ -837,7 +893,10 @@ export default function MapPreview({
         {toolbarLeading}
         {!selectMode && waypoints.length > 0 && (
           <div className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-md">
-            <button type="button" className={toolButton} onClick={() => fitRoute()} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
+            <button type="button" className={toolButton} onClick={() => {
+                viewLockedRef.current = false
+                fitRoute()
+              }} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
               <Globe className="h-4 w-4" />
             </button>
             <DropdownMenu>

@@ -1,4 +1,11 @@
-import { flightPlanBodySchema, flightPlanColumns, json, requireUser } from "@/lib/flight-plan-server"
+import {
+  flightPlanBodySchema,
+  flightPlanColumns,
+  isMissingExtraColumn,
+  json,
+  requireUser,
+  withoutExtraNumbers,
+} from "@/lib/flight-plan-server"
 import { MAX_FLIGHT_PLANS_PER_USER } from "@/lib/flight-plans"
 
 // Creates a flight plan for the signed-in user: the first autosave of a draft, or an export of a
@@ -18,11 +25,14 @@ export async function POST(request: Request) {
     return json({ error: `Your dashboard is full (${MAX_FLIGHT_PLANS_PER_USER} flight plans). Delete some to save more.` }, 409)
   }
 
-  const { data, error } = await supabase
-    .from("flight_plans")
-    .insert({ user_id: user.id, source: parsed.data.source, ...flightPlanColumns(parsed.data) })
-    .select("id, status, created_at")
-    .single()
+  const columns = flightPlanColumns(parsed.data)
+  const create = (values: object) =>
+    supabase.from("flight_plans").insert({ user_id: user.id, source: parsed.data.source, ...values }).select("id, status, created_at").single()
+  let { data, error } = await create(columns)
+  // A database without the extra_flight_numbers column yet: save the rest (nothing is lost with one number only).
+  if (isMissingExtraColumn(error) && columns.extra_flight_numbers.length === 0) {
+    ;({ data, error } = await create(withoutExtraNumbers(columns)))
+  }
 
   if (error || !data) {
     console.error("Saving a flight plan failed:", error?.message)

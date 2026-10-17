@@ -58,12 +58,17 @@ import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { copy } from "@/lib/copy"
+import { copy, trimPreviewText, trimRemovedText } from "@/lib/copy"
 import { distanceNm, formatAltitude, formatDistanceNm } from "@/lib/route-render"
 import { EditorWorkspace } from "@/components/editor/workspace"
 import { WaypointList } from "@/components/editor/waypoint-list"
 import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
+import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
+import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
+import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
+import { useToast } from "@/hooks/use-toast"
+import { ToastAction } from "@/components/ui/toast"
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const MapPreview = dynamic(() => import("@/components/map-preview-wrapper"), {
@@ -233,6 +238,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // What the person typed in the Flight number field (a codeshare, a callsign of their own...). undefined = untouched:
   // the number read from the file name (or saved with the draft) stands.
   const [flightNumberEdit, setFlightNumberEdit] = useState<string | undefined>(undefined)
+  // The other numbers of the flight (codeshares), next to the main one above. Saved with the plan.
+  const [extraFlightNumbers, setExtraFlightNumbers] = useState<string[]>([])
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -432,6 +439,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         resetSavedPlan()
         setFlightNumberOverride(null)
         setFlightNumberEdit(undefined)
+        setExtraFlightNumbers([])
         setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -536,6 +544,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // The flight number the plan carries: what was typed in the field when there is something, else the file's. It can be
   // changed until the plan is exported (a flight often has codeshare numbers), and cleared.
   const detectedFlightNumber = flightNumberEdit !== undefined ? flightNumberEdit || null : fileFlightNumber
+  const allFlightNumbers = [detectedFlightNumber, ...extraFlightNumbers].filter((n): n is string => !!n)
+  // The chips field edits the whole list: its first number is the main one, the rest are the extras.
+  const setAllFlightNumbers = (numbers: string[]) => {
+    setFlightNumberEdit(numbers[0] ?? "")
+    setExtraFlightNumbers(numbers.slice(1))
+  }
 
   const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
   const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
@@ -548,6 +562,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       JSON.stringify([
         planSource,
         detectedFlightNumber,
+        extraFlightNumbers,
         originAirport,
         destinationAirport,
         applyBrandingOverlay(waypoints, includeBranding).map(({ name, lat, lng, altitude }) => [
@@ -559,7 +574,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         effectiveBranding,
         flightTimeMinutes,
       ]),
-    [planSource, detectedFlightNumber, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
+    [planSource, detectedFlightNumber, extraFlightNumbers, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
   )
   const isDirty = savedFingerprint !== currentFingerprint
 
@@ -641,6 +656,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       source: planSource,
       status,
       flightNumber: detectedFlightNumber,
+      extraFlightNumbers,
       origin: originAirport,
       destination: destinationAirport,
       waypoints: finalWaypoints.map(({ name, lat, lng, altitude }) => ({ name, lat, lng, altitude })),
@@ -785,6 +801,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
+          setExtraFlightNumbers(Array.isArray(body.extra_flight_numbers) ? body.extra_flight_numbers : [])
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"
@@ -1267,6 +1284,103 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setWaypoints((prev) => applyBrandingOverlay(prev, checked))
   }
 
+
+  // --- Ground trimming (Convert, Options): preview what a trim would remove, then apply it as one undoable step.
+  const { toast } = useToast()
+  const [trimPreview, setTrimPreview] = useState<{ end: TrimEnd; ids: string[]; approximate: boolean } | null>(null)
+  const [trimBusy, setTrimBusy] = useState<TrimEnd | null>(null)
+  const [trimmed, setTrimmed] = useState<Record<TrimEnd, boolean>>({ departure: false, arrival: false })
+  const runwayCache = useRef(new Map<string, TrimAirport | null>())
+  // What each trim took away, so switching the toggle back on can put it back.
+  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
+  const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
+  const [panelTab, setPanelTab] = useState<"waypoints" | "options">("waypoints")
+  const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
+
+  const loadAirport = async (icao: string): Promise<TrimAirport | null> => {
+    if (runwayCache.current.has(icao)) return runwayCache.current.get(icao) ?? null
+    try {
+      const response = await fetch(`/api/airports/${icao}/runways`)
+      const data = response.ok ? ((await response.json()) as TrimAirport) : null
+      runwayCache.current.set(icao, data)
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  // The toggles are "on" while the ground movements are in the plan. Turning one off previews what goes (Apply
+  // removes it); turning a trimmed one back on puts the removed waypoints back.
+  const toggleTrimPreview = async (end: TrimEnd) => {
+    if (trimPreview?.end === end) {
+      setTrimPreview(null)
+      return
+    }
+    if (trimmed[end]) {
+      const back = trimRemoved.current[end] ?? []
+      delete trimRemoved.current[end]
+      setTrimmed((current) => ({ ...current, [end]: false }))
+      if (back.length > 0) {
+        const merged = end === "departure" ? [...back, ...waypoints] : [...waypoints, ...back]
+        setWaypoints(applyWaypointNamingRules(merged, originAirport, destinationAirport, includeBranding))
+      }
+      return
+    }
+    setTrimPreview(null)
+    setTrimBusy(end)
+    const icao = end === "departure" ? originAirport : destinationAirport
+    const known = await loadAirport(icao)
+    setTrimBusy(null)
+    // An airport without runway data still gets the fallback, around the plan's own end point.
+    const endPoint = end === "departure" ? waypoints[0] : waypoints[waypoints.length - 1]
+    const airport: TrimAirport = known ?? { elevationFt: null, lat: endPoint.lat, lng: endPoint.lng, runways: [] }
+    const result = planTrim(waypoints, airport, end)
+    if (result.remove.length === 0) {
+      toast({ title: copy.editor.trimNone })
+      return
+    }
+    setPanelTab("waypoints")
+    const ids = result.remove.map((index) => waypoints[index].id)
+    setTrimPreview({ end, ids, approximate: result.approximate })
+    // Straight to the waypoints that would go; the view stays there after Apply.
+    setMapFocus((current) => ({ ids, nonce: (current?.nonce ?? 0) + 1 }))
+  }
+
+  const applyTrim = () => {
+    if (!trimPreview) return
+    const { end, ids } = trimPreview
+    const remove = new Set(ids)
+    const kept = waypoints.filter((wp) => !remove.has(wp.id))
+    if (kept.length < 2) return
+    trimRemoved.current[end] = waypoints.filter((wp) => remove.has(wp.id))
+    const brandingDropped = includeBranding && waypoints.length >= BRANDING_MIN_WAYPOINTS && kept.length < BRANDING_MIN_WAYPOINTS
+    // One setWaypoints call = one undo step. The naming rules renumber what is left.
+    setWaypoints(applyWaypointNamingRules(kept.map((wp) => ({ ...wp, selected: false })), originAirport, destinationAirport, includeBranding))
+    setTrimmed((current) => ({ ...current, [end]: true }))
+    setTrimPreview(null)
+    toast({
+      title: trimRemovedText(ids.length),
+      description: brandingDropped ? copy.editor.trimBrandingNote : undefined,
+      action: (
+        <ToastAction
+          altText={copy.editor.trimUndo}
+          onClick={() => {
+            waypointsHistory.undo()
+            delete trimRemoved.current[end]
+            setTrimmed((current) => ({ ...current, [end]: false }))
+          }}
+        >
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
+  }
+
+  // Edits made while previewing can change what a trim would do: drop the preview.
+  useEffect(() => {
+    if (trimPreview && trimPreview.ids.some((id) => !waypoints.some((wp) => wp.id === id))) setTrimPreview(null)
+  }, [waypoints, trimPreview])
+
   const exportBlockReason =
     waypoints.length < 2
       ? "Add at least 2 waypoints to export."
@@ -1315,34 +1429,25 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       </PanelSection>
   )
 
-  const flightNumberSection = (inGrid: boolean) =>
-    canSave && (
+  const flightNumberSection = (inGrid: boolean, always = false) =>
+    (canSave || always) && (
         <PanelSection
-          label="Flight number"
+          label={copy.editor.flightNumbersLabel}
           className={inGrid ? exportSectionClass : undefined}
-          help={`Optional. Read from the file name when it carries one; change it if you fly the flight under another number (codeshares). Letters and digits, up to 12. Saved with the plan.`}
+          help={copy.editor.flightNumbersHelp}
         >
-          <Input
-            id="flight-number"
-            value={detectedFlightNumber ?? ""}
-            onChange={(e) => setFlightNumberEdit(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12))}
-            placeholder="e.g. AF69"
-            aria-label="Flight number"
-            autoComplete="off"
-            spellCheck={false}
-            className="h-8 w-full max-w-[9rem] font-mono"
-          />
+          <FlightNumbersField id="flight-number" value={allFlightNumbers} onChange={setAllFlightNumbers} />
         </PanelSection>
     )
 
-  const flightTimeSection = (inGrid: boolean) =>
-    canSave && (
+  const flightTimeSection = (inGrid: boolean, always = false) =>
+    (canSave || always) && (
         <PanelSection
           label="Flight time"
           className={inGrid ? exportSectionClass : undefined}
           help="Optional. How long the flight takes: saved with the plan in your dashboard."
         >
-          <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} />
+          <FlightTimeField idPrefix="flight-time" value={flightTimeMinutes} onChange={setFlightTimeMinutes} fill />
         </PanelSection>
     )
 
@@ -1631,6 +1736,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
               onWaypointsMarqueeSelect={handleMarqueeSelect}
               onClearSelection={handleClearMapSelection}
               hoveredId={hoveredId}
+              ghostIds={ghostIds}
+              focus={mapFocus}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}
@@ -1664,80 +1771,117 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           }
           body={
             <>
-              {hasAlerts && (
-                <div className="shrink-0 space-y-1.5 px-4 pt-3">
-                  {error && (
-                    <p className="flex items-start gap-1.5 text-xs text-destructive">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      {error}
-                    </p>
-                  )}
-                  {successMessage && (
-                    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                      <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                      {successMessage}
-                    </p>
-                  )}
-                  {simplificationInfo && (
-                    <details className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
-                      <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
-                        <Info className="h-3.5 w-3.5 text-primary" />
-                        Waypoint simplification applied
-                        <span className="ml-auto font-mono font-normal text-muted-foreground">
-                          {simplificationInfo.originalCount} → {simplificationInfo.simplifiedCount}
-                        </span>
-                      </summary>
-                      <div className="mt-2 space-y-0.5">
-                        <p>
-                          Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
-                          {simplificationInfo.source && (
-                            <>
-                              {" "}
-                              from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
-                            </>
-                          )}
-                        </p>
-                        <p>{simplificationInfo.reason}</p>
-                      </div>
-                    </details>
-                  )}
+              {/* One view at a time, so the middle of the panel scrolls once: the route's waypoints, or the options */}
+              <div className="shrink-0 px-4 pb-2 pt-2.5">
+                <div role="tablist" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                  {(
+                    [
+                      ["waypoints", `${copy.editor.tabWaypoints} · ${waypoints.length}`],
+                      ["options", copy.editor.optionsHeading],
+                    ] as const
+                  ).map(([tab, label]) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={panelTab === tab}
+                      onClick={() => setPanelTab(tab)}
+                      className={cn(
+                        "h-7 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        panelTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              <div className="flex min-h-[200px] flex-1 flex-col pt-2">
-                <WaypointList
-                  waypoints={waypoints}
-                  isLoading={isLoading}
-                  hoveredId={hoveredId}
-                  onHover={setHoveredId}
-                  scrollTarget={scrollTarget}
-                  onRowClick={handleRowClick}
-                  onUpdateWaypoint={updateWaypoint}
-                  onTabKeyNavigation={handleTabKeyNavigation}
-                  onInputFocus={handleInputFocus}
-                  onToggleSelectAll={toggleSelectAll}
-                  onDeleteSelected={deleteSelectedWaypoints}
-                  onClearAltitudes={clearSelectedAltitudes}
-                />
               </div>
 
-              {/* Options: closed, but clearly a row you open (label, a hint of what is inside, a chevron) */}
-              <details className="group shrink-0 border-t">
-                <summary className="flex cursor-pointer list-none items-baseline gap-2 px-4 py-2.5 text-sm hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
-                  <span className="font-medium">{copy.editor.optionsHeading}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground group-open:hidden">
-                    {copy.editor.optionsHint}
-                  </span>
-                  <ChevronDown className="ml-auto h-4 w-4 shrink-0 translate-y-0.5 self-center text-muted-foreground transition-transform group-open:rotate-180" />
-                </summary>
-                <div className="border-t">
+              {panelTab === "waypoints" ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {hasAlerts && (
+                    <div className="shrink-0 space-y-1.5 px-4 pb-2">
+                      {error && (
+                        <p className="flex items-start gap-1.5 text-xs text-destructive">
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          {error}
+                        </p>
+                      )}
+                      {successMessage && (
+                        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                          {successMessage}
+                        </p>
+                      )}
+                      {simplificationInfo && (
+                        <details className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+                          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
+                            <Info className="h-3.5 w-3.5 text-primary" />
+                            Waypoint simplification applied
+                            <span className="ml-auto font-mono font-normal text-muted-foreground">
+                              {simplificationInfo.originalCount} → {simplificationInfo.simplifiedCount}
+                            </span>
+                          </summary>
+                          <div className="mt-2 space-y-0.5">
+                            <p>
+                              Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
+                              {simplificationInfo.source && (
+                                <>
+                                  {" "}
+                                  from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
+                                </>
+                              )}
+                            </p>
+                            <p>{simplificationInfo.reason}</p>
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {trimPreview && (
+                    <div className="shrink-0">
+                      <GroundTrimBar
+                        text={trimPreviewText(trimPreview.ids.length, trimPreview.end)}
+                        approximate={trimPreview.approximate}
+                        onApply={applyTrim}
+                        onCancel={() => setTrimPreview(null)}
+                      />
+                    </div>
+                  )}
+
+                  <WaypointList
+                    waypoints={waypoints}
+                    isLoading={isLoading}
+                    hoveredId={hoveredId}
+                    onHover={setHoveredId}
+                    scrollTarget={scrollTarget}
+                    onRowClick={handleRowClick}
+                    onUpdateWaypoint={updateWaypoint}
+                    onTabKeyNavigation={handleTabKeyNavigation}
+                    onInputFocus={handleInputFocus}
+                    onToggleSelectAll={toggleSelectAll}
+                    onDeleteSelected={deleteSelectedWaypoints}
+                    onClearAltitudes={clearSelectedAltitudes}
+                    ghostIds={ghostIds}
+                  />
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t">
+                  {/* Flight numbers and time are saved with a plan: only offered when signed in */}
                   {flightNumberSection(false)}
                   {flightTimeSection(false)}
+                  <GroundMovements
+                    previewing={trimPreview?.end ?? null}
+                    busy={trimBusy}
+                    trimmed={trimmed}
+                    disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
+                    onToggle={toggleTrimPreview}
+                  />
                   {optionsContent}
                   {brandingSection(false)}
                 </div>
-              </details>
-
+              )}
             </>
           }
           footer={<div className="px-4 py-3">{exportButtons}</div>}

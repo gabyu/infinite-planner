@@ -1,4 +1,4 @@
-import { isUuid, json, requireUser } from "@/lib/flight-plan-server"
+import { isMissingExtraColumn, isUuid, json, requireUser } from "@/lib/flight-plan-server"
 import { MAX_FLIGHT_PLANS_PER_USER } from "@/lib/flight-plans"
 
 // Copies an EXPORTED plan into a new draft: same waypoints, same branding choice, same flight
@@ -12,13 +12,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (!isUuid(params.id)) return json({ error: "Flight plan not found." }, 404)
 
-  const { data: original } = await supabase
-    .from("flight_plans")
-    .select(
-      "status, source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes",
-    )
-    .eq("id", params.id)
-    .maybeSingle()
+  const fields =
+    "status, source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes"
+  const read = (list: string) => supabase.from("flight_plans").select(list).eq("id", params.id).maybeSingle()
+  let { data: found, error: readError } = await read(`${fields}, extra_flight_numbers`)
+  // A database without the extra_flight_numbers column yet: copy without it.
+  if (isMissingExtraColumn(readError)) ({ data: found, error: readError } = await read(fields))
+  const original = found as (Record<string, unknown> & { status: string }) | null
   if (!original) return json({ error: "Flight plan not found." }, 404)
   if (original.status !== "exported") {
     return json({ error: "Only exported flight plans can be duplicated. Drafts can be edited." }, 409)

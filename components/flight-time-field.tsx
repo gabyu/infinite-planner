@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 
 interface FlightTimeFieldProps {
@@ -9,19 +9,23 @@ interface FlightTimeFieldProps {
   onChange: (minutes: number | null) => void
   // Bump this (e.g. when the dialog opens) to reload the inputs from `value`.
   resetKey?: unknown
+  // Stretch the two inputs over the full width of the container.
+  fill?: boolean
 }
 
 const clampDigits = (value: string, max: number) => {
   const digits = value.replace(/\D/g, "").slice(0, 2)
-  return digits === "" ? "" : String(Math.min(Number(digits), max))
+  // Kept as typed ("01" stays "01"); only a value above the maximum is pulled down to it.
+  return digits === "" ? "" : Number(digits) > max ? String(max) : digits
 }
 
 // Hours + minutes inputs for the optional flight time. The value is whole minutes
 // (null = not set); 0 h 0 min means not set too. Typing is kept as strings so a
 // half-typed value ("" or "0") isn't rewritten under the cursor.
-export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightTimeFieldProps) {
+export function FlightTimeField({ idPrefix, value, onChange, resetKey, fill }: FlightTimeFieldProps) {
   const [hours, setHours] = useState("")
   const [minutes, setMinutes] = useState("")
+  const minutesRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setHours(value ? String(Math.floor(value / 60)) : "")
@@ -43,19 +47,27 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
         id={`${idPrefix}-hours`}
         inputMode="numeric"
         value={hours}
-        onChange={(e) => update(clampDigits(e.target.value, 99), minutes)}
+        onChange={(e) => {
+          update(clampDigits(e.target.value, 99), minutes)
+          // Two digits typed: on to the minutes.
+          if (e.target.value.replace(/\D/g, "").length >= 2) {
+            minutesRef.current?.focus()
+            minutesRef.current?.select()
+          }
+        }}
         placeholder="0"
-        className="w-14 text-center"
+        className={fill ? "flex-1 text-center" : "w-14 text-center"}
         aria-label="Hours"
       />
       <span className="text-xs text-muted-foreground">h</span>
       <Input
+        ref={minutesRef}
         id={`${idPrefix}-minutes`}
         inputMode="numeric"
         value={minutes}
         onChange={(e) => update(hours, clampDigits(e.target.value, 59))}
         placeholder="00"
-        className="w-14 text-center"
+        className={fill ? "flex-1 text-center" : "w-14 text-center"}
         aria-label="Minutes"
       />
       <span className="text-xs text-muted-foreground">min</span>
