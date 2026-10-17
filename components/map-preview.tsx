@@ -3,7 +3,7 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
-import { Crosshair, Minus, Plane, Plus } from "lucide-react"
+import { Globe, Minus, PlaneLanding, PlaneTakeoff, Plus } from "lucide-react"
 import { setBasemap } from "@/lib/map-tiles"
 import { copy } from "@/lib/copy"
 import { Lock, X } from "lucide-react"
@@ -764,7 +764,7 @@ export default function MapPreview({
         {!selectMode && waypoints.length > 0 && (
           <div className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-md">
             <button type="button" className={toolButton} onClick={() => fitRoute()} title={copy.editor.fitRoute} aria-label={copy.editor.fitRoute}>
-              <Crosshair className="h-4 w-4" />
+              <Globe className="h-4 w-4" />
             </button>
             <button type="button" className={toolButton} onClick={() => mapInstanceRef.current?.zoomIn()} title={copy.editor.zoomIn} aria-label={copy.editor.zoomIn}>
               <Plus className="h-4 w-4" />
@@ -775,10 +775,10 @@ export default function MapPreview({
             {waypoints.length > 1 && (
               <>
                 <button type="button" className={toolButton} onClick={zoomToDeparture} title={copy.editor.zoomToDeparture} aria-label={copy.editor.zoomToDeparture}>
-                  <Plane className="h-4 w-4 -rotate-45" />
+                  <PlaneTakeoff className="h-4 w-4" />
                 </button>
                 <button type="button" className={toolButton} onClick={zoomToArrival} title={copy.editor.zoomToArrival} aria-label={copy.editor.zoomToArrival}>
-                  <Plane className="h-4 w-4 rotate-45" />
+                  <PlaneLanding className="h-4 w-4" />
                 </button>
               </>
             )}

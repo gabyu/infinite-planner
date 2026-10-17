@@ -1533,36 +1533,38 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       })
     }
 
+    // Same look as the zoom group under it: a card with a hairline border, h-9, primary when active.
+    const toolbarButton = (active: boolean, destructive = false) =>
+      cn(
+        "inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-medium shadow-md transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:h-4 [&_svg]:w-4",
+        destructive
+          ? "border-destructive bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          : active
+            ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+            : "bg-card text-foreground hover:bg-accent",
+      )
+
     const toolbar = waypoints.length > 0 && (
       <div className="flex flex-wrap justify-end gap-2">
         {isEditingMap && selectMode && selectedAny && (
-          <Button onClick={deleteSelectedWaypoints} variant="destructive" size="sm" className="shadow-md">
+          <button type="button" onClick={deleteSelectedWaypoints} className={toolbarButton(false, true)}>
             <Trash2 />
             {copy.editor.deleteWaypoints}
-          </Button>
+          </button>
         )}
         {isEditingMap && (
-          <Button
-            onClick={toggleSelectMode}
-            variant={selectMode ? "default" : "outline"}
-            size="sm"
-            className={cn("shadow-md", !selectMode && "bg-card")}
-          >
+          <button type="button" onClick={toggleSelectMode} className={toolbarButton(selectMode)}>
             <LassoSelect />
             {selectMode ? copy.editor.doneSelecting : copy.editor.selectPoints}
-          </Button>
+          </button>
         )}
         {/* Hidden while selecting - the only way out of select mode is "Done selecting" */}
         {!selectMode && (
-          <Button
-            onClick={toggleMapEditing}
-            variant={isEditingMap ? "default" : "outline"}
-            size="sm"
-            className={cn("shadow-md", !isEditingMap && "bg-card")}
-          >
+          <button type="button" onClick={toggleMapEditing} className={toolbarButton(isEditingMap)}>
             <Pencil />
             {isEditingMap ? copy.editor.doneEditing : copy.editor.editWaypoints}
-          </Button>
+          </button>
         )}
       </div>
     )
