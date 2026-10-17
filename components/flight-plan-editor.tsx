@@ -1868,9 +1868,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t">
-                  {!canSave && <p className="border-b px-4 py-3 text-xs text-muted-foreground">{copy.editor.signedOutNote}</p>}
-                  {flightNumberSection(false, true)}
-                  {flightTimeSection(false, true)}
+                  {/* Flight numbers and time are saved with a plan: only offered when signed in */}
+                  {flightNumberSection(false)}
+                  {flightTimeSection(false)}
                   <GroundMovements
                     previewing={trimPreview?.end ?? null}
                     busy={trimBusy}

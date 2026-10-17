@@ -32,7 +32,6 @@ export const copy = {
     flightNumberPlaceholder: "e.g. AF69", // PROVISIONAL
     flightNumberAddPlaceholder: "Add another", // PROVISIONAL
     flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.", // PROVISIONAL
-    signedOutNote: "Flight number and flight time are saved with the plan once you sign in.", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
 
     // Ground movements (Options)

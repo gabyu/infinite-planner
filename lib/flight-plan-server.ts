@@ -122,3 +122,14 @@ export async function requireLibraryUser(request: Request) {
 
   return auth
 }
+
+// A database that hasn't had the extra_flight_numbers migration yet answers "undefined column": saving and reading
+// then carry on without it (plans with only one flight number lose nothing).
+export function isMissingExtraColumn(error: { code?: string; message?: string } | null | undefined) {
+  return !!error && (error.code === "42703" || /extra_flight_numbers/.test(error.message ?? ""))
+}
+
+export function withoutExtraNumbers<T extends { extra_flight_numbers?: unknown }>(columns: T): Omit<T, "extra_flight_numbers"> {
+  const { extra_flight_numbers: _omit, ...rest } = columns
+  return rest
+}
