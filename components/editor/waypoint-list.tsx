@@ -78,7 +78,7 @@ export function WaypointList({
             checked={waypoints.length > 0 && waypoints.every((wp) => wp.selected)}
             onCheckedChange={(checked) => onToggleSelectAll(!!checked)}
           />
-          <h3 className="studio-label">{copy.editor.waypointsHeading}</h3>
+          <h3 className="sr-only">{copy.editor.waypointsHeading}</h3>
         </div>
         <div className="flex items-center gap-1">
           <Button

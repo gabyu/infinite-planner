@@ -25,12 +25,13 @@ export const copy = {
     waypointLongitude: "Longitude", // PROVISIONAL
     waypointLimit: "Over the 250 waypoint limit", // PROVISIONAL
     optionsHeading: "Options", // PROVISIONAL
-    optionsHint: "Flight number, flight time, ground movements", // PROVISIONAL
+    tabWaypoints: "Waypoints", // PROVISIONAL
+    signedOutNote: "Flight number and flight time are saved with the plan once you sign in.", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
 
     // Ground movements (Options)
     groundHeading: "Ground movements", // PROVISIONAL
-    groundHint: "Remove the taxi before take-off and after landing", // PROVISIONAL
+    groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.", // PROVISIONAL
     trimDeparture: "Departure", // PROVISIONAL
     trimArrival: "Arrival", // PROVISIONAL
     trimmed: "Trimmed", // PROVISIONAL

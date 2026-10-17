@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 
 interface FlightTimeFieldProps {
@@ -13,7 +13,8 @@ interface FlightTimeFieldProps {
 
 const clampDigits = (value: string, max: number) => {
   const digits = value.replace(/\D/g, "").slice(0, 2)
-  return digits === "" ? "" : String(Math.min(Number(digits), max))
+  // Kept as typed ("01" stays "01"); only a value above the maximum is pulled down to it.
+  return digits === "" ? "" : Number(digits) > max ? String(max) : digits
 }
 
 // Hours + minutes inputs for the optional flight time. The value is whole minutes
@@ -22,6 +23,7 @@ const clampDigits = (value: string, max: number) => {
 export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightTimeFieldProps) {
   const [hours, setHours] = useState("")
   const [minutes, setMinutes] = useState("")
+  const minutesRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setHours(value ? String(Math.floor(value / 60)) : "")
@@ -43,13 +45,21 @@ export function FlightTimeField({ idPrefix, value, onChange, resetKey }: FlightT
         id={`${idPrefix}-hours`}
         inputMode="numeric"
         value={hours}
-        onChange={(e) => update(clampDigits(e.target.value, 99), minutes)}
+        onChange={(e) => {
+          update(clampDigits(e.target.value, 99), minutes)
+          // Two digits typed: on to the minutes.
+          if (e.target.value.replace(/\D/g, "").length >= 2) {
+            minutesRef.current?.focus()
+            minutesRef.current?.select()
+          }
+        }}
         placeholder="0"
         className="w-14 text-center"
         aria-label="Hours"
       />
       <span className="text-xs text-muted-foreground">h</span>
       <Input
+        ref={minutesRef}
         id={`${idPrefix}-minutes`}
         inputMode="numeric"
         value={minutes}

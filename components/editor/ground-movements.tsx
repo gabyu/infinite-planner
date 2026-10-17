@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Loader2, PlaneLanding, PlaneTakeoff } from "lucide-react"
+import { Loader2, PlaneLanding, PlaneTakeoff } from "lucide-react"
 import { copy } from "@/lib/copy"
 import type { TrimEnd } from "@/lib/ground-trim"
 import { cn } from "@/lib/utils"
@@ -30,26 +30,28 @@ export function GroundMovements({ previewing, busy, trimmed, disabled, onToggle 
       </div>
       <div className="grid grid-cols-2 gap-2">
         {buttons.map(({ end, label, icon }) => {
-          const active = previewing === end
-          const done = trimmed[end]
+          const previewed = previewing === end
+          const off = trimmed[end]
           return (
             <button
               key={end}
               type="button"
-              aria-pressed={active}
-              disabled={disabled || busy !== null || done}
+              role="switch"
+              aria-checked={!off}
+              disabled={disabled || busy !== null}
               onClick={() => onToggle(end)}
               className={cn(
                 "flex h-9 items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
-                active ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-accent",
-                done && "text-muted-foreground",
-                !done && disabled && "opacity-50",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                off
+                  ? "bg-card text-muted-foreground hover:bg-accent"
+                  : "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+                previewed && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
               )}
             >
-              {busy === end ? <Loader2 className="h-4 w-4 animate-spin" /> : done ? <Check className="h-4 w-4" /> : icon}
+              {busy === end ? <Loader2 className="h-4 w-4 animate-spin" /> : icon}
               {label}
-              {done && <span className="text-xs font-normal">{copy.editor.trimmed}</span>}
+              {off && <span className="text-xs font-normal">{copy.editor.trimmed}</span>}
             </button>
           )
         })}

@@ -63,7 +63,7 @@ export function EditorWorkspace({ map, strip, header, body, footer, isMobile }: 
               aria-hidden={collapsed}
             >
               <div className="shrink-0 border-b">{header}</div>
-              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">{body}</div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{body}</div>
               <div className="shrink-0 border-t bg-card">{footer}</div>
             </aside>
             <button
@@ -182,7 +182,7 @@ function BottomSheet({
         <span className="h-1 w-10 rounded-full bg-muted-foreground/40" />
       </div>
       <div ref={headerRef} className="shrink-0">{header}</div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain border-t">{body}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t">{body}</div>
       <div ref={footerRef} className="shrink-0 border-t bg-card">{footer}</div>
     </div>
   )
