@@ -216,7 +216,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
           </div>
 
           <div key={item.id} className="front-in px-2 pb-2 pt-6 sm:px-3">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
               {item.pinned ? "Editor's pick" : "Trending"}
             </p>
             <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
@@ -258,10 +258,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
         </article>
       </div>
 
-      <aside className="lg:col-span-4" aria-labelledby="front-list">
-        <h2 id="front-list" className="mb-5 border-t-2 border-foreground pt-3 text-xs font-semibold uppercase tracking-[0.16em]">
-          On the front
-        </h2>
+      <aside className="lg:col-span-4" aria-label="On the front">
         {/* The plans are tabs on hairlines, no frame of their own: the current one is tinted. */}
         <ol className="flex overflow-x-auto border-y border-border lg:block lg:overflow-hidden">
           {items.map((entry, index) => (
