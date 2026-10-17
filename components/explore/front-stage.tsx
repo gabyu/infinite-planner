@@ -219,7 +219,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-primary">
               {item.pinned ? "Editor's pick" : "Trending"}
             </p>
-            <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em] decoration-primary decoration-2 underline-offset-[6px] group-hover:underline">
+            <h2 className="mt-2 font-display text-[clamp(1.75rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.02em]">
               {item.cityFrom}
               <RouteArrow className="mx-[0.3em] text-primary" />
               {item.cityTo}
