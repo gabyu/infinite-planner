@@ -26,7 +26,6 @@ export const copy = {
     waypointLimit: "Over the 250 waypoint limit", // PROVISIONAL
     namesHeading: "Names", // PROVISIONAL
     sheetHandle: "Drag to resize the panel", // PROVISIONAL
-    resetPlanner: "Reset planner", // PROVISIONAL
 
     // Map toolbar
     editWaypoints: "Edit waypoints", // PROVISIONAL

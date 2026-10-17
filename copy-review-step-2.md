@@ -27,9 +27,7 @@ Character limits: buttons and toolbar labels ≤ 24, tooltips ≤ 40, aria-label
 | `waypointLimit` | Reserved (warning past 250 waypoints, not shown yet) | The plan exceeds the 250 waypoint limit | Over the 250 waypoint limit | Max 250 waypoints | That's a lot of waypoints: 250 is the limit |
 | `namesHeading` | Collapsible block holding TXT import and the prefix tool | Waypoint names | Names | Names | Name tags |
 | `sheetHandle` | Phone only: aria-label of the bottom sheet handle | Drag to resize the panel, or press Enter to change its height | Drag to resize the panel | Resize | Drag to pull the panel up |
-| `resetPlanner` | Panel header, small restart icon (tooltip + aria-label) | Discard this plan and start over | Reset planner | Start over | Wipe the flight plan |
 
-`resetPlanner` discards the work in progress: **Fun** is not recommended (a lost-data action should be plain). It had no confirmation before either; say if you want one added.
 
 ## Map toolbar (top right of the map)
 

@@ -1601,18 +1601,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   </p>
                   {flightSummary}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="-mr-2 -mt-1 h-8 w-8 shrink-0 text-muted-foreground"
-                  title={copy.editor.resetPlanner}
-                  aria-label={copy.editor.resetPlanner}
-                  onClick={() => {
-                    window.location.href = `${window.location.pathname}?reset=${Date.now()}`
-                  }}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </Button>
               </div>
               <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
                 {stats.map((stat) => (
