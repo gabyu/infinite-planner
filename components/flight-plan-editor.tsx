@@ -20,7 +20,6 @@ import {
   LassoSelect,
   AlertCircle,
   Info,
-  Share2,
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
@@ -30,11 +29,14 @@ import {
   AUTOSAVE_INTERVAL_MS,
   BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
+  PRIVATE_SHARE,
   type FlightPlanSource,
   type FlightPlanStatus,
+  type PlanShare,
+  type PlanVisibility,
   type StoredWaypoint,
 } from "@/lib/flight-plans"
-import { ShareDialog } from "@/components/share-dialog"
+import { VisibilitySwitch } from "@/components/visibility-switch"
 import { RouteArrow } from "@/components/route-arrow"
 import { IcaoInput } from "@/components/ds/icao-input"
 import { StartLayout } from "@/components/convert/start-layouts"
@@ -201,10 +203,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // waypoints go into the exported (and saved) plan. Needs BRANDING_MIN_WAYPOINTS waypoints to apply.
   const [includeBranding, setIncludeBranding] = useState(true)
   const [flightTimeMinutes, setFlightTimeMinutes] = useState<number | null>(null)
-  const [showShareDialog, setShowShareDialog] = useState(false)
-  const [isPreparingShare, setIsPreparingShare] = useState(false)
   // Share link of the plan this session saved, if it is being shared (null = not shared).
-  const [planShareToken, setPlanShareToken] = useState<string | null>(null)
+  const [planShare, setPlanShare] = useState<PlanShare>(PRIVATE_SHARE)
+  const [planFeatured, setPlanFeatured] = useState(false)
+  // Whether "Public" is offered when sharing: the library is launched, or the user is an admin (asked once signed in).
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
@@ -228,6 +231,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const draftLoadedRef = useRef(false)
   const skipNamingRef = useRef(false)
   const [flightNumberOverride, setFlightNumberOverride] = useState<string | null>(null)
+  // What the person typed in the Flight number field (a codeshare, a callsign of their own...). undefined = untouched:
+  // the number read from the file name (or saved with the draft) stands.
+  const [flightNumberEdit, setFlightNumberEdit] = useState<string | undefined>(undefined)
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -420,6 +426,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         // A new import is a new plan: it must not overwrite the one saved from the previous import.
         resetSavedPlan()
         setFlightNumberOverride(null)
+        setFlightNumberEdit(undefined)
         setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
         setSimplificationInfo({
           originalCount: result.originalCount,
@@ -515,7 +522,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
   // strict patterns, so a looser guess never counts. Shown on the page and saved with the plan. A reopened
   // draft has no file name any more: it uses the flight number that was saved with it.
-  const detectedFlightNumber = (() => {
+  const fileFlightNumber = (() => {
     if (mode !== "import") return null
     if (importedFileName) {
       const parsed = parseFlightFilename(importedFileName)
@@ -523,6 +530,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
     return flightNumberOverride
   })()
+  // The flight number the plan carries: what was typed in the field when there is something, else the file's. It can be
+  // changed until the plan is exported (a flight often has codeshare numbers), and cleared.
+  const detectedFlightNumber = flightNumberEdit !== undefined ? flightNumberEdit || null : fileFlightNumber
 
   const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
   const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
@@ -558,7 +568,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     setSavedStatus(null)
     setSavedFingerprint(null)
     setLastSavedAt(null)
-    setPlanShareToken(null)
+    setPlanShare(PRIVATE_SHARE)
+    setFlightNumberEdit(undefined)
     setDraftArmed(false)
     setAutosaveError(null)
   }
@@ -578,7 +589,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       savedStatusRef.current = null
       setSavedPlanId(null)
       setSavedStatus(null)
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
     }
 
     const body = JSON.stringify({
@@ -596,7 +607,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       fetch(url, { method, headers: { "Content-Type": "application/json" }, body })
     const startNewRow = () => {
       savedPlanIdRef.current = null
-      setPlanShareToken(null)
+      setPlanShare(PRIVATE_SHARE)
       return send("/api/flight-plans", "POST")
     }
 
@@ -698,9 +709,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           return
         }
         // Sketch drafts belong in Sketch, imported ones in Convert.
-        const rightMode = body.source === "Sketch" ? "draw" : "import"
+        // A copy of someone else's plan (an import from the library) always opens in Convert's map view, whatever
+        // its source: it is edited as waypoints, not on the Sketch board.
+        const rightMode = body.source === "Sketch" && !body.is_fork ? "draw" : "import"
         if (rightMode !== mode) {
-          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}`)
+          window.location.replace(`${rightMode === "draw" ? "/sketch" : "/convert"}?draft=${id}${body.is_fork ? "&fork=1" : ""}`)
           return
         }
 
@@ -735,12 +748,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
           setFlightNumberOverride(body.flight_number ?? null)
+          // Straight from the library: map first, editing tools at hand (the same view a fresh conversion opens).
+          if (new URLSearchParams(window.location.search).get("fork") === "1") setShowMapPreview(true)
         }
         savedPlanIdRef.current = body.id
         savedStatusRef.current = "draft"
         setSavedPlanId(body.id)
         setSavedStatus("draft")
-        setPlanShareToken(null)
+        setPlanShare(PRIVATE_SHARE)
         setLastSavedAt(new Date(body.created_at))
         setDraftArmed(true)
         setResume({ state: "idle" })
@@ -1166,22 +1181,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
-  // Share: only an exported plan can be shared, and only while the page still shows it as exported.
-  // Opens the share modal for that row (it may already be shared from an earlier press).
-  const handleShare = async () => {
-    if (!savedPlanIdRef.current || savedStatusRef.current !== "exported") return
-    setError(null)
-    setSuccessMessage(null)
-    setIsPreparingShare(true)
-
-    const supabase = getBrowserSupabase()
-    const { data } = supabase
-      ? await supabase.from("flight_plans").select("share_token").eq("id", savedPlanIdRef.current).maybeSingle()
-      : { data: null }
-    setPlanShareToken((data?.share_token as string | null | undefined) ?? null)
-    setIsPreparingShare(false)
-    setShowShareDialog(true)
-  }
+  useEffect(() => {
+    if (!authUser) return setLibraryOpen(false)
+    fetch("/api/library/access", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((body) => setLibraryOpen(body?.open === true))
+      .catch(() => setLibraryOpen(false))
+  }, [authUser])
 
   // Applies the naming rules: the first/last waypoints are locked to the origin/destination,
   // everything else is numbered by position, and - when the branding checkbox is ticked and
@@ -1275,6 +1281,25 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
       {canSave && (
         <PanelSection
+          label="Flight number"
+          className={inGrid ? exportSectionClass : undefined}
+          help={`Optional. Read from the file name when it carries one; change it if you fly the flight under another number (codeshares). Letters and digits, up to 12. Saved with the plan.`}
+        >
+          <Input
+            id="flight-number"
+            value={detectedFlightNumber ?? ""}
+            onChange={(e) => setFlightNumberEdit(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12))}
+            placeholder="e.g. AF69"
+            aria-label="Flight number"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-8 w-full max-w-[9rem] font-mono"
+          />
+        </PanelSection>
+      )}
+
+      {canSave && (
+        <PanelSection
           label="Flight time"
           className={inGrid ? exportSectionClass : undefined}
           help="Optional. How long the flight takes: saved with the plan in your dashboard."
@@ -1294,14 +1319,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             {detectedFlightNumber}
           </span>
         ) : (
-          <span>No flight number in the file name</span>
+          <span>No flight number in the file name{canSave ? ": you can add one below" : ""}</span>
         )}
         <span>{importSource}</span>
       </div>
     ) : null
 
   // Share needs an exported plan, and the page must still show that exact plan.
-  const canShare = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
+  const canSetVisibility = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
 
   // Where the plan stands: draft autosave, or exported (locked).
   const saveStatusLine = (() => {
@@ -1312,7 +1337,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       return (
         <>
           Exported and saved: this plan is locked. Duplicate it from your{" "}
-          <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+          <Link href="/dashboard" className="link hover:text-foreground">
             dashboard
           </Link>{" "}
           to change it.
@@ -1343,21 +1368,26 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           <Download />
           Export FPL
         </Button>
-        <span
-          title={
-            !canSave
-              ? "Sign in with Discord to share a flight plan"
-              : canShare
-                ? undefined
-                : "Export the flight plan first to share it"
-          }
-        >
-          <Button variant="outline" onClick={handleShare} disabled={!canShare || isLoading || isPreparingShare}>
-            <Share2 />
-            {isPreparingShare ? "Opening..." : "Share"}
-          </Button>
-        </span>
       </div>
+      {libraryOpen && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">Visibility</span>
+          <VisibilitySwitch
+            planId={savedPlanId ?? ""}
+            origin={originAirport || "ORIG"}
+            destination={destinationAirport || "DEST"}
+            flightNumber={detectedFlightNumber}
+            share={planShare}
+            onShareChange={setPlanShare}
+            featured={planFeatured}
+            onFeaturedChange={setPlanFeatured}
+            disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty}
+            disabledReason={
+              !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
+            }
+          />
+        </div>
+      )}
       <p className={cn("text-xs text-muted-foreground", autosaveError && canSave && "text-destructive")}>
         {saveStatusLine}
       </p>
@@ -1391,7 +1421,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         <p className="mt-3 max-w-lg text-balance text-xs text-muted-foreground">
           <span>
             Signed in: your plans are saved as drafts while you edit, and kept in your{" "}
-            <Link href="/dashboard" className="underline underline-offset-2 hover:text-foreground">
+            <Link href="/dashboard" className="link hover:text-foreground">
               dashboard
             </Link>
             .
@@ -1536,7 +1566,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}
                 </div>
 
-                <div className="mt-4 grid overflow-hidden rounded-md border sm:grid-cols-[1fr_1fr_auto]">
+                <div
+                  className={cn(
+                    "mt-4 grid overflow-hidden rounded-md border",
+                    canSave ? "sm:grid-cols-[1fr_1fr_1fr_auto]" : "sm:grid-cols-[1fr_auto]",
+                  )}
+                >
                   {exportOptions(true)}
                   <div className="p-4 sm:w-72">{exportButtons}</div>
                 </div>
@@ -1698,7 +1733,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     {flightSummary}
                   </div>
 
-                  <PanelSection label="Preview">
+                  <PanelSection label="Flight plan editor">
                     <Button
                       onClick={() => setShowMapPreview(true)}
                       variant="outline"
@@ -1707,7 +1742,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                       disabled={waypoints.length === 0 || isLoading}
                     >
                       <Map />
-                      Flight plan map
+                      Open the editor
                     </Button>
                   </PanelSection>
 
@@ -1722,17 +1757,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           </div>
         )}
 
-        {showShareDialog && savedPlanId && (
-          <ShareDialog
-            open
-            onOpenChange={setShowShareDialog}
-            planId={savedPlanId}
-            origin={originAirport || "ORIG"}
-            destination={destinationAirport || "DEST"}
-            shareToken={planShareToken}
-            onShareChange={setPlanShareToken}
-          />
-        )}
 
         {/* Map Preview Dialog */}
         <Dialog
@@ -1750,9 +1774,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           >
             <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
               <div>
-                <DialogTitle>Flight Plan Preview</DialogTitle>
+                <DialogTitle>Flight plan editor</DialogTitle>
                 <DialogDescription>
-                  <span className="hidden lg:inline">Visualize your flight plan with {waypoints.length} waypoints</span>
+                  <span className="hidden lg:inline">Edit your flight plan: {waypoints.length} waypoints</span>
                   <span className="lg:hidden">{waypoints.length} waypoints</span>
                 </DialogDescription>
               </div>

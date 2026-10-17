@@ -39,7 +39,7 @@ export function CookieConsentBanner() {
       className="fixed inset-x-4 bottom-4 z-[100] sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-full sm:max-w-lg sm:-translate-x-1/2"
     >
       <div className="flex flex-col gap-4 rounded-lg border bg-card p-4 text-card-foreground shadow-lg sm:flex-row sm:items-start sm:p-5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
           <Cookie className="h-5 w-5" />
         </div>
 
@@ -50,7 +50,7 @@ export function CookieConsentBanner() {
               Infinite Planner doesn't set any cookies of its own. If you agree, we'll load{" "}
               <span className="font-medium text-foreground">Google Analytics</span> to see how many people use the
               planner - nothing else changes either way.{" "}
-              <Link href="/cookies" className="underline underline-offset-2 hover:text-foreground">
+              <Link href="/cookies" className="link hover:text-foreground">
                 Learn more
               </Link>
             </p>

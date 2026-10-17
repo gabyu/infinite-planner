@@ -14,7 +14,7 @@ export function CookiePreferencesButton({ variant = "default", className }: Cook
       <button
         type="button"
         onClick={openCookiePreferences}
-        className={className ?? "text-gray-500 dark:text-gray-500 text-sm hover:underline underline-offset-2"}
+        className={className ?? "link-quiet text-gray-500 dark:text-gray-500 text-sm"}
       >
         Cookie preferences
       </button>

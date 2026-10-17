@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { FAQ_TEXT } from "@/lib/faq"
 
 // FAQ data with consistent structure
 export const faqData = [
   {
     id: "file-formats",
-    question: "What file formats are supported?",
+    question: FAQ_TEXT["file-formats"].question,
     answer: (
       <div className="space-y-4">
         <p>Infinite Planner currently supports KML files from two major flight tracking services:</p>
@@ -28,7 +29,7 @@ export const faqData = [
   },
   {
     id: "waypoint-limit",
-    question: "Why are my waypoints limited to 250?",
+    question: FAQ_TEXT["waypoint-limit"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -48,7 +49,7 @@ export const faqData = [
   },
   {
     id: "accuracy",
-    question: "How accurate are the converted flight plans?",
+    question: FAQ_TEXT["accuracy"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -80,7 +81,7 @@ export const faqData = [
   },
   {
     id: "import-issue",
-    question: "My KML file won't import. What should I do?",
+    question: FAQ_TEXT["import-issue"].question,
     answer: (
       <div className="space-y-4">
         <p>If you're having trouble importing your KML file, try these troubleshooting steps:</p>
@@ -110,7 +111,7 @@ export const faqData = [
   },
   {
     id: "export-usage",
-    question: "How do I use the exported flight plan in Infinite Flight?",
+    question: FAQ_TEXT["export-usage"].question,
     answer: (
       <div className="space-y-4">
         <p>Once you've exported your flight plan as an FPL file, follow these steps to use it in Infinite Flight:</p>
@@ -143,8 +144,7 @@ export const faqData = [
   },
   {
     id: "subscription",
-    question:
-      "I can't download KML file from FlightRadar24. Must I purchase a subscription plan to use Infinite Planner?",
+    question: FAQ_TEXT["subscription"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -164,7 +164,7 @@ export const faqData = [
                 href="https://www.flightaware.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="link-quiet text-primary hover:text-primary"
               >
                 FlightAware.com
               </a>
@@ -185,7 +185,7 @@ export const faqData = [
               href="https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="link-quiet text-primary hover:text-primary break-all"
             >
               https://www.flightaware.com/live/findflight?origin=EHAM&destination=KSFO
             </a>
@@ -206,7 +206,7 @@ export const faqData = [
   },
   {
     id: "fpl-import",
-    question: "I cannot import the flight plan in Infinite Flight",
+    question: FAQ_TEXT["fpl-import"].question,
     answer: (
       <div className="space-y-4">
         <p>
@@ -240,7 +240,7 @@ export const faqData = [
   },
   {
     id: "atc-compatible",
-    question: "Will ATC accept our custom flight plan?",
+    question: FAQ_TEXT["atc-compatible"].question,
     answer: (
       <div className="space-y-4">
         <p>Yes, landing with ATC is absolutely fine — but it's important to know how Infinite Planner works.</p>
@@ -279,6 +279,53 @@ export const faqData = [
       </div>
     ),
   },
+  {
+    id: "explore",
+    question: FAQ_TEXT["explore"].question,
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Explore is the library of flight plans published by the community: real flights converted from FlightRadar24
+          or FlightAware, and hand-drawn routes. Every flight plan you export is <strong>private</strong> until you
+          switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore
+          and indexed by search engines, and your Discord name and avatar are shown with it.
+        </p>
+        <p>
+          You can switch it back to private at any time and its page stops working. Search engines can keep an old copy
+          for a while, which we don't control.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "download-import",
+    question: FAQ_TEXT["download-import"].question,
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Yes, once you are signed in with Discord. <strong>Download</strong> gives you the .fpl file for Infinite
+          Flight. <strong>Import</strong> puts a copy in your dashboard as a draft that you can open in the flight plan
+          editor, adjust and export as your own: the original is never changed, and your copy stays yours even if its
+          author later makes theirs private. You can also like a flight plan to find it again under Favorites.
+        </p>
+        <p>A copy can only be published once you have changed its route.</p>
+      </div>
+    ),
+  },
+  {
+    id: "report",
+    question: FAQ_TEXT["report"].question,
+    answer: (
+      <div className="space-y-4">
+        <p>
+          Open the flight plan's page while signed in and use <strong>Report this flight plan</strong>. Choose a reason
+          and, if you like, add a few words. Admins review reports and can hide a flight plan. To ask for the removal of
+          something you believe infringes your rights, write to the address in our{" "}
+          <a href="/terms">Terms of Service</a>.
+        </p>
+      </div>
+    ),
+  },
 ]
 
 export default function FAQSelector() {
@@ -298,7 +345,7 @@ export default function FAQSelector() {
               onClick={() => setSelectedId(faq.id)}
               className={`text-left px-4 py-3 rounded-lg transition-all duration-200 border-2 ${
                 selectedId === faq.id
-                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-gray-900 dark:text-gray-100"
+                  ? "border-primary bg-primary/10 text-gray-900 dark:text-gray-100"
                   : "border-gray-200 dark:border-gray-700 bg-transparent text-gray-900 dark:text-gray-100 hover:border-gray-300 dark:hover:border-gray-600"
               }`}
             >

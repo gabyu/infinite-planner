@@ -2,15 +2,14 @@ import Link from "next/link"
 import { Cookie } from "lucide-react"
 import { LegalPage } from "@/components/legal-page"
 import { CookiePreferencesButton } from "@/components/cookie-preferences-button"
+import { pageMetadata } from "@/lib/seo"
 
-export const metadata = {
-  title: "Cookie Policy - Infinite Planner",
-  description: "What Infinite Planner does and doesn't store in your browser, and why.",
-}
+export const metadata = pageMetadata("cookies")
 
 export default function CookiesPage() {
   return (
     <LegalPage
+      seo="cookies"
       icon={<Cookie className="h-6 w-6" />}
       title="Cookie Policy"
       intro="Short version: the only cookie we set is the one that keeps you signed in, and only if you sign in. The only optional one is Google Analytics, and only if you say yes."

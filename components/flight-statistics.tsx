@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
   getPopularAirports,
@@ -15,6 +16,8 @@ export function FlightStatistics() {
   const [popularFlights, setPopularFlights] = useState<FlightStats[]>([])
   const [totalStats, setTotalStats] = useState({ totalFlights: 0, totalAirports: 0 })
   const [airportNames, setAirportNames] = useState<Record<string, string>>({})
+  // Explore pages that exist for these airports and flight numbers (code -> path), once the library is open to this visitor.
+  const [links, setLinks] = useState<{ airports: Record<string, string>; flights: Record<string, string> }>({ airports: {}, flights: {} })
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -36,6 +39,12 @@ export function FlightStatistics() {
           .then((data) => data?.names && setAirportNames(data.names))
           .catch(() => {})
         setPopularFlights(flights)
+        fetch(
+          `/api/library/links?airports=${airports.map((a) => a.airport_code).join(",")}&flights=${flights.map((f) => f.flight_number).join(",")}`,
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => data && setLinks({ airports: data.airports ?? {}, flights: data.flights ?? {} }))
+          .catch(() => {})
         setTotalStats(totals)
       } catch (error) {
         console.error("Error fetching flight statistics:", error)
@@ -91,13 +100,19 @@ export function FlightStatistics() {
               label: airportNames[a.airport_code] ?? a.airport_code,
               title: a.airport_code,
               value: `${a.count} flights`,
+              href: links.airports[a.airport_code.toUpperCase()],
             }))}
           />
           <RankList
             title="Popular flights"
             empty="No flight data available yet"
             isLoading={isLoading}
-            rows={popularFlights.map((f) => ({ key: f.flight_number, label: f.flight_number, value: `${f.count} times` }))}
+            rows={popularFlights.map((f) => ({
+              key: f.flight_number,
+              label: f.flight_number,
+              value: `${f.count} times`,
+              href: links.flights[f.flight_number.toUpperCase()],
+            }))}
           />
         </div>
       </div>
@@ -114,7 +129,7 @@ function RankList({
   title: string
   empty: string
   isLoading: boolean
-  rows: { key: string; label: string; title?: string; value: string }[]
+  rows: { key: string; label: string; title?: string; value: string; href?: string }[]
 }) {
   return (
     <div>
@@ -134,7 +149,13 @@ function RankList({
             <li key={row.key} className="grid grid-cols-[2rem_1fr_auto] items-center gap-2 py-3">
               <span className="font-mono text-sm tabular-nums text-muted-foreground">{index + 1}</span>
               <span title={row.title} className={cn("min-w-0 truncate", row.title ? "font-medium" : "font-mono font-medium tabular-nums")}>
-                {row.label}
+                {row.href ? (
+                  <Link href={row.href} className="link-quiet text-primary hover:text-primary" title={row.title ? `${row.title}: flight plans in Explore` : "Flight plans in Explore"}>
+                    {row.label}
+                  </Link>
+                ) : (
+                  row.label
+                )}
               </span>
               <span className="font-mono text-sm tabular-nums text-muted-foreground">{row.value}</span>
             </li>

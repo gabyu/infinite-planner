@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { CookiePreferencesButton } from "./cookie-preferences-button"
 
-const linkClass = "text-gray-500 dark:text-gray-500 hover:underline underline-offset-2"
+const linkClass = "link-quiet text-gray-500 dark:text-gray-500"
 const dividerClass = "text-gray-300 dark:text-gray-700"
 
 // Terms / Privacy / Cookie Policy links shown in the footer of every page.

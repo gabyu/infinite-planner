@@ -19,3 +19,18 @@ export function getServiceRoleSupabase() {
     global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
   })
 }
+
+// Service-role client for the cached public pages: its requests go through Next's data cache
+// (revalidated every 5 minutes, dropped by the given tags) instead of being forced to no-store,
+// because a no-store fetch makes a statically generated page fail. Only for reads that are fine
+// to serve a few minutes old and that are invalidated by tag; everything else uses the client above.
+export function getCachedServiceRoleSupabase(tags: string[]) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceRoleKey) return null
+
+  return createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, next: { revalidate: 300, tags } }) },
+  })
+}

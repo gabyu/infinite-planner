@@ -93,6 +93,17 @@
   }
 }
 
+/* Radix locks the page scroll while a menu or dialog is open and pads the body by the scrollbar's width so
+   nothing jumps. The scrollbar gutter above is already always reserved, so that padding would double up and
+   shift the whole page; switch the compensation off. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+html body[data-scroll-locked] .right-scroll-bar-position {
+  right: 0 !important;
+}
+
 /* Added high-contrast dark mode filter for map tiles */
 .dark-map-tiles {
   /* Updated filter for "High Detail Blue HUD": invert standard OSM to black, rotate hue to blue, boost brightness/contrast */
@@ -101,7 +112,7 @@
 }
 
 /*
- * Admin dashboard theme: neutral Supabase-Studio-like surfaces with a green accent.
+ * Admin dashboard theme: neutral Supabase-Studio-like surfaces (the layout and density, not its colour) with Infinite Planner's blue accent.
  * Scoped to .admin-theme (set on the dashboard wrapper AND on <body> by AdminThemeScope,
  * so Radix portals - menus, dialogs - rendered into <body> pick it up too). The public
  * site keeps its own blue theme.
@@ -114,8 +125,8 @@
     --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
-    --primary: 153 62% 32%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
     --secondary: 0 0% 94%;
     --secondary-foreground: 0 0% 12%;
     --muted: 0 0% 95%;
@@ -124,7 +135,7 @@
     --accent-foreground: 0 0% 9%;
     --border: 0 0% 89%;
     --input: 0 0% 85%;
-    --ring: 153 62% 38%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.375rem;
 
     /* Activity heatmap: single-hue blue ramp, light -> dark = more exports. */
@@ -143,8 +154,8 @@
     --card-foreground: 0 0% 93%;
     --popover: 0 0% 14%;
     --popover-foreground: 0 0% 93%;
-    --primary: 153 60% 53%;
-    --primary-foreground: 0 0% 8%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 0 0% 17%;
     --secondary-foreground: 0 0% 93%;
     --muted: 0 0% 16%;
@@ -153,7 +164,7 @@
     --accent-foreground: 0 0% 93%;
     --border: 0 0% 20%;
     --input: 0 0% 22%;
-    --ring: 153 60% 45%;
+    --ring: 217.2 91.2% 59.8%;
 
     /* Dark surface: more exports = lighter, so intensity still reads as "more". */
     --hm-0: 0 0% 17%;
@@ -243,6 +254,52 @@
 }
 
 @layer components {
+  /*
+   * Text links, without the 2000s underline. .link (links in running text) keeps a hairline at 30% of the
+   * text colour and a solid line sweeps over it on hover; .link-quiet (footer, muted links) shows no line
+   * at rest, and the line draws in on hover while the text warms up to the foreground. The line is a
+   * background so it wraps with the text; it enters from the left and leaves to the right.
+   */
+  .link,
+  .link-quiet {
+    --link-rest: 100%;
+    background-image:
+      linear-gradient(currentColor, currentColor),
+      linear-gradient(color-mix(in srgb, currentColor 30%, transparent), color-mix(in srgb, currentColor 30%, transparent));
+    background-repeat: no-repeat;
+    background-size: 0% 1px, var(--link-rest) 1px;
+    background-position: 100% calc(100% - 0.04em), 0 calc(100% - 0.04em);
+    text-decoration: none;
+    padding-bottom: 0.08em;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    transition:
+      background-size 0.45s cubic-bezier(0.65, 0, 0.35, 1),
+      color 0.2s ease;
+  }
+  .link:hover,
+  .link:focus-visible,
+  .link-quiet:hover,
+  .link-quiet:focus-visible {
+    background-size: 100% 1px, var(--link-rest) 1px;
+    background-position: 0 calc(100% - 0.04em), 0 calc(100% - 0.04em);
+  }
+  .link-quiet {
+    --link-rest: 0%;
+  }
+  .link-quiet:hover,
+  .link-quiet:focus-visible {
+    color: hsl(var(--foreground));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .link,
+    .link-quiet {
+      transition: none;
+    }
+  }
+}
+
+@layer components {
   /* Small mono uppercase caption used for section and field labels in the Studio theme. */
   .studio-label {
     @apply font-mono text-[11px] font-medium uppercase leading-none tracking-wider text-muted-foreground;
@@ -256,5 +313,128 @@
   }
   to {
     width: 100%;
+  }
+}
+
+/* Route colour by altitude (same ramp as the homepage globe: components/home/altitude-ramp.ts), in 16 steps
+   from 0 to 40,000 ft. Used by the plan page map and the library's cards. */
+.alt-0 { stroke: #06b6d4; }
+.dark .alt-0 { stroke: #22d3ee; }
+.alt-1 { stroke: #0ca5d9; }
+.dark .alt-1 { stroke: #2ecaf0; }
+.alt-2 { stroke: #1295dd; }
+.dark .alt-2 { stroke: #3bc1f3; }
+.alt-3 { stroke: #1984e2; }
+.dark .alt-3 { stroke: #47b7f5; }
+.alt-4 { stroke: #1f74e6; }
+.dark .alt-4 { stroke: #54aef8; }
+.alt-5 { stroke: #2563eb; }
+.dark .alt-5 { stroke: #60a5fa; }
+.alt-6 { stroke: #335cea; }
+.dark .alt-6 { stroke: #6b9ff9; }
+.alt-7 { stroke: #4155e9; }
+.dark .alt-7 { stroke: #7598f8; }
+.alt-8 { stroke: #4e4de8; }
+.dark .alt-8 { stroke: #8092f8; }
+.alt-9 { stroke: #5c46e7; }
+.dark .alt-9 { stroke: #8a8bf7; }
+.alt-10 { stroke: #6a3fe6; }
+.dark .alt-10 { stroke: #9585f6; }
+.alt-11 { stroke: #753ce5; }
+.dark .alt-11 { stroke: #9e83f7; }
+.alt-12 { stroke: #8039e4; }
+.dark .alt-12 { stroke: #a781f8; }
+.alt-13 { stroke: #8c35e2; }
+.dark .alt-13 { stroke: #b07ff8; }
+.alt-14 { stroke: #9732e1; }
+.dark .alt-14 { stroke: #b97df9; }
+.alt-15 { stroke: #a22fe0; }
+.dark .alt-15 { stroke: #c27bfa; }
+.alt-swatch { background: linear-gradient(90deg, #06b6d4, #0ca5d9, #1295dd, #1984e2, #1f74e6, #2563eb, #335cea, #4155e9, #4e4de8, #5c46e7, #6a3fe6, #753ce5, #8039e4, #8c35e2, #9732e1, #a22fe0); }
+.dark .alt-swatch { background: linear-gradient(90deg, #22d3ee, #2ecaf0, #3bc1f3, #47b7f5, #54aef8, #60a5fa, #6b9ff9, #7598f8, #8092f8, #8a8bf7, #9585f6, #9e83f7, #a781f8, #b07ff8, #b97df9, #c27bfa); }
+
+/* The same ramp as stop colours, for the altitude graph's gradient (stop i = i / 15 of 40,000 ft). */
+.alt-stop-0 { stop-color: #06b6d4; }
+.dark .alt-stop-0 { stop-color: #22d3ee; }
+.alt-stop-1 { stop-color: #0ca5d9; }
+.dark .alt-stop-1 { stop-color: #2ecaf0; }
+.alt-stop-2 { stop-color: #1295dd; }
+.dark .alt-stop-2 { stop-color: #3bc1f3; }
+.alt-stop-3 { stop-color: #1984e2; }
+.dark .alt-stop-3 { stop-color: #47b7f5; }
+.alt-stop-4 { stop-color: #1f74e6; }
+.dark .alt-stop-4 { stop-color: #54aef8; }
+.alt-stop-5 { stop-color: #2563eb; }
+.dark .alt-stop-5 { stop-color: #60a5fa; }
+.alt-stop-6 { stop-color: #335cea; }
+.dark .alt-stop-6 { stop-color: #6b9ff9; }
+.alt-stop-7 { stop-color: #4155e9; }
+.dark .alt-stop-7 { stop-color: #7598f8; }
+.alt-stop-8 { stop-color: #4e4de8; }
+.dark .alt-stop-8 { stop-color: #8092f8; }
+.alt-stop-9 { stop-color: #5c46e7; }
+.dark .alt-stop-9 { stop-color: #8a8bf7; }
+.alt-stop-10 { stop-color: #6a3fe6; }
+.dark .alt-stop-10 { stop-color: #9585f6; }
+.alt-stop-11 { stop-color: #753ce5; }
+.dark .alt-stop-11 { stop-color: #9e83f7; }
+.alt-stop-12 { stop-color: #8039e4; }
+.dark .alt-stop-12 { stop-color: #a781f8; }
+.alt-stop-13 { stop-color: #8c35e2; }
+.dark .alt-stop-13 { stop-color: #b07ff8; }
+.alt-stop-14 { stop-color: #9732e1; }
+.dark .alt-stop-14 { stop-color: #b97df9; }
+.alt-stop-15 { stop-color: #a22fe0; }
+.dark .alt-stop-15 { stop-color: #c27bfa; }
+
+/* The arrow beside the title of a plan page flies from the origin line down to the destination line. --fly is the
+   distance between the two lines: one line of the title on larger screens, a little more on a phone, where the airport
+   codes take a line of their own. */
+.plan-flight {
+  --fly: 1.9em;
+  transform: translateY(var(--fly));
+  animation: plan-flight 1.3s cubic-bezier(0.45, 0.05, 0.2, 1) 0.2s both;
+}
+@media (min-width: 640px) {
+  .plan-flight {
+    --fly: 1.05em;
+  }
+}
+@keyframes plan-flight {
+  from {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(var(--fly));
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-flight {
+    animation: none;
+  }
+}
+
+/* The text under the featured stage of Explore slides in when the plan changes. */
+.front-in {
+  animation: front-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes front-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .front-in {
+    animation: none;
   }
 }

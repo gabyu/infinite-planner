@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react"
+import { ArrowRight } from "@/components/arrow-right"
 import { cn } from "@/lib/utils"
 
 // The "origin → destination" arrow as an icon: the font's → glyph is very wide, this one is

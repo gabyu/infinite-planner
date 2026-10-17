@@ -130,7 +130,7 @@ export function ActivityHeatmap({
             <>
               Days in <span className="font-mono">{tz}</span> ({source}).{" "}
               {profileHref && (
-                <Link href={profileHref} className="underline underline-offset-2">
+                <Link href={profileHref} className="link">
                   Change
                 </Link>
               )}

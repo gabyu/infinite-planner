@@ -1,7 +1,7 @@
 "use client"
 
+import { ArrowRight } from "@/components/arrow-right"
 import { useEffect, useState } from "react"
-import { ArrowRight } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { formatAgo } from "@/lib/format-ago"
 
