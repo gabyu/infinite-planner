@@ -109,29 +109,28 @@ export const visibilityCopy = {
 }
 
 /**
- * Legal and compliance correctif (copy-review-legal.md has the four options of each string). Calm option, PROVISIONAL
- * until approved: the production build refuses to run while any line below ends with the marker.
+ * Legal and compliance correctif (copy-review-legal.md has the four options of each string). Calm option, approved 2026-10-18.
  */
 export const legalCopy = {
   // Where publishing is refused or switched off (switch helper text, API error). Same sentence everywhere.
-  publishOnlyOwnDesigns: "Only flight plans you design in Route Sketch can be published.", // PROVISIONAL
+  publishOnlyOwnDesigns: "Only flight plans you design in Route Sketch can be published.",
   // A plan an admin took off Explore: the owner sees this, never a reason.
-  planNotAvailable: "This flight plan isn't available on Explore right now.", // PROVISIONAL
+  planNotAvailable: "This flight plan isn't available on Explore right now.",
   // Short tag beside a view or a download of a plan.
-  simulationOnly: "Simulation only", // PROVISIONAL
+  simulationOnly: "Simulation only",
   // Report control and form.
-  reportLink: "Report", // PROVISIONAL
-  reportTitle: "Report this flight plan", // PROVISIONAL
-  reportIntro: "Tell us what's wrong. Only the admins see your report.", // PROVISIONAL
-  reportReasonInappropriate: "Inappropriate content", // PROVISIONAL
-  reportReasonCopyright: "Copyright infringement", // PROVISIONAL
-  reportReasonWrongData: "Wrong or broken data", // PROVISIONAL
-  reportReasonSpam: "Spam", // PROVISIONAL
-  reportReasonOther: "Something else", // PROVISIONAL
-  reportDetailsPlaceholder: "Details (optional)", // PROVISIONAL
-  reportSend: "Send report", // PROVISIONAL
-  reportThanksTitle: "Thanks for your report", // PROVISIONAL
-  reportThanksBody: "An admin will look at it.", // PROVISIONAL
-  reportError: "Couldn't send your report. Please try again.", // PROVISIONAL
-  reportOwnPlan: "This is your own flight plan.", // PROVISIONAL
+  reportLink: "Report",
+  reportTitle: "Report this flight plan",
+  reportIntro: "Tell us what's wrong. Only the admins see your report.",
+  reportReasonInappropriate: "Inappropriate content",
+  reportReasonCopyright: "Copyright infringement",
+  reportReasonWrongData: "Wrong or broken data",
+  reportReasonSpam: "Spam",
+  reportReasonOther: "Something else",
+  reportDetailsPlaceholder: "Details (optional)",
+  reportSend: "Send report",
+  reportThanksTitle: "Thanks for your report",
+  reportThanksBody: "An admin will look at it.",
+  reportError: "Couldn't send your report. Please try again.",
+  reportOwnPlan: "This is your own flight plan.",
 } as const
