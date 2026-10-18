@@ -120,14 +120,14 @@ export const legalCopy = {
   simulationOnly: "Simulation only: not the published procedure",
   // The publish dialog, the same from every place a plan can be published. Imported plans add the checkbox.
   // Bump the version in DECLARATION_WORDING_KEY below whenever the title, body or checkbox wording changes.
-  declarationTitle: "Do you have the right to share this flight plan?", // PROVISIONAL
-  declarationBody: "This flight plan comes from a file you imported. Publishing it shows it to the community.", // PROVISIONAL
+  declarationTitle: "Do you have the right to share this flight plan?",
+  declarationBody: "Publishing it shows it to the community.",
   // The checkbox label is this text, then the link, then the full stop.
-  declarationCheckbox: "I created this flight plan, or I have the right to share it, and it does not come from a source that forbids sharing. See the", // PROVISIONAL
-  declarationTermsLink: "Terms", // PROVISIONAL
-  declarationConfirm: "Share it", // PROVISIONAL
-  declarationCancel: "Not now", // PROVISIONAL
-  declarationRequired: "Confirm you have the right to share this flight plan.", // PROVISIONAL
+  declarationCheckbox: "I created this flight plan, or I have the right to share it, and it does not come from a source that forbids sharing. See the",
+  declarationTermsLink: "Terms",
+  declarationConfirm: "Share it",
+  declarationCancel: "Not now",
+  declarationRequired: "Confirm you have the right to share this flight plan.",
   // Report control and form.
   reportLink: "Report",
   reportTitle: "Report this flight plan",
