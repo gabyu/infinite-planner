@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const viewer = await getViewer()
   if (!(await fetchLibraryLaunched()) && !viewer.canPreview) return json({ error: "This flight plan isn't available." }, 404)
-  if (!viewer.userId) return json({ error: "Sign in with Discord to download flight plans." }, 401)
+  if (!viewer.userId) return json({ error: "sign_in_required" }, 401)
   if (!allowAction(viewer.userId)) return json({ error: "Too many actions. Try again in a minute." }, 429)
 
   const service = getServiceRoleSupabase()

@@ -112,7 +112,8 @@ export function isUuid(value: string) {
 // is open to them (launched, or they are an admin) and applies the per-user rate limit.
 export async function requireLibraryUser(request: Request) {
   const auth = await requireUser(request)
-  if (auth.error) return auth
+  // Library routes answer an anonymous caller with one stable code, no message about the plan.
+  if (auth.error) return auth.error.status === 401 ? { error: json({ error: "sign_in_required" }, 401) } : auth
 
   const { getViewer, isLibraryOpenFor } = await import("@/lib/library")
   if (!(await isLibraryOpenFor(await getViewer()))) return { error: json({ error: "Not found." }, 404) }

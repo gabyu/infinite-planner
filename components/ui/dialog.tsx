@@ -59,7 +59,8 @@ const DialogHeader = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      'flex flex-col space-y-1.5 text-center sm:text-left',
+      // Right padding keeps the title clear of the 40 px close button in the corner.
+      'flex flex-col space-y-1.5 pr-14 text-center sm:text-left',
       className,
     )}
     {...props}

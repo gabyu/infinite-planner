@@ -106,8 +106,6 @@ export const visibilityCopy = {
   labelShort: "Public",
   helperPrivate: "Only you can see this plan.",
   helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`,
-  copyLink: "Copy link",
-  copied: "Link copied",
 }
 
 /**
@@ -120,13 +118,16 @@ export const legalCopy = {
   planNotAvailable: "This flight plan isn't available on Explore right now.",
   // Short tag beside a view or a download of a plan.
   simulationOnly: "Simulation only: not the published procedure",
-  // The declaration asked the first time an Imported plan (a file from another source) is published.
-  declarationTitle: "Do you have the right to share this flight plan?",
-  declarationBody: "This flight plan comes from a file you imported. Publishing it shows it to the community.",
-  declarationCheckbox: "I confirm I have the right to share this flight plan.",
-  declarationConfirm: "Share it",
-  declarationCancel: "Not now",
-  declarationRequired: "Confirm you have the right to share this flight plan.",
+  // The publish dialog, the same from every place a plan can be published. Imported plans add the checkbox.
+  // Bump the version in DECLARATION_WORDING_KEY below whenever the title, body or checkbox wording changes.
+  declarationTitle: "Do you have the right to share this flight plan?", // PROVISIONAL
+  declarationBody: "This flight plan comes from a file you imported. Publishing it shows it to the community.", // PROVISIONAL
+  // The checkbox label is this text, then the link, then the full stop.
+  declarationCheckbox: "I created this flight plan, or I have the right to share it, and it does not come from a source that forbids sharing. See the", // PROVISIONAL
+  declarationTermsLink: "Terms", // PROVISIONAL
+  declarationConfirm: "Share it", // PROVISIONAL
+  declarationCancel: "Not now", // PROVISIONAL
+  declarationRequired: "Confirm you have the right to share this flight plan.", // PROVISIONAL
   // Report control and form.
   reportLink: "Report",
   reportTitle: "Report this flight plan",
@@ -143,3 +144,6 @@ export const legalCopy = {
   reportError: "Couldn't send your report. Please try again.",
   reportOwnPlan: "This is your own flight plan.",
 } as const
+
+/** What is stored with each declaration instead of its text: the checkbox key and the version of its wording. */
+export const DECLARATION_WORDING_KEY = "declarationCheckbox@1"

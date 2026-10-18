@@ -50,6 +50,19 @@ interface ReportRow {
   page_url: string | null
 }
 
+interface DeclarationRow {
+  id: string
+  declared_at: string
+  wording_key: string
+  origin_sources: string[]
+  user_name: string
+  public_id: string | null
+  origin_airport: string
+  destination_airport: string
+  flight_number: string | null
+  total: number
+}
+
 interface Coverage {
   public_plans: number
   distinct_routes: number
@@ -79,7 +92,7 @@ export default async function RoutesAdminPage({ searchParams }: { searchParams: 
   const source = one(searchParams.source)
   const author = one(searchParams.author)
 
-  const [plansResult, reportsResult, coverageResult, settings] = await Promise.all([
+  const [plansResult, reportsResult, coverageResult, settings, declarationsResult] = await Promise.all([
     ctx.supabase.rpc("admin_list_library_plans", {
       p_route: route || null,
       p_flight: flight || null,
@@ -89,9 +102,11 @@ export default async function RoutesAdminPage({ searchParams }: { searchParams: 
     ctx.supabase.rpc("admin_list_reports"),
     ctx.supabase.rpc("admin_library_coverage"),
     ctx.supabase.rpc("library_state"),
+    ctx.supabase.rpc("admin_list_declarations", { p_limit: 100 }),
   ])
   const plans = (plansResult.data ?? []) as PlanRow[]
   const reports = (reportsResult.data ?? []) as ReportRow[]
+  const declarations = (declarationsResult.data ?? []) as DeclarationRow[]
   const coverage = coverageResult.data as Coverage | null
   const launched = settings.data === true
   const filtered = !!(route || flight || source || author)
@@ -188,6 +203,49 @@ export default async function RoutesAdminPage({ searchParams }: { searchParams: 
                         Hide plan
                       </LibraryActionButton>
                     </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </section>
+
+      <section aria-labelledby="declarations" className="mb-8">
+        <h2 id="declarations" className="mb-3 text-sm font-semibold">
+          Publish declarations{" "}
+          <Badge variant="secondary">{declarations[0]?.total ?? 0}</Badge>
+        </h2>
+        <div className="rounded-lg border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Plan</TableHead>
+                <TableHead>Declared by</TableHead>
+                <TableHead>Origin</TableHead>
+                <TableHead>Wording</TableHead>
+                <TableHead className="w-28">When</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {declarations.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                    No declarations yet.
+                  </TableCell>
+                </TableRow>
+              )}
+              {declarations.map((declaration) => (
+                <TableRow key={declaration.id}>
+                  <TableCell className="font-medium">
+                    {declaration.origin_airport} → {declaration.destination_airport}
+                    {declaration.flight_number ? ` ${declaration.flight_number}` : ""}
+                  </TableCell>
+                  <TableCell>{declaration.user_name}</TableCell>
+                  <TableCell>{declaration.origin_sources.join(", ")}</TableCell>
+                  <TableCell className="font-mono text-xs">{declaration.wording_key}</TableCell>
+                  <TableCell>
+                    <LocalDate iso={declaration.declared_at} timezone={timezone} />
                   </TableCell>
                 </TableRow>
               ))}

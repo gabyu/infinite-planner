@@ -287,12 +287,11 @@ export const faqData = [
         <p>
           Explore is the library of flight plans published by the community. A flight plan converted from
           a FlightRadar24 or FlightAware file stays private. Every flight plan you export is <strong>private</strong> until you
-          switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore
-          and indexed by search engines, and your Discord name and avatar are shown with it.
+          switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore for
+          signed-in users, and your Discord name and avatar are shown with it.
         </p>
         <p>
-          You can switch it back to private at any time and its page stops working. Search engines can keep an old copy
-          for a while, which we don't control.
+          You can switch it back to private at any time and its page stops working.
         </p>
       </div>
     ),

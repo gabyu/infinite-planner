@@ -42,7 +42,7 @@ export function LegalSections({ sections }: { sections: TermsSection[] }) {
   return (
     <>
       {sections.map((section, index) => (
-        <section key={section.heading}>
+        <section key={section.heading} id={section.heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")} className="scroll-mt-24">
           <h2>
             {index + 1}. {section.heading}
           </h2>

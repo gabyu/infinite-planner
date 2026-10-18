@@ -59,14 +59,11 @@ export default function PrivacyPage() {
         <p>
           Your Discord username is the name by which you are identified on the Service, and the only element of your
           profile that is visible to anyone, until you make a flight plan public. When you make a flight plan public,
-          your Discord username and avatar are displayed with it as its author to anyone who opens its page, whether or
-          not they have an account. Your email address is never shown to other users or visitors.
+          your Discord username and avatar are displayed with it as its author to the signed-in users who open its page. Your email address is never shown to other users or visitors.
         </p>
         <p>
-          A flight plan you make <strong>public</strong> is listed in the Service's library, and search engines may index
-          it, together with your Discord username. A <strong>private</strong> plan is visible to you only. Search
-          engines and other caches may keep a page for some time after you make a plan private again, which we do not
-          control.
+          A flight plan you make <strong>public</strong> is listed in the Service's library for signed-in users. The library is not indexed by search
+          engines. A <strong>private</strong> plan is visible to you only.
         </p>
         <p>
           Signed-in users can open a pilot profile page, which shows your Discord username and avatar, the month you
@@ -122,7 +119,7 @@ export default function PrivacyPage() {
         <p>We share information only with the following recipients, and only as needed to operate the Service:</p>
         <ul>
           <li>
-            <strong>Anyone who opens a flight plan you make public</strong>, who can view it, sees your Discord name and
+            <strong>The signed-in users who open a flight plan you make public</strong>, who can view it, sees your Discord name and
             avatar as its author and, once signed in, can download it. You can make it private at any time, after which
             its page no longer works.
           </li>

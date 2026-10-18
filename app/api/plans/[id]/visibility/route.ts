@@ -1,10 +1,10 @@
 import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { isUuid, json, requireUser } from "@/lib/flight-plan-server"
-import { legalCopy } from "@/lib/copy"
+import { DECLARATION_WORDING_KEY, legalCopy } from "@/lib/copy"
 import { getViewer, isLibraryOpenFor } from "@/lib/library"
 
-const bodySchema = z.object({ visibility: z.enum(["private", "public"]) })
+const bodySchema = z.object({ visibility: z.enum(["private", "public"]), declaration: z.boolean().optional() })
 
 // What the database says when set_plan_visibility refuses, in words for the person who asked.
 function messageFor(error: { code?: string; message?: string }) {
@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return json({ error: "Invalid visibility." }, 400)
-  const { visibility } = parsed.data
+  const { visibility, declaration } = parsed.data
 
   if (visibility === "public") {
     const viewer = await getViewer()
@@ -47,7 +47,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!profile.library_consent_at) return json({ error: "Please confirm before publishing.", code: "consent_required" }, 409)
   }
 
-  const { data, error } = await supabase.rpc("set_plan_visibility", { p_plan_id: params.id, p_visibility: visibility })
+  const { data, error } = await supabase.rpc("set_plan_visibility", {
+    p_plan_id: params.id,
+    p_visibility: visibility,
+    // The wording the person ticked, recorded with the publish (null = nothing declared).
+    p_declaration_key: visibility === "public" && declaration ? DECLARATION_WORDING_KEY : null,
+  })
   if (error) {
     // An Imported plan needs the owner's declaration first: the switch asks for it, then tries again.
     if ((error.message ?? "").includes("declaration_required")) {

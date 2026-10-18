@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import type { PlanShare, PlanVisibility } from "@/lib/flight-plans"
-import { planPath } from "@/lib/plan-slug"
-import { legalCopy, visibilityCopy } from "@/lib/copy"
+import { PublishDialog } from "@/components/publish-dialog"
+import { visibilityCopy } from "@/lib/copy"
 import { cn } from "@/lib/utils"
 
 interface VisibilitySwitchProps {
@@ -23,6 +23,8 @@ interface VisibilitySwitchProps {
   layout?: "field" | "inline"
   // A shorter label where the column already says "Visibility" (the dashboard table).
   short?: boolean
+  // The plan comes from an imported file: publishing needs the declaration (the server also says so if this is wrong).
+  requiresDeclaration?: boolean
   disabled?: boolean
   disabledReason?: string
   className?: string
@@ -34,41 +36,34 @@ interface VisibilitySwitchProps {
 // exported plan) and drops the cached public page. The first time someone goes public they confirm what that means.
 export function VisibilitySwitch({
   planId,
-  origin: from,
-  destination: to,
-  flightNumber,
   share,
   onShareChange,
   layout = "field",
   short = false,
+  requiresDeclaration = false,
   disabled,
   disabledReason,
   className,
 }: VisibilitySwitchProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [siteOrigin, setSiteOrigin] = useState("")
   const [askConsent, setAskConsent] = useState(false)
-  // The declaration an Imported plan needs before it can be published.
-  const [askDeclaration, setAskDeclaration] = useState(false)
-  const [declared, setDeclared] = useState(false)
-  useEffect(() => setSiteOrigin(window.location.origin), [])
+  // The publish dialog: shown on every publish; the checkbox is in it when the plan needs the declaration.
+  const [askPublish, setAskPublish] = useState(false)
+  // Whether the declaration was ticked in the dialog that is being confirmed (kept for the consent retry).
+  const [declarationGiven, setDeclarationGiven] = useState(false)
+  const [serverWantsDeclaration, setServerWantsDeclaration] = useState(false)
 
   const isPublic = share.visibility === "public"
-  const link =
-    isPublic && share.publicId
-      ? `${siteOrigin}${planPath({ origin: from, destination: to, flightNumber, publicId: share.publicId })}`
-      : ""
 
-  async function choose(visibility: PlanVisibility) {
+  async function choose(visibility: PlanVisibility, declaration = false) {
     setBusy(true)
     setError(null)
     try {
       const response = await fetch(`/api/plans/${planId}/visibility`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ visibility }),
+        body: JSON.stringify({ visibility, declaration }),
       })
       const body = await response.json().catch(() => null)
       if (response.status === 409 && body?.code === "consent_required") {
@@ -76,8 +71,9 @@ export function VisibilitySwitch({
         return
       }
       if (response.status === 409 && body?.code === "declaration_required") {
-        setDeclared(false)
-        setAskDeclaration(true)
+        // The server knows better than the page: ask again, with the checkbox.
+        setServerWantsDeclaration(true)
+        setAskPublish(true)
         return
       }
       if (!response.ok) {
@@ -98,26 +94,7 @@ export function VisibilitySwitch({
     setBusy(false)
     setAskConsent(false)
     if (!response?.ok) return setError("Couldn't save your choice. Please try again.")
-    await choose("public")
-  }
-
-  async function acceptDeclaration() {
-    setBusy(true)
-    const response = await fetch(`/api/plans/${planId}/declaration`, { method: "POST" }).catch(() => null)
-    setBusy(false)
-    setAskDeclaration(false)
-    if (!response?.ok) return setError("Couldn't save your choice. Please try again.")
-    await choose("public")
-  }
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      setError("Couldn't copy the link.")
-    }
+    await choose("public", declarationGiven)
   }
 
   const t = visibilityCopy
@@ -134,7 +111,7 @@ export function VisibilitySwitch({
           id={`visibility-${planId}`}
           checked={isPublic}
           disabled={disabled || busy}
-          onCheckedChange={(checked) => choose(checked ? "public" : "private")}
+          onCheckedChange={(checked) => (checked ? setAskPublish(true) : choose("private"))}
           aria-describedby={layout === "field" ? `visibility-help-${planId}` : undefined}
         />
       </div>
@@ -143,15 +120,6 @@ export function VisibilitySwitch({
         // One line, always there, so the panel never moves when the plan goes public.
         <div className="mt-1 flex min-h-[1.25rem] items-center justify-between gap-3 text-xs text-muted-foreground">
           <span id={`visibility-help-${planId}`}>{helper}</span>
-          {isPublic && link && (
-            <button
-              type="button"
-              onClick={copy}
-              className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline"
-            >
-              {copied ? t.copied : t.copyLink}
-            </button>
-          )}
         </div>
       )}
       {layout === "inline" && disabled && disabledReason && (
@@ -160,31 +128,18 @@ export function VisibilitySwitch({
       )}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
 
-      <Dialog open={askDeclaration} onOpenChange={setAskDeclaration}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{legalCopy.declarationTitle}</DialogTitle>
-            <DialogDescription>{legalCopy.declarationBody}</DialogDescription>
-          </DialogHeader>
-          <label className="flex cursor-pointer items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={declared}
-              onChange={(e) => setDeclared(e.target.checked)}
-              className="mt-0.5 accent-[hsl(var(--primary))]"
-            />
-            {legalCopy.declarationCheckbox}
-          </label>
-          <DialogFooter className="gap-2 sm:space-x-0">
-            <Button variant="outline" onClick={() => setAskDeclaration(false)} disabled={busy}>
-              {legalCopy.declarationCancel}
-            </Button>
-            <Button onClick={acceptDeclaration} disabled={busy || !declared}>
-              {legalCopy.declarationConfirm}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PublishDialog
+        open={askPublish}
+        needsDeclaration={requiresDeclaration || serverWantsDeclaration}
+        busy={busy}
+        onClose={() => setAskPublish(false)}
+        onConfirm={() => {
+          const given = requiresDeclaration || serverWantsDeclaration
+          setDeclarationGiven(given)
+          setAskPublish(false)
+          void choose("public", given)
+        }}
+      />
 
       <Dialog open={askConsent} onOpenChange={setAskConsent}>
         <DialogContent className="max-w-sm">

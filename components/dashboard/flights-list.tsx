@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, Eye, Info, Link2, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
+import { Copy, Download, Eye, Info, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -175,22 +175,6 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
     if (!result) return toast({ title: "Couldn't load more", variant: "destructive" })
     setPlans((current) => [...current, ...result.rows.filter((row) => !current.some((plan) => plan.id === row.id))])
     setTotal(result.total)
-  }
-
-  async function copyLink(plan: FlightPlanSummary) {
-    if (!plan.public_id) return
-    const link = `${window.location.origin}${planPath({
-      origin: plan.origin_airport,
-      destination: plan.destination_airport,
-      flightNumber: plan.flight_number,
-      publicId: plan.public_id,
-    })}`
-    try {
-      await navigator.clipboard.writeText(link)
-      toast({ title: "Link copied", description: routeOf(plan) })
-    } catch {
-      toast({ title: "Couldn't copy the link", variant: "destructive" })
-    }
   }
 
   async function toggleFeatured(plan: FlightPlanSummary) {
@@ -441,6 +425,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         share={shareOf(plan)}
                         layout="inline"
                         short
+                        requiresDeclaration={plan.origin_sources.includes("Imported")}
                         onShareChange={(share) =>
                           patchPlan(plan.id, {
                             visibility: share.visibility,
@@ -496,9 +481,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                           </DropdownMenuItem>
                           {library && plan.visibility === "public" && plan.public_id && (
                             <>
-                              <DropdownMenuItem onSelect={() => copyLink(plan)}>
-                                <Link2 /> Copy link
-                              </DropdownMenuItem>
+
                               <DropdownMenuItem onSelect={() => toggleFeatured(plan)}>
                                 <Star className={cn(plan.featured && "fill-primary text-primary")} />
                                 {plan.featured ? "Remove from profile" : "Feature on profile"}

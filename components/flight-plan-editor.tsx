@@ -1556,6 +1556,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             flightNumber={detectedFlightNumber}
             share={planShare}
             onShareChange={setPlanShare}
+            requiresDeclaration={[...originSources, ...(planSource ? [planSource] : [])].includes("Imported")}
             disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty || trackerDerived}
             disabledReason={
               trackerDerived

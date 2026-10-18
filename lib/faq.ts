@@ -45,7 +45,7 @@ export const FAQ_TEXT = {
   explore: {
     question: "What is Explore, and who can see my flight plans?",
     answer:
-      "Explore is the library of flight plans published by the community. Plans converted from FlightRadar24 or FlightAware files stay private. Your plans are private until you make one public; a public plan is listed in Explore and indexed by search engines, with your Discord name and avatar. You can make it private again at any time.",
+      "Explore is the library of flight plans published by the community. Plans converted from FlightRadar24 or FlightAware files stay private. Your plans are private until you make one public; a public plan is listed in Explore for signed-in users, with your Discord name and avatar. You can make it private again at any time.",
   },
   "download-import": {
     question: "Can I download or adapt someone else's flight plan?",
