@@ -1,8 +1,8 @@
 /**
  * Every new user-facing string of the editor revamp and the Explore launch lives here, grouped by screen.
- * Components never hard-code these. A line ending in `// PROVISIONAL` is the "Calm" option waiting for
- * Gabriel's approval (see copy-review-step-N.md); `pnpm check:copy` fails while any remain, and the
- * production build runs it.
+ * Components never hard-code these. The text is the "Calm" option, approved for the first production release (see copy-review-step-N.md for the
+ * alternatives). A new string is added with `// PROVISIONAL` at the end of its line until Gabriel approves it: `pnpm
+ * check:copy` fails while any remain, and the production build runs it.
  */
 
 import { LIBRARY_NAV_LABEL } from "@/lib/brand"
@@ -10,100 +10,100 @@ import { LIBRARY_NAV_LABEL } from "@/lib/brand"
 export const copy = {
   editor: {
     // Panel
-    panelCollapse: "Hide panel", // PROVISIONAL
-    panelExpand: "Show panel", // PROVISIONAL
-    statsDistance: "Distance", // PROVISIONAL
-    statsWaypoints: "Waypoints", // PROVISIONAL
-    statsMaxAltitude: "Max altitude", // PROVISIONAL
-    statsFlightTime: "Flight time", // PROVISIONAL
-    detailsHeading: "Flight details", // PROVISIONAL
-    waypointsHeading: "Waypoints", // PROVISIONAL
-    selectAll: "Select all waypoints", // PROVISIONAL
-    deleteSelected: "Delete selected waypoints", // PROVISIONAL
-    clearAltitudes: "Clear altitudes of selected waypoints", // PROVISIONAL
-    waypointName: "Waypoint name", // PROVISIONAL
-    waypointAltitude: "Altitude in feet", // PROVISIONAL
-    waypointLatitude: "Latitude", // PROVISIONAL
-    waypointLongitude: "Longitude", // PROVISIONAL
-    waypointLimit: "Over the 250 waypoint limit", // PROVISIONAL
-    optionsHeading: "Options", // PROVISIONAL
-    tabWaypoints: "Waypoints", // PROVISIONAL
-    flightNumbersLabel: "Flight numbers", // PROVISIONAL
-    flightNumberPrimary: "Main flight number", // PROVISIONAL
-    flightNumberRemove: "Remove", // PROVISIONAL
-    flightNumberPlaceholder: "e.g. AF69", // PROVISIONAL
-    flightNumberAddPlaceholder: "Add another", // PROVISIONAL
-    flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.", // PROVISIONAL
-    sheetHandle: "Drag to resize the panel", // PROVISIONAL
+    panelCollapse: "Hide panel",
+    panelExpand: "Show panel",
+    statsDistance: "Distance",
+    statsWaypoints: "Waypoints",
+    statsMaxAltitude: "Max altitude",
+    statsFlightTime: "Flight time",
+    detailsHeading: "Flight details",
+    waypointsHeading: "Waypoints",
+    selectAll: "Select all waypoints",
+    deleteSelected: "Delete selected waypoints",
+    clearAltitudes: "Clear altitudes of selected waypoints",
+    waypointName: "Waypoint name",
+    waypointAltitude: "Altitude in feet",
+    waypointLatitude: "Latitude",
+    waypointLongitude: "Longitude",
+    waypointLimit: "Over the 250 waypoint limit",
+    optionsHeading: "Options",
+    tabWaypoints: "Waypoints",
+    flightNumbersLabel: "Flight numbers",
+    flightNumberPrimary: "Main flight number",
+    flightNumberRemove: "Remove",
+    flightNumberPlaceholder: "e.g. AF69",
+    flightNumberAddPlaceholder: "Add another",
+    flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.",
+    sheetHandle: "Drag to resize the panel",
 
     // Ground movements (Options)
-    groundHeading: "Ground movements", // PROVISIONAL
-    groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.", // PROVISIONAL
-    trimDeparture: "Departure", // PROVISIONAL
-    trimArrival: "Arrival", // PROVISIONAL
-    trimApply: "Apply", // PROVISIONAL
-    trimCancel: "Cancel", // PROVISIONAL
-    trimApproximate: "Approximate", // PROVISIONAL
-    trimNone: "No ground movements found", // PROVISIONAL
-    trimLoading: "Looking at the runways...", // PROVISIONAL
-    trimUndo: "Undo", // PROVISIONAL
-    trimBrandingNote: "The plan is now too short for Made with Infinite Planner, so it was left out.", // PROVISIONAL
+    groundHeading: "Ground movements",
+    groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.",
+    trimDeparture: "Departure",
+    trimArrival: "Arrival",
+    trimApply: "Apply",
+    trimCancel: "Cancel",
+    trimApproximate: "Approximate",
+    trimNone: "No ground movements found",
+    trimLoading: "Looking at the runways...",
+    trimUndo: "Undo",
+    trimBrandingNote: "The plan is now too short for Made with Infinite Planner, so it was left out.",
 
     // Going back to the Convert start screen
-    leaveTitle: "Are you sure you want to go back?", // PROVISIONAL
-    leaveBody: "This flight plan hasn't been exported or saved. Going back erases everything you created.", // PROVISIONAL
-    leaveStay: "Stay", // PROVISIONAL
-    leaveConfirm: "Go back and erase", // PROVISIONAL
+    leaveTitle: "Are you sure you want to go back?",
+    leaveBody: "This flight plan hasn't been exported or saved. Going back erases everything you created.",
+    leaveStay: "Stay",
+    leaveConfirm: "Go back and erase",
 
     // Map toolbar
-    editWaypoints: "Edit waypoints", // PROVISIONAL
-    doneEditing: "Done editing", // PROVISIONAL
-    selectPoints: "Select points", // PROVISIONAL
-    doneSelecting: "Done selecting", // PROVISIONAL
-    deleteWaypoints: "Delete", // PROVISIONAL
-    fitRoute: "Fit route", // PROVISIONAL
-    zoomIn: "Zoom in", // PROVISIONAL
-    zoomOut: "Zoom out", // PROVISIONAL
-    zoomToDeparture: "Zoom to departure", // PROVISIONAL
-    zoomToArrival: "Zoom to arrival", // PROVISIONAL
-    mapLoading: "Loading map...", // PROVISIONAL
-    mapStyle: "Map style", // PROVISIONAL
-    styleAuto: "Auto", // PROVISIONAL
-    styleLight: "Light", // PROVISIONAL
-    styleDark: "Dark", // PROVISIONAL
-    styleColour: "Colour", // PROVISIONAL
-    altitudeColours: "Altitude colours", // PROVISIONAL
+    editWaypoints: "Edit waypoints",
+    doneEditing: "Done editing",
+    selectPoints: "Select points",
+    doneSelecting: "Done selecting",
+    deleteWaypoints: "Delete",
+    fitRoute: "Fit route",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    zoomToDeparture: "Zoom to departure",
+    zoomToArrival: "Zoom to arrival",
+    mapLoading: "Loading map...",
+    mapStyle: "Map style",
+    styleAuto: "Auto",
+    styleLight: "Light",
+    styleDark: "Dark",
+    styleColour: "Colour",
+    altitudeColours: "Altitude colours",
 
     // Altitude strip
-    altitudeHeading: "Altitude profile", // PROVISIONAL
-    altitudeShow: "Show altitude profile", // PROVISIONAL
-    altitudeHide: "Hide altitude profile", // PROVISIONAL
-    altitudeNone: "No altitude data in this plan yet.", // PROVISIONAL
+    altitudeHeading: "Altitude profile",
+    altitudeShow: "Show altitude profile",
+    altitudeHide: "Hide altitude profile",
+    altitudeNone: "No altitude data in this plan yet.",
   },
 } as const
 
 /** "12 waypoints will be removed" while previewing a trim. */
 export function trimPreviewText(count: number, end: "departure" | "arrival") {
   const where = end === "departure" ? "before take-off" : "after landing"
-  return `${count} waypoint${count === 1 ? "" : "s"} will be removed ${where}` // PROVISIONAL
+  return `${count} waypoint${count === 1 ? "" : "s"} will be removed ${where}`
 }
 
 /** "12 waypoints removed" in the toast after applying. */
 export function trimRemovedText(count: number) {
-  return `${count} waypoint${count === 1 ? "" : "s"} removed` // PROVISIONAL
+  return `${count} waypoint${count === 1 ? "" : "s"} removed`
 }
 
 /** "Altitude profile: cruises at FL370 over 5,420 NM" for the screen reader label of the strip. */
 export function altitudeLabel(cruise: string, distance: string) {
-  return `Altitude profile: cruises at ${cruise} over ${distance}` // PROVISIONAL
+  return `Altitude profile: cruises at ${cruise} over ${distance}`
 }
 
 /** The visibility switch (editor, plan page, dashboard): the label says what the switch does, it sits on the left. */
 export const visibilityCopy = {
-  label: `Publish on ${LIBRARY_NAV_LABEL}`, // PROVISIONAL
-  labelShort: "Public", // PROVISIONAL
-  helperPrivate: "Only you can see this plan.", // PROVISIONAL
-  helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`, // PROVISIONAL
-  copyLink: "Copy link", // PROVISIONAL
-  copied: "Link copied", // PROVISIONAL
+  label: `Publish on ${LIBRARY_NAV_LABEL}`,
+  labelShort: "Public",
+  helperPrivate: "Only you can see this plan.",
+  helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`,
+  copyLink: "Copy link",
+  copied: "Link copied",
 }

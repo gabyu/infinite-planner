@@ -1,6 +1,6 @@
 # Copy review, step 2: editor workspace
 
-All keys are in `lib/copy.ts` under `editor`. The text on staging today is the **Calm** option, marked `// PROVISIONAL`.
+All keys are in `lib/copy.ts` under `editor`. The text in the catalog is the **Calm** option. On 2026-10-18 Gabriel approved the Calm text as it stands for the first production release (the `// PROVISIONAL` markers were removed); the other options below stay here to switch to later.
 Reply with a choice per row (or per block), e.g. "Panel: Short, Toolbar: Calm, Altitude: Fun".
 Most strings here are short UI labels, so the options differ mostly in wording and length. Nothing here is consent, privacy or data-loss text, so no option is marked not recommended except where noted.
 
