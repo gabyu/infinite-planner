@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTheme } from "next-themes"
 import { Globe, Layers, Minus, PlaneLanding, PlaneTakeoff, Plus } from "lucide-react"
 import {
@@ -13,7 +13,7 @@ import {
   setBasemap,
   type BasemapChoice,
 } from "@/lib/map-tiles"
-import { altitudeBucket, hasAltitudeData } from "@/lib/route-render"
+import { altitudeBucket, hasAltitudeData, unwrapLongitudes } from "@/lib/route-render"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -59,6 +59,9 @@ export interface MapPreviewProps {
   focus?: { ids: string[]; nonce: number } | null
 }
 
+// Back into -180..180 (a point dragged or inserted beyond the date line).
+const foldLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180
+
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
@@ -74,7 +77,7 @@ const CHEVRON_MIN_ZOOM = 6
 const CHEVRON_SPACING_PX = 150
 
 export default function MapPreview({
-  waypoints,
+  waypoints: rawWaypoints,
   isEditing,
   onWaypointDragEnd,
   onWaypointInsert,
@@ -89,6 +92,10 @@ export default function MapPreview({
   ghostIds,
   focus,
 }: MapPreviewProps) {
+  // A route that crosses the antimeridian (Tokyo to San Francisco) has longitudes that jump from +140 to -122. The map
+  // draws it continuous by carrying on past 180 (the tiles repeat), so the line goes over the Pacific and not across
+  // the whole world; positions going back to the editor are folded back into -180..180.
+  const waypoints = useMemo(() => unwrapLongitudes(rawWaypoints), [rawWaypoints])
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const routeLineRef = useRef<any>(null)
@@ -341,7 +348,7 @@ export default function MapPreview({
   // Handle insert marker click
   const handleInsertMarkerClick = () => {
     if (hoverSegmentIndex !== null && hoverPoint && onWaypointInsert) {
-      onWaypointInsert(hoverSegmentIndex, hoverPoint.lat, hoverPoint.lng)
+      onWaypointInsert(hoverSegmentIndex, hoverPoint.lat, foldLng(hoverPoint.lng))
       // Clear hover state after insertion
       setHoverSegmentIndex(null)
       setHoverPoint(null)
@@ -622,7 +629,7 @@ export default function MapPreview({
         })
         marker.on("dragend", (e: any) => {
           const newLatLng = e.target.getLatLng()
-          callbacksRef.current.onWaypointDragEnd(waypoint.id, newLatLng.lat, newLatLng.lng)
+          callbacksRef.current.onWaypointDragEnd(waypoint.id, newLatLng.lat, foldLng(newLatLng.lng))
           justDraggedIdRef.current = waypoint.id
         })
         markersRef.current.set(waypoint.id, marker)
