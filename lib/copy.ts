@@ -30,6 +30,8 @@ export const copy = {
     tabWaypoints: "Waypoints",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
+    addFlightNumber: "Add a flight number", // PROVISIONAL
+    noFlightNumber: "No flight number", // PROVISIONAL
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
     flightNumberAddPlaceholder: "Add another",

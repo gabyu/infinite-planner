@@ -1478,7 +1478,25 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             {detectedFlightNumber}
           </span>
         ) : (
-          <span>No flight number in the file name{canSave ? ": you can add one below" : ""}</span>
+          // Signed in: a link that opens the Options tab and puts the cursor in the Flight numbers field.
+          canSave ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPanelTab("options")
+                window.setTimeout(() => {
+                  const field = document.getElementById("flight-number")
+                  field?.scrollIntoView({ block: "center", behavior: "smooth" })
+                  field?.focus({ preventScroll: true })
+                }, 80)
+              }}
+              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+            >
+              {copy.editor.addFlightNumber}
+            </button>
+          ) : (
+            <span>{copy.editor.noFlightNumber}</span>
+          )
         )}
         <SourceMark source={importSource} />
       </div>

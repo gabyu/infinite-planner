@@ -68,3 +68,12 @@ Control: small link under the plan's stats, for signed-in people who are not the
 
 - Terms of Service and Privacy Policy wording: the lawyer's. The Terms text is one file, `content/terms.ts`.
 - The FAQ lines about Explore and the arrival route (no more SID/STAR wording): small factual edits, listed in the PR.
+
+## Editor: no flight number (not legal, same review)
+
+Top of the editor panel when the file name carries no flight number. Signed in: a link that opens Options and focuses the Flight numbers field. Signed out: plain text. Replaces the long "No flight number in the file name: you can add one below". Keys `editor.addFlightNumber` and `editor.noFlightNumber`, limit ≤ 24.
+
+| Key | Serious | Calm (current) | Short | Fun |
+|---|---|---|---|---|
+| `addFlightNumber` | Enter a flight number | Add a flight number | Add number | Give it a callsign |
+| `noFlightNumber` | No flight number | No flight number | No number | No callsign yet |
