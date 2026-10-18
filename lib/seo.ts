@@ -70,7 +70,8 @@ export const PAGES = {
     summary:
       "Routes (Explore): a public library of Infinite Flight flight plans shared by pilots. Search by airport, route or flight number, sort by popularity, download a plan as an FPL file, or open it in Convert to adjust it. Each plan, route, airport and flight number has its own page.",
     schema: "CollectionPage",
-    indexable: true,
+    // Members-only: the library is never indexed, listed in the sitemap or described in llms.txt.
+    indexable: false,
   },
   help: {
     path: "/help",

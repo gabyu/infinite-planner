@@ -11,6 +11,32 @@ const FIRST_LOGIN = `${ADMIN_BASE}/first-login`
 // request once the library is launched, is untouched. Only library routes ever reach the flag lookup.
 const LIBRARY_PREFIXES = ["/explore/plans/"]
 
+// The library is for signed-in Discord members only, never for search engines: every page below (Explore, hubs, plans and
+// their OG/Twitter images, pilot profiles) sends an anonymous visitor to the Discord sign-in, and the library's API routes
+// answer 401. The gate sits in front of the ISR/data caches, so cached plan pages are never served to an anonymous request.
+const MEMBER_PAGE_PREFIXES = ["/explore", "/pilots"]
+const MEMBER_API_PREFIXES = ["/api/library/links", "/api/plans/"]
+const underPrefix = (pathname: string, prefix: string) =>
+  prefix.endsWith("/") ? pathname.startsWith(prefix) : pathname === prefix || pathname.startsWith(`${prefix}/`)
+
+function membersOnly(request: NextRequest, response: NextResponse, user: Awaited<ReturnType<typeof updateSession>>["user"]) {
+  const { pathname, search } = request.nextUrl
+  const isPage = MEMBER_PAGE_PREFIXES.some((prefix) => underPrefix(pathname, prefix))
+  const isApi = MEMBER_API_PREFIXES.some((prefix) => underPrefix(pathname, prefix))
+  if (!isPage && !isApi) return null
+  if (user) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow")
+    return null
+  }
+  const blocked = isApi
+    ? NextResponse.json({ error: "Sign in with Discord to use the library." }, { status: 401 })
+    : NextResponse.redirect(new URL(`/auth/signin?next=${encodeURIComponent(pathname + search)}`, request.url))
+  response.cookies.getAll().forEach((cookie) => blocked.cookies.set(cookie))
+  blocked.headers.set("Cache-Control", "private, no-store")
+  blocked.headers.set("X-Robots-Tag", "noindex, nofollow")
+  return blocked
+}
+
 async function previewForAdmins(
   request: NextRequest,
   response: NextResponse,
@@ -38,6 +64,9 @@ async function previewForAdmins(
 export async function middleware(request: NextRequest) {
   const { response, supabase, user } = await updateSession(request)
   const { pathname } = request.nextUrl
+
+  const blocked = membersOnly(request, response, user)
+  if (blocked) return blocked
 
   if (pathname !== ADMIN_BASE && !pathname.startsWith(`${ADMIN_BASE}/`)) {
     return (await previewForAdmins(request, response, supabase, user)) ?? response

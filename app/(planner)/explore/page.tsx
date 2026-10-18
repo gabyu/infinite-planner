@@ -48,9 +48,9 @@ export async function generateMetadata({ searchParams }: { searchParams: SearchP
     title: pageTitle(PAGES.explore),
     description: PAGES.explore.description,
     path: LIBRARY_PATH,
-    indexable: launched && !hasVariant,
+    indexable: false,
     // A filtered or paginated variant stays out of the index but its plan links are still followed.
-    follow: launched,
+    follow: false,
   })
 }
 

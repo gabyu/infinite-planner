@@ -41,7 +41,7 @@ export async function generateMetadata({
   const title = `${from.city ?? ends.from} (${from.iata ?? ends.from}) to ${to.city ?? ends.to} (${to.iata ?? ends.to}) flight plans | ${BRAND_NAME}`
   const description = `Fly ${from.name ?? ends.from} (${ends.from}) to ${to.name ?? ends.to} (${ends.to}) with flight plans shared by the community. Download one for Infinite Flight, or import it and adjust the route.`
   const launched = await getLibraryLaunched()
-  const indexable = launched && plans.length > 0 && !searchParams.cursor
+  const indexable = false
   return buildMetadata({
     title,
     description,

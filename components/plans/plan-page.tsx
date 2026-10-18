@@ -33,7 +33,7 @@ async function resolve(slug: string, mode: PlanPageMode): Promise<Resolved | nul
   // Every plan the library knows is public; before the launch only the admins' preview shows them.
   if (mode === "public" && !launched) return null
 
-  return { plan, indexable: mode === "public" && launched, prelaunch: !launched }
+  return { plan, indexable: false, prelaunch: !launched }
 }
 
 export async function planPageMetadata(slug: string, mode: PlanPageMode): Promise<Metadata> {

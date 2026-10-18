@@ -1,5 +1,5 @@
-import { BRAND_NAME, LIBRARY_NAME } from "@/lib/brand"
-import { IS_STAGING, SITE_URL } from "@/lib/site-url"
+import { BRAND_NAME, LIBRARY_PATH } from "@/lib/brand"
+import { IS_STAGING } from "@/lib/site-url"
 import { absoluteUrl, PAGES, pageTitle, SITE_TAGLINE } from "@/lib/seo"
 
 // /llms.txt: the site in plain markdown for AI agents (llmstxt.org). Built from the same registry as the
@@ -18,7 +18,7 @@ const FACTS = [
 export function GET() {
   if (IS_STAGING) return new Response("Not indexed.\n", { headers: { "Content-Type": "text/plain; charset=utf-8" } })
 
-  const pages = Object.values(PAGES).filter((page) => page.indexable)
+  const pages = Object.values(PAGES).filter((page) => page.indexable && !page.path.startsWith(LIBRARY_PATH))
   const body = [
     `# ${BRAND_NAME}`,
     "",
@@ -31,14 +31,6 @@ export function GET() {
     "## Pages",
     "",
     ...pages.map((page) => `- [${pageTitle(page)}](${absoluteUrl(page.path)}): ${page.summary}`),
-    "",
-    `## ${LIBRARY_NAME} (shared flight plans)`,
-    "",
-    `- Plan pages: ${SITE_URL}/explore/plans/{origin}-{destination}[-{flight number}]-{id}. Each has the route, distance, flight time, waypoints and an FPL download.`,
-    `- Route pages: ${SITE_URL}/explore/routes/{origin}-{destination} (ICAO codes), e.g. lfpg-klax.`,
-    `- Airport pages: ${SITE_URL}/explore/location/{ICAO}, e.g. KPHX.`,
-    `- Flight number pages: ${SITE_URL}/explore/flight_number/{flight number}, e.g. AF69.`,
-    `- The full list of public pages is in ${SITE_URL}/sitemap.xml.`,
     "",
   ].join("\n")
 

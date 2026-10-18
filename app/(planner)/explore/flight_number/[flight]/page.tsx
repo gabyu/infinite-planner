@@ -35,7 +35,7 @@ export async function generateMetadata({
     title,
     description,
     path: flightNumberPath(flight),
-    indexable: launched && plans.length > 0 && !searchParams.cursor,
+    indexable: false,
     follow: true,
   })
 }

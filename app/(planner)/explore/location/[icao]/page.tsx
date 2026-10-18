@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: { icao: string } })
     title,
     description,
     path: locationPath(airport.icao),
-    indexable: launched && plans.length > 0,
+    indexable: false,
     follow: true,
   })
 }
