@@ -1,5 +1,6 @@
 import { isMissingExtraColumn, isUuid, json, requireUser } from "@/lib/flight-plan-server"
 import { MAX_FLIGHT_PLANS_PER_USER } from "@/lib/flight-plans"
+import { getServiceRoleSupabase } from "@/lib/supabase/admin"
 
 // Copies an EXPORTED plan into a new draft: same waypoints, same branding choice, same flight
 // time, but a fresh created_at, status 'draft' and never shared (share_token and the download
@@ -13,7 +14,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!isUuid(params.id)) return json({ error: "Flight plan not found." }, 404)
 
   const fields =
-    "status, source, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes"
+    "status, source, origin_sources, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes"
   const read = (list: string) => supabase.from("flight_plans").select(list).eq("id", params.id).maybeSingle()
   let { data: found, error: readError } = await read(`${fields}, extra_flight_numbers`)
   // A database without the extra_flight_numbers column yet: copy without it.
@@ -29,9 +30,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return json({ error: `Your dashboard is full (${MAX_FLIGHT_PLANS_PER_USER} flight plans). Delete some to save more.` }, 409)
   }
 
-  const { data, error } = await supabase
+  // The copy keeps every origin of the original. origin_sources is server-controlled (the signed-in user has no
+  // right to write it), so the row is written with the service role once ownership and the cap are checked above;
+  // a database trigger also adds the copy's own source, and never lets an origin be removed later.
+  const { origin_sources: originSources, ...content } = original
+  const writer = getServiceRoleSupabase() ?? supabase
+  const { data, error } = await writer
     .from("flight_plans")
-    .insert({ ...original, status: "draft", user_id: user.id })
+    .insert(
+      writer === supabase
+        ? { ...content, status: "draft", user_id: user.id }
+        : { ...content, origin_sources: originSources, status: "draft", user_id: user.id },
+    )
     .select("id")
     .single()
 

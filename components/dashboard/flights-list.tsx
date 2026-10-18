@@ -27,6 +27,7 @@ import { toast } from "@/hooks/use-toast"
 import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
+import { legalCopy } from "@/lib/copy"
 import { VisibilitySwitch } from "@/components/visibility-switch"
 import { planPath } from "@/lib/plan-slug"
 import { getBrowserSupabase } from "@/lib/supabase/client"
@@ -35,6 +36,7 @@ import {
   HISTORY_PAGE_SIZE,
   flightPlanEditPath,
   formatFlightTime,
+  isTrackerDerived,
   sourceLabel,
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
@@ -406,7 +408,10 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
 
                 {library && (
                   <div className="order-last col-span-2 md:order-none md:col-span-1">
-                    {!isDraft && (
+                    {!isDraft && plan.moderation_status === "hidden" && (
+                      <span className="text-xs text-muted-foreground">{legalCopy.planNotAvailable}</span>
+                    )}
+                    {!isDraft && plan.moderation_status !== "hidden" && (
                       <VisibilitySwitch
                         planId={plan.id}
                         origin={plan.origin_airport}
@@ -415,6 +420,8 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         share={shareOf(plan)}
                         layout="inline"
                         short
+                        disabled={isTrackerDerived(plan.origin_sources) && plan.visibility !== "public"}
+                        disabledReason={legalCopy.publishOnlyOwnDesigns}
                         onShareChange={(share) =>
                           patchPlan(plan.id, {
                             visibility: share.visibility,

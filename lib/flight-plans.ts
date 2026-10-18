@@ -4,6 +4,19 @@
 export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "Sketch"] as const
 export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 
+// Only a plan designed in Infinite Planner (source 'Sketch') can be published. This mirrors the database setting
+// app_settings.shareable_sources, which is the authority: the server refuses everything else whatever this says.
+// This constant only decides what the interface offers.
+export const SHAREABLE_SOURCES: readonly string[] = ["Sketch"]
+
+// Where a plan comes from, as a set that survives duplicating and editing (flight_plans.origin_sources, kept by a
+// database trigger). A plan is tracker-derived when the set holds a source outside the allowed one, or is unknown.
+// The one helper the interface uses; the SQL twin is public.is_tracker_derived().
+export function isTrackerDerived(originSources: readonly string[] | null | undefined): boolean {
+  if (!originSources || originSources.length === 0) return true
+  return originSources.some((source) => !SHAREABLE_SOURCES.includes(source))
+}
+
 // draft: autosaved while editing in Convert or Sketch, editable. exported: the FPL was
 // downloaded, the plan is locked for good (the database refuses any change); further changes
 // start from a duplicate, which is a new draft.
@@ -38,6 +51,10 @@ export interface FlightPlanSummary {
   id: string
   status: FlightPlanStatus
   source: FlightPlanSource
+  // Every source the plan comes from, kept through copies and edits (see isTrackerDerived).
+  origin_sources: string[]
+  // 'hidden' when an admin took the plan off Explore (the owner sees a neutral message).
+  moderation_status: "ok" | "hidden"
   created_at: string
   flight_number: string | null
   origin_airport: string
@@ -56,7 +73,7 @@ export interface FlightPlanSummary {
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
+  "id, status, source, origin_sources, moderation_status, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
 
 // How many dashboard rows are loaded at a time ("Load more" fetches the next page).
 export const HISTORY_PAGE_SIZE = 50

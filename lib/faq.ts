@@ -40,12 +40,12 @@ export const FAQ_TEXT = {
   "atc-compatible": {
     question: "Will ATC accept our custom flight plan?",
     answer:
-      "Yes, you can land with ATC. Infinite Planner does not pick runways or approaches, so you always follow ATC instructions and the ATIS. A plan from a recent real flight usually stays valid; if approach is active, replace the final waypoints with the STAR.",
+      "Yes, you can land with ATC. Infinite Planner does not pick runways or approaches, so you always follow ATC instructions and the ATIS. A plan from a recent real flight usually stays valid; if approach is active, replace the final waypoints with the arrival route ATC gives you.",
   },
   explore: {
     question: "What is Explore, and who can see my flight plans?",
     answer:
-      "Explore is the library of flight plans published by the community. Your plans are private until you make one public; a public plan is listed in Explore and indexed by search engines, with your Discord name and avatar. You can make it private again at any time.",
+      "Explore is the library of routes drawn in Route Sketch and published by the community. Your plans are private until you make one public; a public plan is listed in Explore and indexed by search engines, with your Discord name and avatar. You can make it private again at any time.",
   },
   "download-import": {
     question: "Can I download or adapt someone else's flight plan?",

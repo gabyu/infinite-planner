@@ -137,6 +137,10 @@ export function VisibilitySwitch({
           )}
         </div>
       )}
+      {layout === "inline" && disabled && disabledReason && (
+        // Where the switch can't be used, the row says why in one line (the field layout has its helper line).
+        <p className="basis-full text-xs text-muted-foreground">{disabledReason}</p>
+      )}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
 
       <Dialog open={askConsent} onOpenChange={setAskConsent}>

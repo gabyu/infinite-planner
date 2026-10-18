@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (!isUuid(params.id)) return json({ error: "Flight plan not found." }, 404)
 
   const fields =
-    "id, status, source, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
+    "id, status, source, origin_sources, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
   const read = (list: string) => auth.supabase.from("flight_plans").select(list).eq("id", params.id).maybeSingle()
   let { data, error } = await read(`${fields}, extra_flight_numbers`)
   // A database without the extra_flight_numbers column yet: read the plan without it.

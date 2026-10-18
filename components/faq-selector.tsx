@@ -261,13 +261,13 @@ export const faqData = [
           </li>
           <li>
             If <strong>approach frequency is active</strong>, ATC may require you to follow the published ATIS and the
-            preferred STAR approach. In this case, you'll need to amend your flight plan:
+            preferred arrival route. In this case, you'll need to amend your flight plan:
             <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
               <li>
-                <strong>Remove waypoints</strong> that don't match the STAR path
+                <strong>Remove waypoints</strong> that don't match the arrival route
               </li>
               <li>
-                <strong>Add the STAR waypoints</strong> up to the final approach
+                <strong>Add the arrival route waypoints</strong> up to the final approach
               </li>
               <li>
                 For the last waypoints before landing, you can still keep those from your original plan, as long as the
@@ -285,8 +285,8 @@ export const faqData = [
     answer: (
       <div className="space-y-4">
         <p>
-          Explore is the library of flight plans published by the community: real flights converted from FlightRadar24
-          or FlightAware, and hand-drawn routes. Every flight plan you export is <strong>private</strong> until you
+          Explore is the library of routes drawn in Route Sketch and published by the community. Only
+          a flight plan you design in Route Sketch can be made public. Every flight plan you export is <strong>private</strong> until you
           switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore
           and indexed by search engines, and your Discord name and avatar are shown with it.
         </p>

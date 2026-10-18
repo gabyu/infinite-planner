@@ -7,6 +7,7 @@ import { Download, Flag, Heart, Import } from "lucide-react"
 import { DiscordIcon } from "@/components/discord-icon"
 import { VisibilitySwitch } from "@/components/visibility-switch"
 import { Button } from "@/components/ui/button"
+import { legalCopy } from "@/lib/copy"
 import { ReportDialog } from "@/components/plans/report-dialog"
 import { signInWithDiscordTo, useAuthUser } from "@/hooks/use-auth-user"
 import type { PlanShare } from "@/lib/flight-plans"
@@ -200,7 +201,9 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
-      <p className="mt-4 text-sm text-muted-foreground">
+      <p className="mt-3 text-xs text-muted-foreground">{legalCopy.simulationOnly}</p>
+
+      <p className="mt-2 text-sm text-muted-foreground">
         {stats.downloadCount} download{stats.downloadCount === 1 ? "" : "s"} · {stats.importCount} import
         {stats.importCount === 1 ? "" : "s"} · {stats.likeCount} like{stats.likeCount === 1 ? "" : "s"}
       </p>
@@ -211,7 +214,7 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
           onClick={() => setReporting(true)}
           className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground link-quiet"
         >
-          <Flag size={12} aria-hidden /> Report this flight plan
+          <Flag size={12} aria-hidden /> {legalCopy.reportLink}
         </button>
       )}
 

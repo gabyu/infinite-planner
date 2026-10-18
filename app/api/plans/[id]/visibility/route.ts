@@ -1,6 +1,7 @@
 import { revalidateTag } from "next/cache"
 import { z } from "zod"
 import { isUuid, json, requireUser } from "@/lib/flight-plan-server"
+import { legalCopy } from "@/lib/copy"
 import { getViewer, isLibraryOpenFor } from "@/lib/library"
 
 const bodySchema = z.object({ visibility: z.enum(["private", "public"]) })
@@ -9,6 +10,8 @@ const bodySchema = z.object({ visibility: z.enum(["private", "public"]) })
 function messageFor(error: { code?: string; message?: string }) {
   const text = error.message ?? ""
   if (text.includes("plan_not_exported")) return "Export the flight plan first: only exported plans can be made public."
+  // Plans that come from a tracker export are never published; the database decides, whatever the interface shows.
+  if (text.includes("tracker_derived")) return legalCopy.publishOnlyOwnDesigns
   if (text.includes("publishing_blocked")) return "Publishing is disabled for your account."
   if (text.includes("unchanged_fork")) return "Change the route before publishing a copy of someone else's flight plan."
   if (text.includes("rate_limited")) return "You've published a lot today. Try again tomorrow."

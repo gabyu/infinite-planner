@@ -2,14 +2,15 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { legalCopy as t } from "@/lib/copy"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const REASONS = [
-  { value: "inappropriate", label: "Inappropriate content" },
-  { value: "copyright", label: "Copyright or data rights" },
-  { value: "wrong_data", label: "Wrong or broken data" },
-  { value: "spam", label: "Spam" },
-  { value: "other", label: "Something else" },
+  { value: "inappropriate", label: t.reportReasonInappropriate },
+  { value: "copyright", label: t.reportReasonCopyright },
+  { value: "wrong_data", label: t.reportReasonWrongData },
+  { value: "spam", label: t.reportReasonSpam },
+  { value: "other", label: t.reportReasonOther },
 ]
 
 // Reports a plan to the admins: a reason and an optional word of explanation.
@@ -26,11 +27,11 @@ export function ReportDialog({ publicId, onClose }: { publicId: string; onClose:
     const response = await fetch(`/api/plans/${publicId}/report`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason, details: details.trim() || undefined }),
+      body: JSON.stringify({ reason, details: details.trim() || undefined, pageUrl: window.location.pathname }),
     }).catch(() => null)
     const body = await response?.json().catch(() => null)
     setBusy(false)
-    if (!response?.ok) return setError(body?.error ?? "Couldn't send your report. Please try again.")
+    if (!response?.ok) return setError(body?.error ?? t.reportError)
     setSent(true)
   }
 
@@ -38,9 +39,9 @@ export function ReportDialog({ publicId, onClose }: { publicId: string; onClose:
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>{sent ? "Thanks for your report" : "Report this flight plan"}</DialogTitle>
+          <DialogTitle>{sent ? t.reportThanksTitle : t.reportTitle}</DialogTitle>
           <DialogDescription>
-            {sent ? "An admin will look at it." : "Tell us what's wrong. Only the admins see your report."}
+            {sent ? t.reportThanksBody : t.reportIntro}
           </DialogDescription>
         </DialogHeader>
         {!sent && (
@@ -66,7 +67,7 @@ export function ReportDialog({ publicId, onClose }: { publicId: string; onClose:
               onChange={(e) => setDetails(e.target.value)}
               maxLength={500}
               rows={3}
-              placeholder="Details (optional)"
+              placeholder={t.reportDetailsPlaceholder}
               aria-label="Details"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             />
@@ -79,7 +80,7 @@ export function ReportDialog({ publicId, onClose }: { publicId: string; onClose:
           </Button>
           {!sent && (
             <Button onClick={submit} disabled={busy}>
-              Send report
+              {t.reportSend}
             </Button>
           )}
         </DialogFooter>

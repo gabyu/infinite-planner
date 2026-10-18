@@ -78,8 +78,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           We record which signed-in users liked, downloaded, or imported a published flight plan (one record per user
-          and plan, to avoid counting twice), and the reports users send about flight plans, with the reporter and the
-          reason. Anonymous visits are not counted. The record of who liked or downloaded a plan is visible to you for
+          and plan, to avoid counting twice), and the reports users send about flight plans, with the reporter, the
+          reason, any text they add, the page they reported from and the time. When an administrator hides a flight plan, we keep a
+          record of who did it and when. Reports and that record are visible to administrators only. Anonymous visits are not counted. The record of who liked or downloaded a plan is visible to you for
           your own actions only; other users see totals.
         </p>
         <p>The core features of the Service can be used without creating an account.</p>

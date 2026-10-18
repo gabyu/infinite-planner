@@ -1,10 +1,13 @@
 import { z } from "zod"
+import { legalCopy } from "@/lib/copy"
 import { json, requireLibraryUser } from "@/lib/flight-plan-server"
 import { isPublicId } from "@/lib/plan-slug"
 
 const bodySchema = z.object({
   reason: z.enum(["inappropriate", "copyright", "wrong_data", "spam", "other"]),
   details: z.string().max(500).optional(),
+  // The page the report was made from (its path, no query), kept with the report.
+  pageUrl: z.string().max(300).optional(),
 })
 
 // Reports a plan of the library to the admins. One open report per person and plan (a repeat is accepted
@@ -21,12 +24,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     p_public_id: params.id,
     p_reason: parsed.data.reason,
     p_details: parsed.data.details ?? null,
+    p_page_url: parsed.data.pageUrl ?? null,
   })
   if (error) {
     if (error.message.includes("plan_not_found")) return json({ error: "Flight plan not found." }, 404)
-    if (error.message.includes("own_plan")) return json({ error: "This is your own flight plan." }, 409)
+    if (error.message.includes("own_plan")) return json({ error: legalCopy.reportOwnPlan }, 409)
     console.error("Reporting a plan failed:", error.message)
-    return json({ error: "Couldn't send your report. Please try again." }, 500)
+    return json({ error: legalCopy.reportError }, 500)
   }
   return json({ ok: true })
 }

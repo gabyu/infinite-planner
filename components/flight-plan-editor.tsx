@@ -29,6 +29,7 @@ import {
   BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
   PRIVATE_SHARE,
+  isTrackerDerived,
   type FlightPlanSource,
   type FlightPlanStatus,
   type PlanShare,
@@ -58,7 +59,7 @@ import dynamic from "next/dynamic"
 import { Toaster } from "@/components/ui/toaster"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { copy, trimPreviewText, trimRemovedText } from "@/lib/copy"
+import { copy, legalCopy, trimPreviewText, trimRemovedText } from "@/lib/copy"
 import { distanceNm, formatAltitude, formatDistanceNm } from "@/lib/route-render"
 import { EditorWorkspace } from "@/components/editor/workspace"
 import { WaypointList } from "@/components/editor/waypoint-list"
@@ -214,6 +215,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
+  // Every source a reopened draft comes from (flight_plans.origin_sources): a copy keeps the origin of the plan it was made from.
+  const [originSources, setOriginSources] = useState<string[]>([])
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
   // near-identical entries. Cleared when a new plan is started.
   const savedPlanIdRef = useRef<string | null>(null)
@@ -552,6 +555,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   }
 
   const planSource: FlightPlanSource | null = mode === "draw" ? "Sketch" : importSource
+  // Publishing is only offered for a plan designed here; the server refuses anything else anyway.
+  const trackerDerived = isTrackerDerived([...originSources, ...(planSource ? [planSource] : [])])
   const icaoReady = /^[A-Z]{4}$/.test(originAirport) && /^[A-Z]{4}$/.test(destinationAirport)
   const effectiveBranding = includeBranding && waypoints.length >= BRANDING_MIN_WAYPOINTS
 
@@ -797,6 +802,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setIncludeBranding(branded)
         setFlightTimeMinutes(body.flight_time_minutes ?? null)
         setWaypoints(restored)
+        setOriginSources(Array.isArray(body.origin_sources) ? body.origin_sources : [])
         if (mode === "import") {
           setHasImported(true)
           setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
@@ -1518,6 +1524,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           Export FPL
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">{legalCopy.simulationOnly}</p>
       {libraryOpen && (
         <div>
           <VisibilitySwitch
@@ -1527,9 +1534,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             flightNumber={detectedFlightNumber}
             share={planShare}
             onShareChange={setPlanShare}
-            disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty}
+            disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty || trackerDerived}
             disabledReason={
-              !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
+              trackerDerived
+                ? legalCopy.publishOnlyOwnDesigns
+                : !canSave
+                  ? "Sign in with Discord to publish a flight plan"
+                  : "Export the flight plan first to make it public"
             }
           />
         </div>

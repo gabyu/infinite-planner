@@ -47,6 +47,7 @@ interface ReportRow {
   moderation_status: "ok" | "hidden"
   author_id: string
   author_name: string
+  page_url: string | null
 }
 
 interface Coverage {
@@ -170,6 +171,7 @@ export default async function RoutesAdminPage({ searchParams }: { searchParams: 
                   <TableCell>
                     <p>{REASONS[report.reason] ?? report.reason}</p>
                     {report.details && <p className="max-w-xs text-xs text-muted-foreground">{report.details}</p>}
+                    {report.page_url && <p className="max-w-xs break-all text-xs text-muted-foreground">{report.page_url}</p>}
                   </TableCell>
                   <TableCell>{report.reporter_name}</TableCell>
                   <TableCell>

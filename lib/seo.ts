@@ -66,7 +66,7 @@ export const PAGES = {
     path: LIBRARY_PATH,
     title: "Routes: flight plans by Infinite Flight pilots",
     description:
-      "Find a flight plan shared by fellow pilots, from real flights to hand-drawn routes. Download it for Infinite Flight, or import it and make it your own.",
+      "Find a route drawn by fellow pilots. Download it for Infinite Flight, or import it and make it your own.",
     summary:
       "Routes (Explore): a public library of Infinite Flight flight plans shared by pilots. Search by airport, route or flight number, sort by popularity, download a plan as an FPL file, or open it in Convert to adjust it. Each plan, route, airport and flight number has its own page.",
     schema: "CollectionPage",
