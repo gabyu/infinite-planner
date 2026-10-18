@@ -443,12 +443,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setFlightNumberOverride(null)
         setFlightNumberEdit(undefined)
         setExtraFlightNumbers([])
-        setImportSource(result.source === "FlightAware" || result.source === "FlightRadar24" ? result.source : null)
+        setImportSource(
+          result.source === "FlightAware" || result.source === "FlightRadar24" || result.source === "Imported" ? result.source : null,
+        )
         setSimplificationInfo({
           originalCount: result.originalCount,
           simplifiedCount: result.simplifiedCount,
           reason: result.simplificationReason,
-          source: result.source,
+          source: result.source === "Imported" ? undefined : result.source,
         })
 
         // Set hasImported to true to reveal the rest of the UI (the workspace: map first, panel beside it)
@@ -457,7 +459,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setDraftArmed(true)
 
         setSuccessMessage(
-          `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source || "KML file"}`,
+          `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source && result.source !== "Imported" ? result.source : "KML file"}`,
         )
       }
     } catch (error) {
@@ -805,7 +807,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setOriginSources(Array.isArray(body.origin_sources) ? body.origin_sources : [])
         if (mode === "import") {
           setHasImported(true)
-          setImportSource(body.source === "FlightAware" || body.source === "FlightRadar24" ? body.source : null)
+          setImportSource(
+            body.source === "FlightAware" || body.source === "FlightRadar24" || body.source === "Imported" ? body.source : null,
+          )
           setFlightNumberOverride(body.flight_number ?? null)
           setExtraFlightNumbers(Array.isArray(body.extra_flight_numbers) ? body.extra_flight_numbers : [])
         }

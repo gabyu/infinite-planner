@@ -21,6 +21,20 @@ interface SimplificationResult {
 // Conversion factor from meters to feet (1 meter = 3.28084 feet)
 const METERS_TO_FEET = 3.28084
 
+// Which service a KML comes from. FlightRadar24 files link to flightradar24.com in their description, FlightAware
+// files use gx:Track (or say FlightAware in their name, file or filename). Anything else is "Imported".
+export function detectKmlSource(
+  kml: string,
+  hasGxTrack: boolean,
+  docName: string,
+  filename?: string,
+): "FlightRadar24" | "FlightAware" | "Imported" {
+  if (hasGxTrack || /flightaware/i.test(docName) || /^FlightAware_/i.test(filename ?? "")) return "FlightAware"
+  if (/flightradar24/i.test(kml)) return "FlightRadar24"
+  if (/flightaware/i.test(kml)) return "FlightAware"
+  return "Imported"
+}
+
 export function parseKML(
   kmlString: string,
   filename?: string,
@@ -34,25 +48,23 @@ export function parseKML(
     // Initialize waypoints array
     const originalWaypoints: Waypoint[] = []
 
-    // Detect the source of the KML file (FlightRadar24 or FlightAware)
-    let source = "Unknown"
+    // Detect the source of the KML file: FlightRadar24, FlightAware, or "Imported" for anything else. A file is only
+    // called a tracker's when it carries that tracker's signature, never by default.
+    let source = "Imported"
 
-    // Check for FlightAware signature (gx:Track elements with gx:coord)
+    // FlightAware signature: gx:Track elements with gx:coord, or the name in the document or the file
     const gxTracks = xmlDoc.getElementsByTagNameNS("http://www.google.com/kml/ext/2.2", "Track")
-    const hasFlightAwareSignature = gxTracks && gxTracks.length > 0
-
-    // Check for FlightRadar24 signature (typically has LineString with coordinates)
     const lineStrings = xmlDoc.getElementsByTagName("LineString")
-    const hasFlightRadarSignature = lineStrings && lineStrings.length > 0
 
-    // Also check document name or description for additional clues
     const docNames = xmlDoc.getElementsByTagName("name")
     let docName = ""
     if (docNames && docNames.length > 0 && docNames[0].textContent) {
       docName = docNames[0].textContent
     }
+    const detected = detectKmlSource(kmlString, gxTracks.length > 0, docName, filename)
+    const hasFlightAwareSignature = detected === "FlightAware"
 
-    if (hasFlightAwareSignature || (docName && docName.includes("FlightAware"))) {
+    if (hasFlightAwareSignature) {
       source = "FlightAware"
       // console.log("Detected FlightAware KML format")
 
@@ -108,8 +120,7 @@ export function parseKML(
         // console.log("No waypoints found in FlightAware format, trying standard KML processing")
       }
     } else {
-      source = "FlightRadar24"
-      // console.log("Processing as FlightRadar24 KML format")
+      source = detected
     }
 
     // If we haven't found waypoints yet, process as FlightRadar24 or standard KML
@@ -241,7 +252,8 @@ export function parseKML(
     if (filename && originalWaypoints.length > 0) {
       try {
         const flightData = parseFlightFilename(filename)
-        flightData.source = source
+        // Only the two trackers are recorded in the public statistics; any other file has no source there.
+        flightData.source = source === "Imported" ? undefined : source
 
         // console.log("Parsed flight data:", flightData)
         // console.log("Origin airport parameter:", originAirport)

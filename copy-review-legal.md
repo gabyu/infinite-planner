@@ -12,7 +12,7 @@ Shown where the person meets the limit: under or beside the visibility switch (e
 
 | Key | Where / when | Serious | Calm (current) | Short | Fun (not recommended) |
 |---|---|---|---|---|---|
-| `publishOnlyOwnDesigns` | Switch helper line (disabled) and API error | Only flight plans designed in Route Sketch can be published. | Only flight plans you design in Route Sketch can be published. | Publish routes drawn in Route Sketch. | Only your own Route Sketch creations make it to Explore. |
+| `publishOnlyOwnDesigns` **(changed)** | Info bubble on a dashboard row, switch helper line in the editor, API error: plan recognised as a FlightRadar24 / FlightAware conversion | Flight plans converted from FlightRadar24 or FlightAware files cannot be published. | Flight plans converted from FlightRadar24 or FlightAware files can't be published. | Converted tracker files can't be published. | This one came from a tracker, so it stays in your hangar. |
 
 ## A plan an admin took off Explore
 
@@ -28,7 +28,20 @@ A small line where a plan is viewed or downloaded: under the Download button on 
 
 | Key | Where / when | Serious | Calm (current) | Short | Fun |
 |---|---|---|---|---|---|
-| `simulationOnly` | Under Download / Export buttons | For flight simulation only | Simulation only | Sim only | Strictly for the sim: keep it off the real flight deck |
+| `simulationOnly` **(changed)** | Under Download / Export buttons | For flight simulation only: not the published procedure | Simulation only: not the published procedure | Sim only, not the published procedure | Sim only: not the real procedure, so keep it off the real flight deck |
+
+## Declaration before publishing an Imported plan
+
+A plan made from a KML that isn't recognised as FlightRadar24 or FlightAware is "Imported". The first time its owner turns the switch on, a dialog asks for the declaration (checkbox must be ticked). It is stored on the plan; a copy needs its own.
+
+| Key | Where / when | Serious | Calm (current) | Short | Fun (not recommended) |
+|---|---|---|---|---|---|
+| `declarationTitle` | Dialog title | Declaration of rights | Do you have the right to share this flight plan? | Right to share? | Is this one yours to share? |
+| `declarationBody` | Dialog text | This flight plan was created from a file you imported. Publishing makes it visible to the community. | This flight plan comes from a file you imported. Publishing it shows it to the community. | From your imported file. Publishing shows it to everyone. | This plan came from a file you brought in. Ready to show it off? |
+| `declarationCheckbox` | Checkbox | I declare that I have the right to share this flight plan. | I confirm I have the right to share this flight plan. | I have the right to share it. | Yes, it's mine to share. |
+| `declarationConfirm` | Button | Publish | Share it | Share | Share it with the world |
+| `declarationCancel` | Button | Cancel | Not now | Cancel | Maybe later |
+| `declarationRequired` | API error if the declaration is missing | A declaration of rights is required to publish this flight plan. | Confirm you have the right to share this flight plan. | Declaration needed. | Hold on: confirm it's yours to share. |
 
 ## Report control and form
 

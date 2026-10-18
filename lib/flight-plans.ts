@@ -1,13 +1,14 @@
 // Shared (client + server) types and helpers for saved flight plans.
 // The table and its access rules: supabase/migrations/20261003000000_flight_plans.sql.
 
-export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "Sketch"] as const
+export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "Sketch", "Imported"] as const
 export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 
-// Only a plan designed in Infinite Planner (source 'Sketch') can be published. This mirrors the database setting
+// A plan can be published unless it is recognised as coming from a FlightRadar24 or FlightAware export: plans designed
+// here ('Sketch') and plans imported from any other source ('Imported', with a declaration) can. This mirrors the database setting
 // app_settings.shareable_sources, which is the authority: the server refuses everything else whatever this says.
 // This constant only decides what the interface offers.
-export const SHAREABLE_SOURCES: readonly string[] = ["Sketch"]
+export const SHAREABLE_SOURCES: readonly string[] = ["Sketch", "Imported"]
 
 // Where a plan comes from, as a set that survives duplicating and editing (flight_plans.origin_sources, kept by a
 // database trigger). A plan is tracker-derived when the set holds a source outside the allowed one, or is unknown.
@@ -99,7 +100,7 @@ export function formatFlightTime(minutes: number | null | undefined): string | n
 }
 
 export function sourceLabel(source: FlightPlanSource): string {
-  return source === "Sketch" ? "Route Sketch" : source
+  return source === "Sketch" ? "Route Sketch" : source === "Imported" ? "Imported file" : source
 }
 
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.

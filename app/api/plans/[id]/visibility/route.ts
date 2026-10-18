@@ -49,6 +49,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   const { data, error } = await supabase.rpc("set_plan_visibility", { p_plan_id: params.id, p_visibility: visibility })
   if (error) {
+    // An Imported plan needs the owner's declaration first: the switch asks for it, then tries again.
+    if ((error.message ?? "").includes("declaration_required")) {
+      return json({ error: legalCopy.declarationRequired, code: "declaration_required" }, 409)
+    }
     const message = messageFor(error)
     if (!message) console.error("Changing a plan's visibility failed:", error.message)
     return json({ error: message ?? "Couldn't change the visibility. Please try again." }, message ? 409 : 500)

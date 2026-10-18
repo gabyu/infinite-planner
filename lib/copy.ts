@@ -113,11 +113,18 @@ export const visibilityCopy = {
  */
 export const legalCopy = {
   // Where publishing is refused or switched off (switch helper text, API error). Same sentence everywhere.
-  publishOnlyOwnDesigns: "Only flight plans you design in Route Sketch can be published.",
+  publishOnlyOwnDesigns: "Flight plans converted from FlightRadar24 or FlightAware files can't be published.", // PROVISIONAL
   // A plan an admin took off Explore: the owner sees this, never a reason.
   planNotAvailable: "This flight plan isn't available on Explore right now.",
   // Short tag beside a view or a download of a plan.
-  simulationOnly: "Simulation only",
+  simulationOnly: "Simulation only: not the published procedure", // PROVISIONAL
+  // The declaration asked the first time an Imported plan (a file from another source) is published.
+  declarationTitle: "Do you have the right to share this flight plan?", // PROVISIONAL
+  declarationBody: "This flight plan comes from a file you imported. Publishing it shows it to the community.", // PROVISIONAL
+  declarationCheckbox: "I confirm I have the right to share this flight plan.", // PROVISIONAL
+  declarationConfirm: "Share it", // PROVISIONAL
+  declarationCancel: "Not now", // PROVISIONAL
+  declarationRequired: "Confirm you have the right to share this flight plan.", // PROVISIONAL
   // Report control and form.
   reportLink: "Report",
   reportTitle: "Report this flight plan",

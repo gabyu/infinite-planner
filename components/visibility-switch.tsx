@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Switch } from "@/components/ui/switch"
 import type { PlanShare, PlanVisibility } from "@/lib/flight-plans"
 import { planPath } from "@/lib/plan-slug"
-import { visibilityCopy } from "@/lib/copy"
+import { legalCopy, visibilityCopy } from "@/lib/copy"
 import { cn } from "@/lib/utils"
 
 interface VisibilitySwitchProps {
@@ -50,6 +50,9 @@ export function VisibilitySwitch({
   const [copied, setCopied] = useState(false)
   const [siteOrigin, setSiteOrigin] = useState("")
   const [askConsent, setAskConsent] = useState(false)
+  // The declaration an Imported plan needs before it can be published.
+  const [askDeclaration, setAskDeclaration] = useState(false)
+  const [declared, setDeclared] = useState(false)
   useEffect(() => setSiteOrigin(window.location.origin), [])
 
   const isPublic = share.visibility === "public"
@@ -72,6 +75,11 @@ export function VisibilitySwitch({
         setAskConsent(true)
         return
       }
+      if (response.status === 409 && body?.code === "declaration_required") {
+        setDeclared(false)
+        setAskDeclaration(true)
+        return
+      }
       if (!response.ok) {
         setError(body?.error ?? "Couldn't change the visibility. Please try again.")
         return
@@ -89,6 +97,15 @@ export function VisibilitySwitch({
     const response = await fetch("/api/library/consent", { method: "POST" }).catch(() => null)
     setBusy(false)
     setAskConsent(false)
+    if (!response?.ok) return setError("Couldn't save your choice. Please try again.")
+    await choose("public")
+  }
+
+  async function acceptDeclaration() {
+    setBusy(true)
+    const response = await fetch(`/api/plans/${planId}/declaration`, { method: "POST" }).catch(() => null)
+    setBusy(false)
+    setAskDeclaration(false)
     if (!response?.ok) return setError("Couldn't save your choice. Please try again.")
     await choose("public")
   }
@@ -142,6 +159,32 @@ export function VisibilitySwitch({
         <p className="basis-full text-xs text-muted-foreground">{disabledReason}</p>
       )}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+
+      <Dialog open={askDeclaration} onOpenChange={setAskDeclaration}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{legalCopy.declarationTitle}</DialogTitle>
+            <DialogDescription>{legalCopy.declarationBody}</DialogDescription>
+          </DialogHeader>
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={declared}
+              onChange={(e) => setDeclared(e.target.checked)}
+              className="mt-0.5 accent-[hsl(var(--primary))]"
+            />
+            {legalCopy.declarationCheckbox}
+          </label>
+          <DialogFooter className="gap-2 sm:space-x-0">
+            <Button variant="outline" onClick={() => setAskDeclaration(false)} disabled={busy}>
+              {legalCopy.declarationCancel}
+            </Button>
+            <Button onClick={acceptDeclaration} disabled={busy || !declared}>
+              {legalCopy.declarationConfirm}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={askConsent} onOpenChange={setAskConsent}>
         <DialogContent className="max-w-sm">

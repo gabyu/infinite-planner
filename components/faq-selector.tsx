@@ -285,8 +285,8 @@ export const faqData = [
     answer: (
       <div className="space-y-4">
         <p>
-          Explore is the library of routes drawn in Route Sketch and published by the community. Only
-          a flight plan you design in Route Sketch can be made public. Every flight plan you export is <strong>private</strong> until you
+          Explore is the library of flight plans published by the community. A flight plan converted from
+          a FlightRadar24 or FlightAware file stays private. Every flight plan you export is <strong>private</strong> until you
           switch its <strong>visibility</strong> to <strong>public</strong>. A public flight plan is listed in Explore
           and indexed by search engines, and your Discord name and avatar are shown with it.
         </p>
