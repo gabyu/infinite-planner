@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, Eye, Link2, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
+import { Copy, Download, Eye, Info, Link2, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -79,6 +80,9 @@ interface Lineage {
 }
 
 const shareOf = (plan: FlightPlanSummary) => ({ visibility: plan.visibility, publicId: plan.public_id })
+
+// Tracker-derived plans can't be published (a public one can still be switched off).
+const notPublishable = (plan: FlightPlanSummary) => isTrackerDerived(plan.origin_sources) && plan.visibility !== "public"
 
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
@@ -411,7 +415,24 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     {!isDraft && plan.moderation_status === "hidden" && (
                       <span className="text-xs text-muted-foreground">{legalCopy.planNotAvailable}</span>
                     )}
-                    {!isDraft && plan.moderation_status !== "hidden" && (
+                    {!isDraft && plan.moderation_status !== "hidden" && notPublishable(plan) && (
+                      // No switch where publishing isn't possible: an info bubble says why.
+                      <TooltipProvider delayDuration={100}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={legalCopy.publishOnlyOwnDesigns}
+                              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"
+                            >
+                              <Info size={16} aria-hidden /> Private
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[16rem]">{legalCopy.publishOnlyOwnDesigns}</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    {!isDraft && plan.moderation_status !== "hidden" && !notPublishable(plan) && (
                       <VisibilitySwitch
                         planId={plan.id}
                         origin={plan.origin_airport}
@@ -420,8 +441,6 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         share={shareOf(plan)}
                         layout="inline"
                         short
-                        disabled={isTrackerDerived(plan.origin_sources) && plan.visibility !== "public"}
-                        disabledReason={legalCopy.publishOnlyOwnDesigns}
                         onShareChange={(share) =>
                           patchPlan(plan.id, {
                             visibility: share.visibility,
