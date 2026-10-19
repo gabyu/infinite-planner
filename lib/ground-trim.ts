@@ -17,8 +17,8 @@ export interface TrimAirport {
   lat: number
   lng: number
   runways: RunwayRow[]
-  /** The two names of every open runway, e.g. ["13R", "31L"]. Not used by trimming; the airport panel offers them. */
-  names?: [string, string][]
+  /** Every open runway as ["13R", "31L", true heading of the first end or null]. Not used by trimming; the airport panel offers them. */
+  names?: [string, string, number | null][]
 }
 
 export type TrimEnd = "departure" | "arrival"

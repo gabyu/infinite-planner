@@ -10,12 +10,16 @@
 //   for name lookup, left out of search). Read by lib/airports.ts (the Convert airport search, page text).
 // runways.json: for the same airports, the field elevation, the reference point, the open runways that have both end
 //   coordinates, and the runway names:
-//   { "LFPG": [392, 49.0097, 2.5479, [[lat1, lng1, lat2, lng2, lengthFt, widthFt], ...], [["08L","26R"], ...]], ... }
+//   { "LFPG": [392, 49.0097, 2.5479, [[lat1, lng1, lat2, lng2, lengthFt, widthFt], ...], [["08L","26R",87], ...]], ... }
 //   The coordinate rows are what ground trimming (lib/ground-trim.ts) reads. The names list every open runway whose two
 //   ends both have a standard name (number 1-36, optional L / R / C), including the many small airports that have no
 //   coordinates; numbers are padded to two digits ("1L" -> "01L") to match the wording of the ATIS. A pair must be exact
 //   opposites (13R / 31L: numbers 18 apart, L with R, C with C, none with none); the few pairs that are not are typos in
-//   the source and are left out, since a chip for a runway that does not exist is worse than none. Both are served
+//   the source and are left out, since a chip for a runway that does not exist is worse than none. The third value of a
+//   name is the TRUE heading in degrees of the first end (the second end is that + 180), from OurAirports'
+//   le_heading_degT / he_heading_degT, else the bearing between the two thresholds, else null; a heading more than 45
+//   degrees from the runway number x 10 is a source error and becomes null. True, because the weather reports (METAR)
+//   give the wind in degrees true. Both are served
 //   through /api/airports/{icao}/runways.
 import { readFileSync, writeFileSync } from "node:fs"
 
@@ -120,9 +124,32 @@ function runwayName(text) {
 const OPPOSITE = { "": "", L: "R", R: "L", C: "C" }
 const opposite = (le, he) => Math.abs(Number.parseInt(le) - Number.parseInt(he)) === 18 && OPPOSITE[le.slice(2)] === he.slice(2)
 
+// True heading of the first end: the source's own value, else the bearing from the thresholds; null when neither exists or
+// the value disagrees with the runway number by more than 45 degrees (runway numbers are magnetic, within a few tens of
+// degrees of true everywhere these airports are).
+const norm = (degrees) => ((Math.round(degrees) % 360) + 360) % 360
+const angleBetween = (x, y) => Math.abs(((x - y + 540) % 360) - 180)
+function bearing(lat1, lng1, lat2, lng2) {
+  const rad = Math.PI / 180
+  const y = Math.sin((lng2 - lng1) * rad) * Math.cos(lat2 * rad)
+  const x = Math.cos(lat1 * rad) * Math.sin(lat2 * rad) - Math.sin(lat1 * rad) * Math.cos(lat2 * rad) * Math.cos((lng2 - lng1) * rad)
+  return norm(Math.atan2(y, x) / rad)
+}
+function trueHeading(row, le, hasEnds, ends) {
+  const fromLe = Number.parseFloat(row[r("le_heading_degT")])
+  const fromHe = Number.parseFloat(row[r("he_heading_degT")])
+  let heading = null
+  if (Number.isFinite(fromLe)) heading = norm(fromLe)
+  else if (Number.isFinite(fromHe)) heading = norm(fromHe + 180)
+  else if (hasEnds) heading = bearing(ends[0], ends[1], ends[2], ends[3])
+  if (heading === null) return null
+  return angleBetween(heading, Number.parseInt(le) * 10) <= 45 ? heading : null
+}
+
 let rows = 0
 let named = 0
 let notOpposite = 0
+let headed = 0
 for (const row of rRows) {
   const codes = refToCodes.get(row[r("airport_ref")])
   if (!codes || row[r("closed")] === "1") continue
@@ -141,8 +168,10 @@ for (const row of rRows) {
       rows++
     }
     if (le && he && !runways[code][4].some(([x, y]) => x === le && y === he)) {
-      runways[code][4].push([le, he])
+      const heading = trueHeading(row, le, hasEnds, ends)
+      runways[code][4].push([le, he, heading])
       named++
+      if (heading !== null) headed++
     }
   }
 }
@@ -153,5 +182,5 @@ writeFileSync(new URL("../lib/data/airports.json", import.meta.url), JSON.string
 writeFileSync(new URL("../lib/data/runways.json", import.meta.url), JSON.stringify(sorted(runways)))
 console.log(
   `${aRows.length} airport rows -> ${Object.keys(airports).length} ICAO airports; ${rows} runways with both ends, ${named} named runways ` +
-    `(${Object.values(runways).filter((entry) => entry[4].length > 0).length} airports with names; ${notOpposite} pairs left out as not opposite ends)`,
+    `(${Object.values(runways).filter((entry) => entry[4].length > 0).length} airports with names; ${notOpposite} pairs left out as not opposite ends; ${headed} with a true heading)`,
 )
