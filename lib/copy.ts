@@ -101,6 +101,10 @@ export const copy = {
     runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.", // PROVISIONAL
     showText: "Show the ATIS text", // PROVISIONAL
     hideText: "Hide the ATIS text", // PROVISIONAL
+    runwayTap: "Tap the runway you'll use.", // PROVISIONAL
+    runwayFromAtis: "From the ATIS.", // PROVISIONAL
+    runwayYours: "Your choice.", // PROVISIONAL
+    runwayYoursNotInAtis: "Your choice. Not in the ATIS now.", // PROVISIONAL
   },
 } as const
 
