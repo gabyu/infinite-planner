@@ -82,7 +82,35 @@ export const copy = {
     altitudeHide: "Hide altitude profile",
     altitudeNone: "No altitude data in this plan yet.",
   },
+
+  // Live airport information (editor Options). Every line below waits for Gabriel's approval.
+  live: {
+    heading: "Live airport info", // PROVISIONAL
+    source: "Live from the Infinite Flight Expert Server. Simulation only.", // PROVISIONAL
+    departure: "Departure", // PROVISIONAL
+    arrival: "Arrival", // PROVISIONAL
+    loading: "Looking for the ATIS...", // PROVISIONAL
+    atisLetter: "Information", // PROVISIONAL
+    landing: "Landing", // PROVISIONAL
+    departing: "Departing", // PROVISIONAL
+    wind: "Wind", // PROVISIONAL
+    windCalm: "Calm", // PROVISIONAL
+    windVariable: "Variable", // PROVISIONAL
+    noAtis: "No ATIS at this airport right now.", // PROVISIONAL
+    unavailable: "Live data isn't available right now.", // PROVISIONAL
+    runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.", // PROVISIONAL
+    showText: "Show the ATIS text", // PROVISIONAL
+    hideText: "Hide the ATIS text", // PROVISIONAL
+  },
 } as const
+
+/** "240° at 5 kt", "Variable at 5 kt", "240° at 12 kt, gusting 25 kt", or "Calm", for the ATIS wind. */
+export function atisWindText(wind: { from: number | null; speedKt: number; gustKt: number | null }) {
+  if (wind.speedKt === 0) return copy.live.windCalm
+  const from = wind.from === null ? copy.live.windVariable : `${String(wind.from).padStart(3, "0")}°`
+  const gust = wind.gustKt ? `, gusting ${wind.gustKt} kt` : ""
+  return `${from} at ${wind.speedKt} kt${gust}` // PROVISIONAL
+}
 
 /** "12 waypoints will be removed" while previewing a trim. */
 export function trimPreviewText(count: number, end: "departure" | "arrival") {

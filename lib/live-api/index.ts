@@ -1,7 +1,9 @@
 import "server-only"
 import { createLiveClient, liveHealth, type LiveEnv } from "./core"
+import { getAirportLive } from "./airport"
 
 export type { LiveFailure, LiveHealth, LiveResult } from "./core"
+export type { AirportLive } from "./airport"
 
 const readEnv = (): LiveEnv => ({
   IF_API_KEY: process.env.IF_API_KEY,
@@ -13,3 +15,4 @@ const readEnv = (): LiveEnv => ({
 export const liveClient = createLiveClient({ fetch: (...args) => fetch(...args), now: Date.now, env: readEnv })
 
 export const getLiveHealth = () => liveHealth(liveClient, readEnv(), Date.now)
+export const getAirportAtis = (icao: string) => getAirportLive(liveClient, readEnv(), icao)

@@ -13,6 +13,8 @@ export const API_BASE = "https://api.infiniteflight.com/public/v2"
 export const MIN_REFRESH_MS = 15_000
 export const MAX_PER_MINUTE = 25 // the limit is 30 (100 with a Pro-linked key); keep a margin
 export const REQUEST_TIMEOUT_MS = 8_000
+// An entry nobody has asked for in this long is dropped: nothing is kept past the window in which it is used.
+export const IDLE_EVICT_MS = 15 * 60_000
 const MINUTE_MS = 60_000
 
 export type LiveFailure = "disabled" | "not_configured" | "refused" | "rate_limited" | "not_found" | "unavailable"
@@ -26,7 +28,7 @@ type Deps = {
   env: () => LiveEnv
 }
 
-type Entry = { result: LiveResult<unknown>; refreshedAt: number; inflight?: Promise<LiveResult<unknown>> }
+type Entry = { result: LiveResult<unknown>; refreshedAt: number; lastAskedAt: number; inflight?: Promise<LiveResult<unknown>> }
 
 // The one setting that turns every live feature off: LIVE_API_ENABLED=false.
 export function liveApiEnabled(env: LiveEnv): boolean {
@@ -76,22 +78,50 @@ export function createLiveClient(deps: Deps) {
   // refresh runs; every request that arrives meanwhile waits for that same call. A failed refresh is remembered
   // for the same period, so a down API is not hammered, and the failure is what callers see: old data is never
   // served past its time.
+  // Entries nobody has asked for in 15 minutes are dropped (this is the "stop after 15 minutes without a request" rule:
+  // refreshing only ever happens on a request, so an unasked entry is simply forgotten).
+  function evictIdle() {
+    const now = deps.now()
+    for (const [path, entry] of entries) if (!entry.inflight && now - entry.lastAskedAt >= IDLE_EVICT_MS) entries.delete(path)
+  }
+
   async function read<T>(path: string, ttlMs: number = MIN_REFRESH_MS): Promise<LiveResult<T>> {
     const ttl = Math.max(ttlMs, MIN_REFRESH_MS)
+    evictIdle()
     const entry = entries.get(path)
     if (entry) {
+      entry.lastAskedAt = deps.now()
       if (entry.inflight) return entry.inflight as Promise<LiveResult<T>>
       if (deps.now() - entry.refreshedAt < ttl) return entry.result as LiveResult<T>
     }
     const inflight = call(path).then((result) => {
-      entries.set(path, { result, refreshedAt: deps.now() })
+      const latest = entries.get(path)
+      entries.set(path, { result, refreshedAt: deps.now(), lastAskedAt: latest?.lastAskedAt ?? deps.now() })
       return result
     })
-    entries.set(path, { result: entry?.result ?? { ok: false, reason: "unavailable", at: deps.now() }, refreshedAt: entry?.refreshedAt ?? 0, inflight })
+    entries.set(path, {
+      result: entry?.result ?? { ok: false, reason: "unavailable", at: deps.now() },
+      refreshedAt: entry?.refreshedAt ?? 0,
+      lastAskedAt: deps.now(),
+      inflight,
+    })
     return inflight as Promise<LiveResult<T>>
   }
 
-  return { read, _entryCount: () => entries.size, _clear: () => entries.clear() }
+  // How many entries with this path prefix are currently held (used to cap how many airports are followed at once).
+  function tracked(prefix: string): number {
+    evictIdle()
+    let count = 0
+    for (const path of entries.keys()) if (path.startsWith(prefix)) count++
+    return count
+  }
+
+  function has(path: string): boolean {
+    evictIdle()
+    return entries.has(path)
+  }
+
+  return { read, tracked, has, _entryCount: () => entries.size, _clear: () => entries.clear() }
 }
 
 export type SessionInfo = { id: string; name: string }

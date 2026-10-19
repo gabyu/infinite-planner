@@ -1,6 +1,16 @@
 // Run with `pnpm test:live-api`. Plain asserts: the project has no test runner.
 import assert from "node:assert/strict"
-import { createLiveClient, liveApiEnabled, liveHealth, MAX_PER_MINUTE, MIN_REFRESH_MS, type LiveEnv } from "@/lib/live-api/core"
+import {
+  createLiveClient,
+  IDLE_EVICT_MS,
+  liveApiEnabled,
+  liveHealth,
+  MAX_PER_MINUTE,
+  MIN_REFRESH_MS,
+  type LiveEnv,
+} from "@/lib/live-api/core"
+import { getAirportLive, MAX_FOLLOWED_AIRPORTS } from "@/lib/live-api/airport"
+import { parseAtis } from "@/lib/live-api/atis"
 
 const KEY = "test-key-not-real"
 let clock = 1_000_000
@@ -142,6 +152,105 @@ async function main() {
     const missing = await liveHealth(fresh(), {}, () => clock)
     assert.equal(missing.status, "not_configured")
     assert.equal(missing.configured, false)
+  }
+
+  // ATIS wording seen live: wind in sentence one, runways in sentence two.
+  {
+    const lhbp = parseAtis(
+      "Budapest Ferenc airport, ATIS information OSCAR, time 1517 ZULU, Wind 240 at 5 Visibility 21, Temperature 20, Dew Point 4, QNH 1020. Landing Runway 13R, Departing Runway 13R. Advise on initial contact.",
+    )
+    assert.equal(lhbp.letter, "OSCAR")
+    assert.deepEqual(lhbp.wind, { from: 240, speedKt: 5, gustKt: null })
+    assert.equal(lhbp.qnh, 1020)
+    assert.deepEqual(lhbp.landing, ["13R"])
+    assert.deepEqual(lhbp.departing, ["13R"])
+
+    const eheh = parseAtis("Landing Runway 03, Departing Runway 03.")
+    assert.deepEqual([eheh.landing, eheh.departing], [["03"], ["03"]])
+    const omdb = parseAtis("Landing Runways 30L and 30R, Departing Runways 30L and 30R.")
+    assert.deepEqual([omdb.landing, omdb.departing], [["30L", "30R"], ["30L", "30R"]])
+
+    // Different landing and departing runways, three runways, single digit, calm and gusting wind.
+    const mixed = parseAtis("Wind 270 at 12 gusting 25. Landing Runways 9, 9L and 9R, Departing Runway 27.")
+    assert.deepEqual(mixed.wind, { from: 270, speedKt: 12, gustKt: 25 })
+    assert.deepEqual(mixed.landing, ["09", "09L", "09R"])
+    assert.deepEqual(mixed.departing, ["27"])
+    assert.deepEqual(parseAtis("Wind calm.").wind, { from: null, speedKt: 0, gustKt: null })
+    assert.deepEqual(parseAtis("Wind variable at 3.").wind, { from: null, speedKt: 3, gustKt: null })
+
+    // Anything unrecognised is left empty, never guessed.
+    const odd = parseAtis("Landing Runway ILS 13R, Departing Runway 13R.")
+    assert.deepEqual(odd.landing, [])
+    assert.deepEqual(odd.departing, ["13R"])
+    assert.deepEqual(parseAtis("Landing Runway 40, Departing Runway 99X."), { letter: null, wind: null, qnh: null, landing: [], departing: [] })
+    assert.deepEqual(parseAtis("nothing useful here"), { letter: null, wind: null, qnh: null, landing: [], departing: [] })
+  }
+
+  // Airport reader: Expert session picked by name, ATIS parsed, no ATIS = its own state, nothing invented on failure.
+  {
+    const atisText = "ATIS information ALPHA, Wind 100 at 8. Landing Runway 10, Departing Runway 10."
+    reply = () => json({ errorCode: 0, result: [] })
+    const answer = (url: string) => {
+      if (url.endsWith("/sessions")) return json({ errorCode: 0, result: [{ id: "casual-id", name: "Casual" }, { id: "expert-id", name: "Expert" }] })
+      if (url.includes("/airport/LFPG/")) return json({ errorCode: 7 }, 404)
+      if (url.includes("/airport/EHAM/")) return json({ errorCode: 0, result: 12 })
+      return json({ errorCode: 0, result: atisText })
+    }
+    const make = () => {
+      calls = []
+      return createLiveClient({
+        fetch: (async (input: string | URL | Request) => {
+          calls.push({ url: String(input), auth: null, cache: undefined })
+          return answer(String(input))
+        }) as typeof fetch,
+        now: () => clock,
+        env: () => env,
+      })
+    }
+    env = { IF_API_KEY: KEY }
+    const client = make()
+
+    const live = await getAirportLive(client, env, "EGLL")
+    assert.equal(live.state, "atis")
+    if (live.state === "atis") {
+      assert.deepEqual(live.landing, ["10"])
+      assert.equal(live.letter, "ALPHA")
+      assert.equal(JSON.stringify(live).includes(KEY), false)
+    }
+    assert.ok(calls.some((c) => c.url.endsWith("/sessions/expert-id/airport/EGLL/atis")))
+
+    assert.deepEqual(await getAirportLive(client, env, "LFPG"), { state: "no_atis" })
+    assert.deepEqual(await getAirportLive(client, env, "EHAM"), { state: "no_atis" })
+
+    // Many readers of one airport, one call a minute.
+    const before = calls.length
+    await Promise.all(Array.from({ length: 30 }, () => getAirportLive(client, env, "EGLL")))
+    clock += 30_000
+    await getAirportLive(client, env, "EGLL")
+    assert.equal(calls.length, before)
+
+    // Off or without a key: "disabled", and no request.
+    const quiet = make()
+    assert.deepEqual(await getAirportLive(quiet, { IF_API_KEY: KEY, LIVE_API_ENABLED: "false" }, "EGLL"), { state: "disabled" })
+    assert.deepEqual(await getAirportLive(quiet, {}, "EGLL"), { state: "disabled" })
+    assert.equal(calls.length, 0)
+
+    // Refused key: unavailable, not invented data.
+    const refusing = createLiveClient({ fetch: (async () => json({}, 401)) as typeof fetch, now: () => clock, env: () => env })
+    assert.deepEqual(await getAirportLive(refusing, env, "EGLL"), { state: "unavailable" })
+
+    // At most MAX_FOLLOWED_AIRPORTS airports are followed at once; one more is unavailable, a followed one still works.
+    clock += IDLE_EVICT_MS
+    const capped = make()
+    const codes = Array.from({ length: MAX_FOLLOWED_AIRPORTS + 1 }, (_, i) => `EG${String.fromCharCode(65 + i)}${String.fromCharCode(65 + i)}`)
+    for (const code of codes.slice(0, MAX_FOLLOWED_AIRPORTS)) assert.equal((await getAirportLive(capped, env, code)).state, "atis")
+    assert.deepEqual(await getAirportLive(capped, env, codes[MAX_FOLLOWED_AIRPORTS]), { state: "unavailable" })
+    assert.equal((await getAirportLive(capped, env, codes[0])).state, "atis")
+
+    // Idle for 15 minutes: everything is forgotten, and the freed room lets a new airport in.
+    clock += IDLE_EVICT_MS
+    assert.equal(capped.tracked("/sessions/"), 0)
+    assert.equal((await getAirportLive(capped, env, codes[MAX_FOLLOWED_AIRPORTS])).state, "atis")
   }
 
   console.log("live-api: all checks passed")
