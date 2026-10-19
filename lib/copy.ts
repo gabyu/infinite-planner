@@ -41,10 +41,8 @@ export const copy = {
     sheetHandle: "Drag to resize the panel",
 
     // Ground movements (Options)
-    groundHeading: "Ground movements",
+    groundWaypoints: "Ground movement waypoints", // PROVISIONAL
     groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.",
-    trimDeparture: "Departure",
-    trimArrival: "Arrival",
     trimApply: "Apply",
     trimCancel: "Cancel",
     trimApproximate: "Approximate",

@@ -1941,7 +1941,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         className="mx-4 mb-3"
                       />
                       <GroundMovements
-                        ends={[activeTab]}
+                        end={activeTab}
                         compact={isMobile}
                         previewing={trimPreview?.end ?? null}
                         busy={trimBusy}

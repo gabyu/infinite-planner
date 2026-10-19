@@ -11,6 +11,7 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 
 | Key | Where / when | Current text |
 |---|---|---|
+| `groundWaypoints` | Label of the Ground movements switch in the Departure and Arrival tabs; the text never changes with the switch state (on keeps the taxi in the plan, off removes it). Replaces the heading "Ground movements" and the two buttons "Departure" / "Arrival". The hint under it (`groundHint`, already approved) stays on desktop | Ground movement waypoints |
 | `heading` | Block title | Live airport info |
 | `departure`, `arrival` | Row titles | Departure, Arrival |
 | `loading` | While the first answer is awaited | Looking for the ATIS... |
