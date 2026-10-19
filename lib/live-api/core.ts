@@ -18,7 +18,7 @@ const MINUTE_MS = 60_000
 export type LiveFailure = "disabled" | "not_configured" | "refused" | "rate_limited" | "not_found" | "unavailable"
 export type LiveResult<T> = { ok: true; data: T; fetchedAt: number } | { ok: false; reason: LiveFailure; at: number }
 
-export type LiveEnv = { INFINITE_FLIGHT_API_KEY?: string; LIVE_API_ENABLED?: string }
+export type LiveEnv = { IF_API_KEY?: string; LIVE_API_ENABLED?: string }
 
 type Deps = {
   fetch: typeof fetch
@@ -49,7 +49,7 @@ export function createLiveClient(deps: Deps) {
     const env = deps.env()
     const at = deps.now()
     if (!liveApiEnabled(env)) return { ok: false, reason: "disabled", at }
-    const key = env.INFINITE_FLIGHT_API_KEY
+    const key = env.IF_API_KEY
     if (!key) return { ok: false, reason: "not_configured", at }
     if (!underBudget()) return { ok: false, reason: "rate_limited", at }
     sent.push(at)
@@ -110,7 +110,7 @@ export type LiveHealth = {
 // from the key, and nothing from the API beyond "it answered".
 export async function liveHealth(client: ReturnType<typeof createLiveClient>, env: LiveEnv, now: () => number): Promise<LiveHealth> {
   const enabled = liveApiEnabled(env)
-  const configured = Boolean(env.INFINITE_FLIGHT_API_KEY)
+  const configured = Boolean(env.IF_API_KEY)
   const checkedAt = new Date(now()).toISOString()
   if (!enabled) return { enabled, configured, status: "disabled", checkedAt }
   if (!configured) return { enabled, configured, status: "not_configured", checkedAt }

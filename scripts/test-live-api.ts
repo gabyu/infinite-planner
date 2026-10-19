@@ -4,7 +4,7 @@ import { createLiveClient, liveApiEnabled, liveHealth, MAX_PER_MINUTE, MIN_REFRE
 
 const KEY = "test-key-not-real"
 let clock = 1_000_000
-let env: LiveEnv = { INFINITE_FLIGHT_API_KEY: KEY }
+let env: LiveEnv = { IF_API_KEY: KEY }
 let calls: { url: string; auth: string | null; cache: string | undefined }[] = []
 let reply: () => Response = () => json({ errorCode: 0, result: [{ id: "a", name: "Expert" }] })
 
@@ -114,7 +114,7 @@ async function main() {
   // Disabled or missing key: no request at all.
   {
     const client = fresh()
-    env = { INFINITE_FLIGHT_API_KEY: KEY, LIVE_API_ENABLED: "false" }
+    env = { IF_API_KEY: KEY, LIVE_API_ENABLED: "false" }
     const off = await client.read("/sessions")
     assert.deepEqual(off.ok === false && off.reason, "disabled")
     env = {}
@@ -122,7 +122,7 @@ async function main() {
     const none = await client.read("/sessions")
     assert.deepEqual(none.ok === false && none.reason, "not_configured")
     assert.equal(calls.length, 0)
-    env = { INFINITE_FLIGHT_API_KEY: KEY }
+    env = { IF_API_KEY: KEY }
   }
 
   // Health: ok when the API answers; reports the state otherwise; never contains the key.
@@ -136,7 +136,7 @@ async function main() {
     await liveHealth(client, env, () => clock)
     assert.equal(calls.length, 1)
 
-    const off = await liveHealth(fresh(), { INFINITE_FLIGHT_API_KEY: KEY, LIVE_API_ENABLED: "false" }, () => clock)
+    const off = await liveHealth(fresh(), { IF_API_KEY: KEY, LIVE_API_ENABLED: "false" }, () => clock)
     assert.equal(off.status, "disabled")
     assert.equal(off.enabled, false)
     const missing = await liveHealth(fresh(), {}, () => clock)
