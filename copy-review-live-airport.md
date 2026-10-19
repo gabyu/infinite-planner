@@ -1,6 +1,8 @@
 # Copy review: live airport info
 
-Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked `// PROVISIONAL`: production is blocked until you approve (`pnpm check:copy`). The block sits in the editor's Options tab, under Ground movements, once per airport (departure and arrival). The whole block is hidden when live data is switched off.
+**Editor tabs (new):** the panel now has Departure, Cruise, Arrival and Options tabs (Cruise appears only when the plan has waypoints between the two ends). Strings: `copy.editor.tabDeparture` = Departure, `tabCruise` = Cruise, `tabArrival` = Arrival (Options is the existing `optionsHeading`). All `// PROVISIONAL`. The old "Waypoints" tab label is gone; the list header still reads "Waypoints · N".
+
+Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked `// PROVISIONAL`: production is blocked until you approve (`pnpm check:copy`). The card sits at the top of the Departure tab and of the Arrival tab, above Ground movements and the waypoints (one line when collapsed, the runway chips and the ATIS text when open). It is hidden when live data is switched off.
 
 **To decide first:**
 1. **Wind unit.** The ATIS says "Wind 240 at 5" with no unit. The panel shows "240° at 5 kt", assuming knots (Infinite Flight uses knots). Check one against the game before approving.
@@ -9,6 +11,7 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 
 | Key | Where / when | Current text |
 |---|---|---|
+| `groundWaypoints` | Label of the Ground movements switch in the Departure and Arrival tabs; the text never changes with the switch state (on keeps the taxi in the plan, off removes it). Replaces the heading "Ground movements" and the two buttons "Departure" / "Arrival". The hint under it (`groundHint`, already approved) stays on desktop | Ground movement waypoints |
 | `heading` | Block title | Live airport info |
 | `departure`, `arrival` | Row titles | Departure, Arrival |
 | `loading` | While the first answer is awaited | Looking for the ATIS... |

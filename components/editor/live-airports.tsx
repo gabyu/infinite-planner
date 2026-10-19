@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Loader2, PlaneLanding, PlaneTakeoff } from "lucide-react"
+import { ChevronDown, Loader2 } from "lucide-react"
 import { atisWindText, copy } from "@/lib/copy"
 import { chipRunways, effectiveChoice, type EndChoice, type HandChoice } from "@/lib/runway-choice"
 import { cn } from "@/lib/utils"
@@ -96,24 +96,30 @@ function Runways({
   )
 }
 
-function AirportRow({
-  icao,
-  end,
-  live,
-  hand,
-  onTap,
-}: {
+interface AirportCardProps {
   icao: string
+  /** The code is a valid, complete ICAO code: nothing is asked of the server otherwise. */
+  valid: boolean
   end: "departure" | "arrival"
-  live: Live
+  /** The runway the pilot tapped for this end, if any. Kept by the editor so it survives switching tabs. */
   hand: HandChoice | null
   onTap: (runway: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const Icon = end === "departure" ? PlaneTakeoff : PlaneLanding
-  const label = end === "departure" ? copy.live.departure : copy.live.arrival
-  // Each row shows the runways of its own end only: the ones taking off at the departure airport, the ones landing at the
-  // arrival airport. The other list stays in the ATIS text.
+  /** Open at first: on a phone the card starts collapsed so the waypoint list keeps the height. */
+  defaultOpen: boolean
+  className?: string
+}
+
+// The live ATIS of one airport, at the top of the Departure or Arrival tab. One line when collapsed (airport, ATIS letter,
+// the runways of this end, wind), the runway chips and the ATIS text when open. Nothing at all while live data is off
+// (switched off, no key) or for a code that isn't an airport.
+export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, className }: AirportCardProps) {
+  const live = useAirportLive(icao, valid && /^[A-Z]{4}$/.test(icao))
+  const [open, setOpen] = useState(defaultOpen)
+  const [showText, setShowText] = useState(false)
+  if (hidden(live) || !live) return null
+
+  // The runways of this end only: the ones taking off at the departure airport, the ones landing at the arrival airport.
+  // The other list stays in the ATIS text.
   const runways = live.state === "atis" ? (end === "departure" ? live.departing : live.landing) : []
   const runwaysLabel = end === "departure" ? copy.live.departing : copy.live.landing
   const notRead = live.state === "atis" && runways.length === 0
@@ -130,30 +136,41 @@ function AirportRow({
         ? copy.live.runwayYours
         : copy.live.runwayYoursNotInAtis
 
+  const summary =
+    live.state === "loading"
+      ? copy.live.loading
+      : live.state === "no_atis"
+        ? copy.live.noAtis
+        : live.state === "unavailable"
+          ? copy.live.unavailable
+          : live.state !== "atis"
+            ? ""
+            : [
+                live.letter ? `${copy.live.atisLetter} ${live.letter}` : null,
+                chips.length > 0 ? `${runwaysLabel} ${choice ? choice.runway : chips.join(" ")}` : null,
+                live.wind ? atisWindText(live.wind) : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+  const expandable = live.state === "atis"
+
   return (
-    <div className="space-y-2 rounded-lg border p-3" aria-live="polite">
-      <div className="flex items-center gap-2 text-sm">
-        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-        <span className="font-medium">{label}</span>
-        <span className="font-mono text-xs text-muted-foreground">{icao}</span>
-        {live.state === "atis" && live.letter && (
-          <span className="ml-auto text-xs text-muted-foreground">
-            {copy.live.atisLetter} <span className="font-medium text-foreground">{live.letter}</span>
-          </span>
-        )}
-      </div>
+    <div className={cn("rounded-lg border", className)} aria-live="polite">
+      <button
+        type="button"
+        disabled={!expandable}
+        aria-expanded={expandable ? open : undefined}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs disabled:cursor-default"
+      >
+        {live.state === "loading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />}
+        <span className="shrink-0 font-mono font-medium">{icao}</span>
+        <span className="min-w-0 flex-1 truncate text-muted-foreground">{summary}</span>
+        {expandable && <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
+      </button>
 
-      {live.state === "loading" && (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          {copy.live.loading}
-        </p>
-      )}
-      {live.state === "no_atis" && <p className="text-xs text-muted-foreground">{copy.live.noAtis}</p>}
-      {live.state === "unavailable" && <p className="text-xs text-muted-foreground">{copy.live.unavailable}</p>}
-
-      {live.state === "atis" && (
-        <>
+      {expandable && live.state === "atis" && open && (
+        <div className="space-y-2 border-t px-3 py-2.5">
           <Runways label={runwaysLabel} runways={chips} choice={choice} onTap={onTap} />
           {choiceNote && <p className="pl-[5.5rem] text-xs text-muted-foreground">{choiceNote}</p>}
           {live.wind && (
@@ -163,7 +180,7 @@ function AirportRow({
             </div>
           )}
           {notRead && <p className="text-xs text-muted-foreground">{copy.live.runwaysNotRead}</p>}
-          {(open || notRead) && (
+          {(showText || notRead) && (
             <p className="whitespace-normal break-words rounded-md bg-muted p-2 text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
               {readableText(live.text)}
             </p>
@@ -171,41 +188,16 @@ function AirportRow({
           {!notRead && (
             <button
               type="button"
-              onClick={() => setOpen((value) => !value)}
-              aria-expanded={open}
+              onClick={() => setShowText((value) => !value)}
+              aria-expanded={showText}
               className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
-              {open ? copy.live.hideText : copy.live.showText}
+              {showText ? copy.live.hideText : copy.live.showText}
             </button>
           )}
-        </>
+          <p className="text-xs text-muted-foreground">{copy.live.source}</p>
+        </div>
       )}
-    </div>
-  )
-}
-
-interface LiveAirportsProps {
-  origin: string
-  destination: string
-  originValid: boolean
-  destinationValid: boolean
-  /** The runways the pilot tapped, one per end. Kept by the editor so they survive switching tabs. */
-  hand: Record<"departure" | "arrival", HandChoice | null>
-  onTap: (end: "departure" | "arrival", icao: string, runway: string) => void
-}
-
-// "Live airport info" block of the editor's Options row: the ATIS of the departure and the arrival airport, when there is one.
-export function LiveAirports({ origin, destination, originValid, destinationValid, hand, onTap }: LiveAirportsProps) {
-  const originLive = useAirportLive(origin, originValid && /^[A-Z]{4}$/.test(origin))
-  const destinationLive = useAirportLive(destination, destinationValid && /^[A-Z]{4}$/.test(destination))
-  if (hidden(originLive) && hidden(destinationLive)) return null
-
-  return (
-    <div className="space-y-2.5 border-b p-4">
-      <h4 className="studio-label">{copy.live.heading}</h4>
-      {!hidden(originLive) && <AirportRow icao={origin} end="departure" live={originLive as Live} hand={hand.departure} onTap={(runway) => onTap("departure", origin, runway)} />}
-      {!hidden(destinationLive) && <AirportRow icao={destination} end="arrival" live={destinationLive as Live} hand={hand.arrival} onTap={(runway) => onTap("arrival", destination, runway)} />}
-      <p className="text-xs text-muted-foreground">{copy.live.source}</p>
     </div>
   )
 }
