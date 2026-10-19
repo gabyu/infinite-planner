@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import { Loader2, PlaneLanding, PlaneTakeoff } from "lucide-react"
 import { atisWindText, copy } from "@/lib/copy"
+import { chipRunways, effectiveChoice, type EndChoice, type HandChoice } from "@/lib/runway-choice"
+import { cn } from "@/lib/utils"
 
 // What /api/live/airports/{icao} answers (see lib/live-api/airport.ts); "unknown" is a 404 for a code that isn't an airport.
 type AtisState = {
@@ -57,21 +59,56 @@ const hidden = (live: Live | null) => !live || live.state === "disabled" || live
 // lets it flow. Display only; the text itself is unchanged.
 const readableText = (text: string) => text.replace(/,(?=[A-Za-z0-9])/g, ", ")
 
-function Runways({ label, runways }: { label: string; runways: string[] }) {
+function Runways({
+  label,
+  runways,
+  choice,
+  onTap,
+}: {
+  label: string
+  runways: string[]
+  choice: EndChoice | null
+  onTap: (runway: string) => void
+}) {
   if (runways.length === 0) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-sm">
       <span className="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
-      {runways.map((runway) => (
-        <span key={runway} className="rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums">
-          {runway}
-        </span>
-      ))}
+      {runways.map((runway) => {
+        const chosen = choice?.runway === runway
+        return (
+          <button
+            key={runway}
+            type="button"
+            aria-pressed={chosen}
+            onClick={() => onTap(runway)}
+            className={cn(
+              "rounded-md border px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              chosen ? "border-primary bg-primary text-primary-foreground" : "bg-muted hover:bg-accent",
+            )}
+          >
+            {runway}
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arrival"; live: Live }) {
+function AirportRow({
+  icao,
+  end,
+  live,
+  hand,
+  onTap,
+}: {
+  icao: string
+  end: "departure" | "arrival"
+  live: Live
+  hand: HandChoice | null
+  onTap: (runway: string) => void
+}) {
   const [open, setOpen] = useState(false)
   const Icon = end === "departure" ? PlaneTakeoff : PlaneLanding
   const label = end === "departure" ? copy.live.departure : copy.live.arrival
@@ -80,6 +117,18 @@ function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arr
   const runways = live.state === "atis" ? (end === "departure" ? live.departing : live.landing) : []
   const runwaysLabel = end === "departure" ? copy.live.departing : copy.live.landing
   const notRead = live.state === "atis" && runways.length === 0
+  // The pilot's tap, else the ATIS's single runway; the pilot's own is kept even when the ATIS stops listing it.
+  const choice = live.state === "atis" ? effectiveChoice(hand, icao, runways) : null
+  const chips = chipRunways(choice, runways)
+  const choiceNote = !choice
+    ? runways.length > 1
+      ? copy.live.runwayTap
+      : null
+    : choice.by === "atis"
+      ? copy.live.runwayFromAtis
+      : choice.inAtis
+        ? copy.live.runwayYours
+        : copy.live.runwayYoursNotInAtis
 
   return (
     <div className="space-y-2 rounded-lg border p-3" aria-live="polite">
@@ -105,7 +154,8 @@ function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arr
 
       {live.state === "atis" && (
         <>
-          <Runways label={runwaysLabel} runways={runways} />
+          <Runways label={runwaysLabel} runways={chips} choice={choice} onTap={onTap} />
+          {choiceNote && <p className="pl-[5.5rem] text-xs text-muted-foreground">{choiceNote}</p>}
           {live.wind && (
             <div className="flex items-center gap-1.5 text-sm">
               <span className="w-20 shrink-0 text-xs text-muted-foreground">{copy.live.wind}</span>
@@ -139,10 +189,13 @@ interface LiveAirportsProps {
   destination: string
   originValid: boolean
   destinationValid: boolean
+  /** The runways the pilot tapped, one per end. Kept by the editor so they survive switching tabs. */
+  hand: Record<"departure" | "arrival", HandChoice | null>
+  onTap: (end: "departure" | "arrival", icao: string, runway: string) => void
 }
 
 // "Live airport info" block of the editor's Options row: the ATIS of the departure and the arrival airport, when there is one.
-export function LiveAirports({ origin, destination, originValid, destinationValid }: LiveAirportsProps) {
+export function LiveAirports({ origin, destination, originValid, destinationValid, hand, onTap }: LiveAirportsProps) {
   const originLive = useAirportLive(origin, originValid && /^[A-Z]{4}$/.test(origin))
   const destinationLive = useAirportLive(destination, destinationValid && /^[A-Z]{4}$/.test(destination))
   if (hidden(originLive) && hidden(destinationLive)) return null
@@ -150,8 +203,8 @@ export function LiveAirports({ origin, destination, originValid, destinationVali
   return (
     <div className="space-y-2.5 border-b p-4">
       <h4 className="studio-label">{copy.live.heading}</h4>
-      {!hidden(originLive) && <AirportRow icao={origin} end="departure" live={originLive as Live} />}
-      {!hidden(destinationLive) && <AirportRow icao={destination} end="arrival" live={destinationLive as Live} />}
+      {!hidden(originLive) && <AirportRow icao={origin} end="departure" live={originLive as Live} hand={hand.departure} onTap={(runway) => onTap("departure", origin, runway)} />}
+      {!hidden(destinationLive) && <AirportRow icao={destination} end="arrival" live={destinationLive as Live} hand={hand.arrival} onTap={(runway) => onTap("arrival", destination, runway)} />}
       <p className="text-xs text-muted-foreground">{copy.live.source}</p>
     </div>
   )

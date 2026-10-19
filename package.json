@@ -11,7 +11,8 @@
     "check:seo": "esbuild scripts/check-seo.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "check:copy": "node scripts/check-copy.mjs",
     "test:ground-trim": "esbuild scripts/test-ground-trim.ts --bundle --platform=node --format=cjs --alias:@=. | node",
-    "test:live-api": "esbuild scripts/test-live-api.ts --bundle --platform=node --format=cjs --alias:@=. | node"
+    "test:live-api": "esbuild scripts/test-live-api.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:runway-choice": "esbuild scripts/test-runway-choice.ts --bundle --platform=node --format=cjs --alias:@=. | node"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

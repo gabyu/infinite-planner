@@ -68,6 +68,7 @@ import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
 import { LiveAirports } from "@/components/editor/live-airports"
+import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
@@ -1306,6 +1307,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
   const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
   const [panelTab, setPanelTab] = useState<"waypoints" | "options">("waypoints")
+  // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
+  const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
   const loadAirport = async (icao: string): Promise<TrimAirport | null> => {
@@ -1915,6 +1918,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     destination={destinationAirport}
                     originValid={icaoValidation.origin}
                     destinationValid={icaoValidation.destination}
+                    hand={handRunways}
+                    onTap={(end, icao, runway) => setHandRunways((current) => ({ ...current, [end]: tapRunway(current[end], icao, runway) }))}
                   />
                   {optionsContent}
                   {brandingSection(false)}
