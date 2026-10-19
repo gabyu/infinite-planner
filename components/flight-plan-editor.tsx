@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
+import { saveFplInBrowser } from "@/lib/fpl-download"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import {
   AUTOSAVE_INTERVAL_MS,
@@ -853,18 +854,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
     try {
       const fplContent = generateFPL(finalWaypoints)
-      const blob = new Blob([fplContent], { type: "application/xml" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-
       const fileName = fplFileName(originAirport, destinationAirport)
-      a.download = fileName
-
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      saveFplInBrowser(fplContent, fileName)
       setExportedFingerprint(currentFingerprint)
 
       // The import flow already records flight_number/origin/destination via
