@@ -1,4 +1,5 @@
 import { fplFileName, generateFPL } from "@/lib/fpl-generator"
+import { fplDownloadHeaders } from "@/lib/fpl-download"
 import { json } from "@/lib/flight-plan-server"
 import { fetchLibraryLaunched } from "@/lib/library-state"
 import { getViewer } from "@/lib/library"
@@ -33,11 +34,6 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!file) return json({ error: "This flight plan isn't available." }, 404)
 
   return new Response(generateFPL(file.waypoints), {
-    headers: {
-      "Content-Type": "application/xml",
-      "Content-Disposition": `attachment; filename="${fplFileName(file.origin_airport, file.destination_airport)}"`,
-      "Cache-Control": "no-store",
-      "X-Robots-Tag": "noindex",
-    },
+    headers: { ...fplDownloadHeaders(fplFileName(file.origin_airport, file.destination_airport)), "X-Robots-Tag": "noindex" },
   })
 }
