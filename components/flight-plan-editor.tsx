@@ -67,6 +67,7 @@ import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
+import { LiveAirports } from "@/components/editor/live-airports"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
@@ -1908,6 +1909,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     trimmed={trimmed}
                     disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
                     onToggle={toggleTrimPreview}
+                  />
+                  <LiveAirports
+                    origin={originAirport}
+                    destination={destinationAirport}
+                    originValid={icaoValidation.origin}
+                    destinationValid={icaoValidation.destination}
                   />
                   {optionsContent}
                   {brandingSection(false)}
