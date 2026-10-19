@@ -105,8 +105,28 @@ export const copy = {
     runwayFromAtis: "From the ATIS.", // PROVISIONAL
     runwayYours: "Your choice.", // PROVISIONAL
     runwayYoursNotInAtis: "Your choice. Not in the ATIS now.", // PROVISIONAL
+    noAtisShort: "No ATIS", // PROVISIONAL
+    runwayIntoWind: "Into the wind.", // PROVISIONAL
+    bestHeadwind: "Best headwind:", // PROVISIONAL
+    lightWind: "Light wind: any runway.", // PROVISIONAL
+    noWeather: "No recent weather report nearby.", // PROVISIONAL
+    weatherUnavailable: "Weather isn't available right now.", // PROVISIONAL
+    weatherCredit: "Weather: NOAA Aviation Weather Center.", // PROVISIONAL
   },
 } as const
+
+/** "METAR KSFO, 04:53Z." for the airport's own report, "From KOAK, 12 NM away, 04:53Z." for a neighbouring station. */
+export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {
+  const time = `${report.observedAt.slice(11, 16)}Z`
+  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}.` : `From ${report.station}, ${report.distanceNm} NM away, ${time}.` // PROVISIONAL
+}
+
+/** "28R: headwind 5 kt, crosswind 3 kt from the right." (tailwind and left likewise). */
+export function runwayComponentsText(runway: string, headwindKt: number, crosswindKt: number) {
+  const head = headwindKt >= 0 ? `headwind ${headwindKt} kt` : `tailwind ${-headwindKt} kt`
+  const cross = crosswindKt === 0 ? "no crosswind" : `crosswind ${Math.abs(crosswindKt)} kt from the ${crosswindKt > 0 ? "right" : "left"}`
+  return `${runway}: ${head}, ${cross}.` // PROVISIONAL
+}
 
 /** "240° at 5 kt", "Variable at 5 kt", "240° at 12 kt, gusting 25 kt", or "Calm", for the ATIS wind. */
 export function atisWindText(wind: { from: number | null; speedKt: number; gustKt: number | null }) {
