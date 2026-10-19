@@ -2,21 +2,8 @@
 // Safari builds the saved file's extension from the Content-Type, and an XML type makes it save "name.fpl.xml", which
 // Infinite Flight then opens with its SimBrief importer. The type below is therefore not XML.
 
-// The variants under test on staging (/fpl-test). "xml" is the previous behaviour, kept as the control.
-export const FPL_CONTENT_TYPES = {
-  a: "application/x-fpl",
-  b: "application/octet-stream",
-  xml: "application/xml",
-} as const
-
-export type FplVariant = keyof typeof FPL_CONTENT_TYPES
-
-export function isFplVariant(value: unknown): value is FplVariant {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(FPL_CONTENT_TYPES, value)
-}
-
-// PROVISIONAL until the staging test (Safari iPhone/iPad/Mac) picks a winner.
-export const FPL_CONTENT_TYPE: string = FPL_CONTENT_TYPES.a
+// Verified on Safari for iOS (dashboard download saved as name.fpl, opened in Infinite Flight): a custom type, not XML.
+export const FPL_CONTENT_TYPE = "application/x-fpl"
 
 export function fplDownloadHeaders(fileName: string, contentType: string = FPL_CONTENT_TYPE): Record<string, string> {
   return {
