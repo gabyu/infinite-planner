@@ -9,8 +9,11 @@ export interface TrimPoint {
   altitude: number
 }
 
-/** [lat1, lng1, lat2, lng2, lengthFt, widthFt]: the two thresholds of one runway. */
-export type RunwayRow = [number, number, number, number, number, number]
+/**
+ * [lat1, lng1, lat2, lng2, lengthFt, widthFt, name1?, name2?]: the two thresholds of one runway, and when it has standard
+ * names ("13R", "31L") the name of the end at each coordinate pair. Trimming reads the first six only.
+ */
+export type RunwayRow = [number, number, number, number, number, number, string?, string?]
 
 export interface TrimAirport {
   elevationFt: number | null
