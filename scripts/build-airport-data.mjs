@@ -10,7 +10,9 @@
 //   for name lookup, left out of search). Read by lib/airports.ts (the Convert airport search, page text).
 // runways.json: for the same airports, the field elevation, the reference point, the open runways that have both end
 //   coordinates, and the runway names:
-//   { "LFPG": [392, 49.0097, 2.5479, [[lat1, lng1, lat2, lng2, lengthFt, widthFt], ...], [["08L","26R",87], ...]], ... }
+//   { "LFPG": [392, 49.0097, 2.5479, [[lat1, lng1, lat2, lng2, lengthFt, widthFt, "08L", "26R"], ...], [["08L","26R",87], ...]], ... }
+//   (a coordinate row has its two names as extra elements when it has standard ones: the first name is the end at the first
+//   coordinate pair, so a runway found by position gives its ends' names)
 //   The coordinate rows are what ground trimming (lib/ground-trim.ts) reads. The names list every open runway whose two
 //   ends both have a standard name (number 1-36, optional L / R / C), including the many small airports that have no
 //   coordinates; numbers are padded to two digits ("1L" -> "01L") to match the wording of the ATIS. A pair must be exact
@@ -150,6 +152,7 @@ let rows = 0
 let named = 0
 let notOpposite = 0
 let headed = 0
+let rowsNamed = 0
 for (const row of rRows) {
   const codes = refToCodes.get(row[r("airport_ref")])
   if (!codes || row[r("closed")] === "1") continue
@@ -164,8 +167,14 @@ for (const row of rRows) {
   }
   for (const code of codes) {
     if (hasEnds) {
-      runways[code][3].push([...ends.map(round), Math.round(num("length_ft")) || 0, Math.round(num("width_ft")) || 0])
+      // A row with standard names carries them as elements 6 and 7 (the first end's name is the one at the first coordinate pair).
+      // Only when the geometry agrees with the names: the source has a few runways whose two ends are swapped (the first
+      // coordinate pair is the end the second name belongs to), and a name on the wrong end would put a guide on the wrong side.
+      const coordinates = [...ends.map(round), Math.round(num("length_ft")) || 0, Math.round(num("width_ft")) || 0]
+      const agrees = le && he && angleBetween(bearing(ends[0], ends[1], ends[2], ends[3]), Number.parseInt(le) * 10) <= 45
+      runways[code][3].push(agrees ? [...coordinates, le, he] : coordinates)
       rows++
+      if (agrees) rowsNamed++
     }
     if (le && he && !runways[code][4].some(([x, y]) => x === le && y === he)) {
       const heading = trueHeading(row, le, hasEnds, ends)
@@ -182,5 +191,5 @@ writeFileSync(new URL("../lib/data/airports.json", import.meta.url), JSON.string
 writeFileSync(new URL("../lib/data/runways.json", import.meta.url), JSON.stringify(sorted(runways)))
 console.log(
   `${aRows.length} airport rows -> ${Object.keys(airports).length} ICAO airports; ${rows} runways with both ends, ${named} named runways ` +
-    `(${Object.values(runways).filter((entry) => entry[4].length > 0).length} airports with names; ${notOpposite} pairs left out as not opposite ends; ${headed} with a true heading)`,
+    `(${Object.values(runways).filter((entry) => entry[4].length > 0).length} airports with names; ${notOpposite} pairs left out as not opposite ends; ${headed} with a true heading; ${rowsNamed} coordinate rows carry their names)`,
 )

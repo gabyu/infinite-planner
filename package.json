@@ -16,7 +16,8 @@
     "test:route-phases": "esbuild scripts/test-route-phases.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:airport-data": "esbuild scripts/test-airport-data.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:weather": "esbuild scripts/test-weather.ts --bundle --platform=node --format=cjs --alias:@=. | node",
-    "test:runway-wind": "esbuild scripts/test-runway-wind.ts --bundle --platform=node --format=cjs --alias:@=. | node"
+    "test:runway-wind": "esbuild scripts/test-runway-wind.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:runway-guide": "esbuild scripts/test-runway-guide.ts --bundle --platform=node --format=cjs --alias:@=. | node"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

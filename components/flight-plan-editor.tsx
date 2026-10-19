@@ -68,6 +68,9 @@ import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
 import { AirportCard } from "@/components/editor/live-airports"
+import { RunwayGuides } from "@/components/editor/runway-guides"
+import type { GuidePoint } from "@/lib/runway-guide"
+import { attachGuideToPlan, GuideError, type StoredGuide } from "@/lib/runway-guide-client"
 import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
@@ -1343,7 +1346,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
-  const loadAirport = async (icao: string): Promise<TrimAirport | null> => {
+  // Stable (it only reads a ref), so effects that depend on it do not run again on every render.
+  const loadAirport = useCallback(async (icao: string): Promise<TrimAirport | null> => {
     if (runwayCache.current.has(icao)) return runwayCache.current.get(icao) ?? null
     try {
       const response = await fetch(`/api/airports/${icao}/runways`)
@@ -1353,6 +1357,40 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     } catch {
       return null
     }
+  }, [])
+
+  // Departure guides: a guide being previewed on the map, and putting a guide's path into the plan.
+  const [guidePreview, setGuidePreview] = useState<{ lat: number; lng: number }[] | null>(null)
+  const guideSupabase = useMemo(() => (authUser ? getBrowserSupabase() : null), [authUser])
+  // The database is told first (the plan takes the guide's origin, so a plan built on a tracker-derived guide cannot be
+  // published), then the departure part of the plan is replaced in one undo step. Throws when the database refuses.
+  const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide) => {
+    if (!guideSupabase || !savedPlanId) throw new GuideError("plan_not_found")
+    setOriginSources(await attachGuideToPlan(guideSupabase, savedPlanId, guide.id))
+    const stamp = Date.now()
+    const replacement: Waypoint[] = points.map((point, index) => ({
+      id: `${stamp}-guide-${index}`,
+      name: `G${index + 1}`,
+      lat: point.lat,
+      lng: point.lng,
+      altitude: Math.round(point.altitude),
+    }))
+    const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
+    // One setWaypoints call = one undo step. The naming rules renumber the new waypoints with the rest.
+    setWaypoints(applyWaypointNamingRules([...replacement, ...kept], originAirport, destinationAirport, includeBranding))
+    delete trimRemoved.current.departure
+    setTrimmed((current) => ({ ...current, departure: false }))
+    setTrimPreview(null)
+    setGuidePreview(null)
+    setMapFocus((current) => ({ ids: replacement.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    toast({
+      title: copy.guides.appliedToast,
+      action: (
+        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
   }
 
   // The toggles are "on" while the ground movements are in the plan. Turning one off previews what goes (Apply
@@ -1805,6 +1843,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
               hoveredId={hoveredId}
               ghostIds={ghostIds}
               focus={mapFocus}
+              ghostPath={guidePreview}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}
@@ -1940,6 +1979,23 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         defaultOpen={!isMobile}
                         className="mx-4 mb-3"
                       />
+                      {activeTab === "departure" && (
+                        <RunwayGuides
+                          supabase={guideSupabase}
+                          icao={originAirport}
+                          valid={icaoValidation.origin}
+                          waypoints={waypoints}
+                          split={phaseSplit}
+                          loadAirport={loadAirport}
+                          planId={savedPlanId}
+                          planIsDraft={savedStatus === "draft"}
+                          targetRunway={handRunways.departure?.icao === originAirport ? handRunways.departure.runway : null}
+                          onPreview={setGuidePreview}
+                          onApply={applyGuideToPlan}
+                          onNotify={(title, description) => toast({ title, description })}
+                          className="mx-4 mb-3"
+                        />
+                      )}
                       <GroundMovements
                         end={activeTab}
                         compact={isMobile}
