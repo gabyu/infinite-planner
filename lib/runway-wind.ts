@@ -81,3 +81,16 @@ export function adviseRunways(ends: RunwayEnd[], wind: WindInput): WindAdvice {
   const clear = alone && (!rival || top.headwindKt - rival.headwindKt >= PICK_MARGIN_KT)
   return { ranked: out, best: best.map((end) => end.name), pick: clear ? top.name : null, light: false }
 }
+
+// How a runway end looks next to the others, for the colour of its chip: good (green), caution (yellow: not the best
+// headwind, or a strong crosswind) or avoid (red: a tailwind). Light or variable wind judges nothing, so no colour.
+export type EndTone = "good" | "caution" | "avoid"
+export const TAILWIND_AVOID_KT = 2 // a tailwind of this much or more is red
+export const CROSSWIND_CAUTION_KT = 15 // this much crosswind is never green
+
+export function endTone(end: { headwindKt: number; crosswindKt: number }, isBest: boolean, light: boolean): EndTone | null {
+  if (light) return null
+  if (end.headwindKt <= -TAILWIND_AVOID_KT) return "avoid"
+  if (Math.abs(end.crosswindKt) >= CROSSWIND_CAUTION_KT) return "caution"
+  return isBest ? "good" : "caution"
+}

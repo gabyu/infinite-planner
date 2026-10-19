@@ -5,6 +5,7 @@ import { ChevronDown, Loader2 } from "lucide-react"
 import { atisWindText, copy, runwayComponentsText, weatherSourceText } from "@/lib/copy"
 import type { WeatherState } from "@/lib/live-api/airport"
 import { chipRunways, effectiveChoice, type EndChoice, type HandChoice } from "@/lib/runway-choice"
+import { endTone, type EndTone } from "@/lib/runway-wind"
 import { cn } from "@/lib/utils"
 
 // What /api/live/airports/{icao} answers (see lib/live-api/airport.ts); "unknown" is a 404 for a code that isn't an airport.
@@ -62,17 +63,26 @@ const hidden = (live: Live | null) => !live || live.state === "disabled" || live
 // lets it flow. Display only; the text itself is unchanged.
 const readableText = (text: string) => text.replace(/,(?=[A-Za-z0-9])/g, ", ")
 
+const TONE_CLASSES: Record<EndTone, string> = {
+  good: "border-emerald-500/50 bg-emerald-500/15 text-emerald-800 hover:bg-emerald-500/25 dark:text-emerald-200",
+  caution: "border-amber-500/50 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:text-amber-200",
+  avoid: "border-red-500/50 bg-red-500/15 text-red-800 hover:bg-red-500/25 dark:text-red-200",
+}
+
 function Runways({
   runways,
   choice,
   onTap,
   titles,
+  tones,
 }: {
   runways: string[]
   choice: EndChoice | null
   onTap: (runway: string) => void
   /** What the wind does on each runway, shown as a tooltip. */
   titles?: Record<string, string>
+  /** Green / yellow / red by how the wind favours each end; a chosen chip is blue whatever its tone. */
+  tones?: Record<string, EndTone>
 }) {
   if (runways.length === 0) return null
   return (
@@ -89,7 +99,11 @@ function Runways({
             className={cn(
               "rounded-md border px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              chosen ? "border-primary bg-primary text-primary-foreground" : "bg-muted hover:bg-accent",
+              chosen
+                ? "border-primary bg-primary text-primary-foreground"
+                : tones?.[runway]
+                  ? TONE_CLASSES[tones[runway]]
+                  : "bg-muted hover:bg-accent",
             )}
           >
             {runway}
@@ -164,8 +178,17 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
             : null
   // What the wind does on each end, as a tooltip, and in words for the chosen one.
   const rankOf = (name: string) => weather?.ranked.find((rank) => rank.name === name)
+  const tones: Record<string, EndTone> = {}
+  for (const rank of weather?.ranked ?? []) {
+    const tone = endTone(rank, weather?.best.includes(rank.name) ?? false, weather?.light ?? true)
+    if (tone) tones[rank.name] = tone
+  }
+  const toneText = { good: copy.live.toneGood, caution: copy.live.toneCaution, avoid: copy.live.toneAvoid }
   const titles = Object.fromEntries(
-    (weather?.ranked ?? []).map((rank) => [rank.name, runwayComponentsText(rank.name, rank.headwindKt, rank.crosswindKt)]),
+    (weather?.ranked ?? []).map((rank) => [
+      rank.name,
+      `${runwayComponentsText(rank.name, rank.headwindKt, rank.crosswindKt)}${tones[rank.name] ? ` ${toneText[tones[rank.name]]}` : ""}`,
+    ]),
   )
   const chosenRank = choice ? rankOf(choice.runway) : undefined
 
@@ -200,7 +223,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
       >
         {live.state === "loading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />}
         <span className="shrink-0 font-mono font-medium">{icao}</span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground">{summary}</span>
+        <span className={cn("min-w-0 flex-1 text-muted-foreground", !open && "truncate")}>{summary}</span>
         {expandable && <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
       </button>
 
@@ -208,12 +231,6 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
         <div className="space-y-2 border-t px-3 py-2.5">
           <Runways runways={chips} choice={choice} onTap={onTap} />
           {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
-          {atis.wind && (
-            <div className="flex items-center gap-1.5 text-sm">
-              <span className="w-20 shrink-0 text-xs text-muted-foreground">{copy.live.wind}</span>
-              <span className="text-xs">{atisWindText(atis.wind)}</span>
-            </div>
-          )}
           {notRead && <p className="text-xs text-muted-foreground">{copy.live.runwaysNotRead}</p>}
           {(showText || notRead) && (
             <p className="whitespace-normal break-words rounded-md bg-muted p-2 text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
@@ -236,22 +253,16 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
 
       {noAtis && expandable && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
-          <Runways runways={chips} choice={choice} onTap={onTap} titles={titles} />
+          <Runways runways={chips} choice={choice} onTap={onTap} titles={titles} tones={tones} />
           {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
           {choice && chosenRank && (
             <p className="text-xs text-muted-foreground">
               {runwayComponentsText(choice.runway, chosenRank.headwindKt, chosenRank.crosswindKt)}
             </p>
           )}
-          {weather && (
-            <div className="flex items-center gap-1.5 text-sm">
-              <span className="w-20 shrink-0 text-xs text-muted-foreground">{copy.live.wind}</span>
-              <span className="text-xs">{atisWindText(weather.wind)}</span>
-            </div>
-          )}
           {weatherNote && <p className="text-xs text-muted-foreground">{weatherNote}</p>}
-          <p className="text-xs text-muted-foreground">
-            {weather ? `${weatherSourceText(weather)} ${copy.live.weatherCredit}` : copy.live.source}
+          <p className="truncate text-xs text-muted-foreground" title={weather ? copy.live.weatherCreditFull : undefined}>
+            {weather ? `${weatherSourceText(weather)} · ${copy.live.weatherCredit}` : copy.live.source}
           </p>
         </div>
       )}

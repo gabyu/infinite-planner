@@ -1,6 +1,6 @@
 // Run with `pnpm test:runway-wind`. Plain asserts: the project has no test runner.
 import assert from "node:assert/strict"
-import { adviseRunways, components, endsOf, LIGHT_WIND_KT, PICK_MARGIN_KT } from "@/lib/runway-wind"
+import { adviseRunways, components, CROSSWIND_CAUTION_KT, endsOf, endTone, LIGHT_WIND_KT, PICK_MARGIN_KT, TAILWIND_AVOID_KT } from "@/lib/runway-wind"
 import { effectiveChoice } from "@/lib/runway-choice"
 
 const near = (actual: number, expected: number, message?: string) => assert.ok(Math.abs(actual - expected) < 0.05, `${message ?? ""} ${actual} vs ${expected}`)
@@ -99,6 +99,27 @@ const near = (actual: number, expected: number, message?: string) => assert.ok(M
   assert.equal(effectiveChoice(null, "EHAM", [], null), null)
   // A hand choice for another airport does not count; the wind of this airport does.
   assert.deepEqual(effectiveChoice({ icao: "KSFO", runway: "28L" }, "EHAM", [], "09"), { runway: "09", by: "wind", inAtis: true })
+}
+
+// Tones, KSFO with wind 270 at 12 (whole knots as the server sends them): 28L/28R green, 19 and the sideways ends yellow, the tailwind ends red.
+{
+  const ksfo = endsOf([["01L", "19R", 28], ["10L", "28R", 118]])
+  const advice = adviseRunways(ksfo, { from: 270, speedKt: 12 })
+  const tone = (name: string) => {
+    const rank = advice.ranked.find((end) => end.name === name)!
+    return endTone({ headwindKt: Math.round(rank.headwindKt), crosswindKt: Math.round(rank.crosswindKt) }, advice.best.includes(name), advice.light)
+  }
+  assert.equal(tone("28R"), "good") // headwind 11
+  assert.equal(tone("19R"), "caution") // headwind 5, crosswind 11: not the best
+  assert.equal(tone("01L"), "avoid") // tailwind 5
+  assert.equal(tone("10L"), "avoid") // tailwind 11
+  // Strong crosswind is never green, even when it is the best headwind; a tailwind stays red.
+  assert.equal(endTone({ headwindKt: 8, crosswindKt: CROSSWIND_CAUTION_KT }, true, false), "caution")
+  assert.equal(endTone({ headwindKt: 8, crosswindKt: CROSSWIND_CAUTION_KT - 1 }, true, false), "good")
+  assert.equal(endTone({ headwindKt: -TAILWIND_AVOID_KT, crosswindKt: 20 }, false, false), "avoid")
+  assert.equal(endTone({ headwindKt: -(TAILWIND_AVOID_KT - 1), crosswindKt: 3 }, false, false), "caution")
+  // Light wind judges nothing.
+  assert.equal(endTone({ headwindKt: 2, crosswindKt: 0 }, true, true), null)
 }
 
 console.log("runway-wind: all checks passed")

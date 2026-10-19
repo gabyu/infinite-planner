@@ -91,7 +91,6 @@ export const copy = {
     arrival: "Arrival", // PROVISIONAL
     loading: "Looking for the ATIS...", // PROVISIONAL
     atisLetter: "Information", // PROVISIONAL
-    wind: "Wind", // PROVISIONAL
     windCalm: "Calm", // PROVISIONAL
     windVariable: "Variable", // PROVISIONAL
     noAtis: "No ATIS at this airport right now.", // PROVISIONAL
@@ -109,14 +108,18 @@ export const copy = {
     lightWind: "Light wind: any runway.", // PROVISIONAL
     noWeather: "No recent weather report nearby.", // PROVISIONAL
     weatherUnavailable: "Weather isn't available right now.", // PROVISIONAL
-    weatherCredit: "Weather: NOAA Aviation Weather Center.", // PROVISIONAL
+    weatherCredit: "NOAA", // PROVISIONAL
+    weatherCreditFull: "Weather: NOAA Aviation Weather Center.", // PROVISIONAL
+    toneGood: "Best headwind.", // PROVISIONAL
+    toneCaution: "Check the wind.", // PROVISIONAL
+    toneAvoid: "Tailwind.", // PROVISIONAL
   },
 } as const
 
-/** "METAR KSFO, 04:53Z." for the airport's own report, "From KOAK, 12 NM away, 04:53Z." for a neighbouring station. */
+/** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
 export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {
   const time = `${report.observedAt.slice(11, 16)}Z`
-  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}.` : `From ${report.station}, ${report.distanceNm} NM away, ${time}.` // PROVISIONAL
+  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm} NM away, ${time}` // PROVISIONAL
 }
 
 /** "28R: headwind 5 kt, crosswind 3 kt from the right." (tailwind and left likewise). */
