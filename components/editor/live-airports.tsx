@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Fragment, useEffect, useState } from "react"
 import { ChevronDown, Loader2 } from "lucide-react"
 import { atisWindText, copy, runwayComponentsText, weatherSourceText } from "@/lib/copy"
 import type { WeatherState } from "@/lib/live-api/airport"
@@ -192,24 +192,24 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
   )
   const chosenRank = choice ? rankOf(choice.runway) : undefined
 
-  const summary =
+  // The collapsed line as pieces ("Information ALPHA", "30L 30R", "350° at 10 kt"). A piece is never split when the line wraps:
+  // it breaks only after a middle dot, and the airport code stays at the top beside the first line.
+  const summaryParts: string[] =
     live.state === "loading"
-      ? copy.live.loading
+      ? [copy.live.loading]
       : noAtis
         ? weather
-          ? [copy.live.noAtisShort, atisWindText(weather.wind), choice ? choice.runway : null].filter(Boolean).join(" · ")
-          : copy.live.noAtis
+          ? [copy.live.noAtisShort, atisWindText(weather.wind), choice ? choice.runway : null].filter((part): part is string => Boolean(part))
+          : [copy.live.noAtis]
         : live.state === "unavailable"
-          ? copy.live.unavailable
+          ? [copy.live.unavailable]
           : !atis
-            ? ""
+            ? []
             : [
                 atis.letter ? `${copy.live.atisLetter} ${atis.letter}` : null,
                 chips.length > 0 ? (choice ? choice.runway : chips.join(" ")) : null,
                 atis.wind ? atisWindText(atis.wind) : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")
+              ].filter((part): part is string => Boolean(part))
   const expandable = atis !== null || (noAtis !== null && (everyEnd.length > 0 || weather !== null))
 
   return (
@@ -219,12 +219,21 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
         disabled={!expandable}
         aria-expanded={expandable ? open : undefined}
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs disabled:cursor-default"
+        className="flex w-full items-start gap-2 px-3 py-2 text-left text-xs disabled:cursor-default"
       >
-        {live.state === "loading" && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />}
+        {live.state === "loading" && <Loader2 className="mt-px h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />}
         <span className="shrink-0 font-mono font-medium">{icao}</span>
-        <span className={cn("min-w-0 flex-1 text-muted-foreground", !open && "truncate")}>{summary}</span>
-        {expandable && <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
+        <span className="min-w-0 flex-1 text-muted-foreground">
+          {summaryParts.length === 1
+            ? summaryParts[0]
+            : summaryParts.map((part, index) => (
+                <Fragment key={part}>
+                  {index > 0 && " "}
+                  <span className="whitespace-nowrap">{index < summaryParts.length - 1 ? `${part} ·` : part}</span>
+                </Fragment>
+              ))}
+        </span>
+        {expandable && <ChevronDown className={cn("mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
       </button>
 
       {atis && open && (
