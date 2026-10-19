@@ -2,7 +2,7 @@ import "server-only"
 import airports from "@/lib/data/airports.json"
 
 // ICAO code -> [name, city, IATA, country, rank], from OurAirports (https://ourairports.com/data/,
-// released to the public domain), filtered to 4-letter ICAO codes by scripts/build-airports.mjs.
+// released to the public domain), filtered to 4-letter ICAO codes by scripts/build-airport-data.mjs (which also builds lib/data/runways.json).
 //
 // Used on the server only: to resolve the airport names stored on a flight plan when it is saved,
 // and to answer the airport search of the Convert form (/api/airports). The dataset never reaches

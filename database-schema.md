@@ -150,7 +150,7 @@ CREATE TABLE flight_plans (
 - **Airport names** come from [OurAirports](https://ourairports.com/data/) (released to the public domain),
   filtered to 4-letter ICAO codes and bundled as `lib/data/airports.json` (about 20,000 entries, 650 KB). It is
   only imported by server code (`lib/airports.ts`), so it never reaches the browser. Regenerate it with
-  `node scripts/build-airports.mjs path/to/airports.csv`. The Infinite Flight Live API is deliberately not used:
+  `node scripts/build-airport-data.mjs path/to/airports.csv path/to/runways.csv` (it builds both the airport list and the runway data from the same two files). The Infinite Flight Live API is deliberately not used:
   its terms forbid keeping API data in our own database.
 
 ## Environments
