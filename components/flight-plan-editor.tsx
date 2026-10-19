@@ -67,7 +67,8 @@ import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
-import { LiveAirports } from "@/components/editor/live-airports"
+import { AirportCard } from "@/components/editor/live-airports"
+import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { useToast } from "@/hooks/use-toast"
@@ -258,10 +259,17 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   // A map point was clicked: the list scrolls to its row.
   const [scrollTarget, setScrollTarget] = useState<{ id: string; nonce: number } | null>(null)
-  const handleMapPointClick = useCallback(
-    (id: string) => setScrollTarget((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 })),
-    [],
-  )
+  // The panel shows one part of the route at a time (departure, cruise, arrival) or the options.
+  const [panelTab, setPanelTab] = useState<Phase | "options">("departure")
+  // The waypoint ids and where the parts split, kept current for callbacks that must not go stale.
+  const routeRef = useRef<{ ids: string[]; split: PhaseSplit }>({ ids: [], split: { departureEnd: -1, arrivalStart: 0 } })
+  const handleMapPointClick = useCallback((id: string) => {
+    // A point on another part of the route: open that tab, then the list scrolls to the row.
+    const { ids, split } = routeRef.current
+    const index = ids.indexOf(id)
+    if (index >= 0) setPanelTab(phaseOf(index, split))
+    setScrollTarget((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 }))
+  }, [])
 
   // Check if device is mobile
   useEffect(() => {
@@ -1306,7 +1314,31 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // What each trim took away, so switching the toggle back on can put it back.
   const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
   const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
-  const [panelTab, setPanelTab] = useState<"waypoints" | "options">("waypoints")
+  // Where departure ends and arrival begins. Recomputed when the waypoints change shape (added, removed, trimmed, imported),
+  // never on an altitude or name edit, so editing a row never makes it jump to another tab.
+  const idsKey = waypoints.map((wp) => wp.id).join(",")
+  const phaseSplit = useMemo(() => splitPhases(waypoints), [idsKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  routeRef.current = { ids: waypoints.map((wp) => wp.id), split: phaseSplit }
+  const phaseSlice = (phase: Phase) => {
+    const [from, to] = phaseRange(phase, waypoints.length, phaseSplit)
+    return { items: waypoints.slice(from, to), offset: from }
+  }
+  const cruiseCount = phaseSlice("cruise").items.length
+  // The Cruise tab only exists when something lies between the two ends.
+  const activeTab: Phase | "options" = panelTab === "cruise" && cruiseCount === 0 ? "departure" : panelTab
+
+  // Opening a part of the route frames it on the map, and drops any selection that is not in it (Delete and
+  // Clear altitudes act on every selected waypoint, so they must never reach rows the pilot cannot see).
+  const selectTab = (tab: Phase | "options") => {
+    setPanelTab(tab)
+    if (tab === "options") return
+    const { items } = phaseSlice(tab)
+    const inTab = new Set(items.map((wp) => wp.id))
+    if (waypoints.some((wp) => wp.selected && !inTab.has(wp.id))) {
+      setWaypoints(waypoints.map((wp) => (wp.selected && !inTab.has(wp.id) ? { ...wp, selected: false } : wp)))
+    }
+    if (items.length > 0) setMapFocus((current) => ({ ids: items.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+  }
   // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
@@ -1353,7 +1385,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       toast({ title: copy.editor.trimNone })
       return
     }
-    setPanelTab("waypoints")
+    setPanelTab(end)
     const ids = result.remove.map((index) => waypoints[index].id)
     setTrimPreview({ end, ids, approximate: result.approximate })
     // Straight to the waypoints that would go; the view stays there after Apply.
@@ -1806,12 +1838,18 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           }
           body={
             <>
-              {/* One view at a time, so the middle of the panel scrolls once: the route's waypoints, or the options */}
+              {/* One view at a time, so the middle of the panel scrolls once: a part of the route, or the options */}
               <div className="shrink-0 px-4 pb-2 pt-2.5">
-                <div role="tablist" className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+                <div
+                  role="tablist"
+                  className="grid gap-1 rounded-lg bg-muted p-1"
+                  style={{ gridTemplateColumns: `repeat(${cruiseCount > 0 ? 4 : 3}, minmax(0, 1fr))` }}
+                >
                   {(
                     [
-                      ["waypoints", `${copy.editor.tabWaypoints} · ${waypoints.length}`],
+                      ["departure", copy.editor.tabDeparture],
+                      ...(cruiseCount > 0 ? ([["cruise", copy.editor.tabCruise]] as const) : []),
+                      ["arrival", copy.editor.tabArrival],
                       ["options", copy.editor.optionsHeading],
                     ] as const
                   ).map(([tab, label]) => (
@@ -1819,11 +1857,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                       key={tab}
                       type="button"
                       role="tab"
-                      aria-selected={panelTab === tab}
-                      onClick={() => setPanelTab(tab)}
+                      aria-selected={activeTab === tab}
+                      onClick={() => selectTab(tab)}
                       className={cn(
-                        "h-7 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        panelTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                        "h-7 truncate rounded-md px-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        activeTab === tab ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                       )}
                     >
                       {label}
@@ -1832,7 +1870,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 </div>
               </div>
 
-              {panelTab === "waypoints" ? (
+              {activeTab !== "options" ? (
                 <div className="flex min-h-0 flex-1 flex-col">
                   {hasAlerts && (
                     <div className="shrink-0 space-y-1.5 px-4 pb-2">
@@ -1885,8 +1923,39 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     </div>
                   )}
 
+                  {(activeTab === "departure" || activeTab === "arrival") && (
+                    <div className="shrink-0">
+                      <AirportCard
+                        key={activeTab}
+                        icao={activeTab === "departure" ? originAirport : destinationAirport}
+                        valid={activeTab === "departure" ? icaoValidation.origin : icaoValidation.destination}
+                        end={activeTab}
+                        hand={handRunways[activeTab]}
+                        onTap={(runway) =>
+                          setHandRunways((current) => ({
+                            ...current,
+                            [activeTab]: tapRunway(current[activeTab], activeTab === "departure" ? originAirport : destinationAirport, runway),
+                          }))
+                        }
+                        defaultOpen={!isMobile}
+                        className="mx-4 mb-3"
+                      />
+                      <GroundMovements
+                        ends={[activeTab]}
+                        compact={isMobile}
+                        previewing={trimPreview?.end ?? null}
+                        busy={trimBusy}
+                        trimmed={trimmed}
+                        disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
+                        onToggle={toggleTrimPreview}
+                      />
+                    </div>
+                  )}
+
                   <WaypointList
-                    waypoints={waypoints}
+                    key={activeTab}
+                    waypoints={phaseSlice(activeTab).items}
+                    offset={phaseSlice(activeTab).offset}
                     isLoading={isLoading}
                     hoveredId={hoveredId}
                     onHover={setHoveredId}
@@ -1895,7 +1964,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                     onUpdateWaypoint={updateWaypoint}
                     onTabKeyNavigation={handleTabKeyNavigation}
                     onInputFocus={handleInputFocus}
-                    onToggleSelectAll={toggleSelectAll}
+                    onToggleSelectAll={(checked) => {
+                      const inTab = new Set(phaseSlice(activeTab).items.map((wp) => wp.id))
+                      setWaypoints(waypoints.map((wp) => (inTab.has(wp.id) ? { ...wp, selected: checked } : wp)))
+                    }}
                     onDeleteSelected={deleteSelectedWaypoints}
                     onClearAltitudes={clearSelectedAltitudes}
                     ghostIds={ghostIds}
@@ -1906,21 +1978,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {/* Flight numbers and time are saved with a plan: only offered when signed in */}
                   {flightNumberSection(false)}
                   {flightTimeSection(false)}
-                  <GroundMovements
-                    previewing={trimPreview?.end ?? null}
-                    busy={trimBusy}
-                    trimmed={trimmed}
-                    disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
-                    onToggle={toggleTrimPreview}
-                  />
-                  <LiveAirports
-                    origin={originAirport}
-                    destination={destinationAirport}
-                    originValid={icaoValidation.origin}
-                    destinationValid={icaoValidation.destination}
-                    hand={handRunways}
-                    onTap={(end, icao, runway) => setHandRunways((current) => ({ ...current, [end]: tapRunway(current[end], icao, runway) }))}
-                  />
                   {optionsContent}
                   {brandingSection(false)}
                 </div>

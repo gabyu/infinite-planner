@@ -27,7 +27,9 @@ export const copy = {
     waypointLongitude: "Longitude",
     waypointLimit: "Over the 250 waypoint limit",
     optionsHeading: "Options",
-    tabWaypoints: "Waypoints",
+    tabDeparture: "Departure", // PROVISIONAL
+    tabCruise: "Cruise", // PROVISIONAL
+    tabArrival: "Arrival", // PROVISIONAL
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
     addFlightNumber: "Add a flight number",
