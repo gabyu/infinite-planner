@@ -1,4 +1,5 @@
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
+import { fplDownloadHeaders } from "@/lib/fpl-download"
 import { isUuid, json, requireUser } from "@/lib/flight-plan-server"
 import type { StoredWaypoint } from "@/lib/flight-plans"
 
@@ -19,10 +20,6 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (data.status !== "exported") return json({ error: "Export the draft from the editor first." }, 409)
 
   return new Response(generateFPL(data.waypoints as StoredWaypoint[]), {
-    headers: {
-      "Content-Type": "application/xml",
-      "Content-Disposition": `attachment; filename="${fplFileName(data.origin_airport, data.destination_airport)}"`,
-      "Cache-Control": "no-store",
-    },
+    headers: fplDownloadHeaders(fplFileName(data.origin_airport, data.destination_airport)),
   })
 }
