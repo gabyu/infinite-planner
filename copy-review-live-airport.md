@@ -2,7 +2,7 @@
 
 **Editor tabs (new):** the panel now has Departure, Cruise, Arrival and Options tabs (Cruise appears only when the plan has waypoints between the two ends). Strings: `copy.editor.tabDeparture` = Departure, `tabCruise` = Cruise, `tabArrival` = Arrival (Options is the existing `optionsHeading`). All `// PROVISIONAL`. The old "Waypoints" tab label is gone; the list header still reads "Waypoints · N".
 
-Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked `// PROVISIONAL`: production is blocked until you approve (`pnpm check:copy`). The card sits at the top of the Departure tab and of the Arrival tab, above Ground movements and the waypoints (one line when collapsed, the runway chips and the ATIS text when open). It is hidden when live data is switched off.
+Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked `// PROVISIONAL`: production is blocked until you approve (`pnpm check:copy`). The card sits at the top of the Departure tab and of the Arrival tab, above Ground movements and the waypoints (one line when collapsed, the runway chips and the ATIS text when open; the chips carry no "Departing" / "Landing" label, the tab already says which end it is). It is hidden when live data is switched off.
 
 **To decide first (weather):** the weather lines above come from real METARs (NOAA, public domain). The game's own ATIS wind repeats the latest METAR about 45-60 minutes late, so a METAR wind may differ slightly from what the game says at the same moment. Have someone read NOAA's disclaimer before launch: no implied endorsement, no presenting the data as official.
 
@@ -18,7 +18,6 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 | `departure`, `arrival` | Row titles | Departure, Arrival |
 | `loading` | While the first answer is awaited | Looking for the ATIS... |
 | `atisLetter` | Before the ATIS letter, top right of a row | Information (then the letter, e.g. OSCAR) |
-| `landing`, `departing` | Runway rows | Landing, Departing |
 | `wind`, `windCalm`, `windVariable` | Wind row | Wind, Calm, Variable |
 | `atisWindText` | Wind value | 240° at 5 kt / Variable at 5 kt / 240° at 12 kt, gusting 25 kt |
 | `noAtis` | No ATIS (no air traffic control with an ATIS online) | No ATIS at this airport right now. |
