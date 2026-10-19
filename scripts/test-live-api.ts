@@ -9,7 +9,7 @@ import {
   MIN_REFRESH_MS,
   type LiveEnv,
 } from "@/lib/live-api/core"
-import { getAirportLive, MAX_FOLLOWED_AIRPORTS } from "@/lib/live-api/airport"
+import { getAirportLive, MAX_FOLLOWED_AIRPORTS, type AirportExtras } from "@/lib/live-api/airport"
 import { parseAtis } from "@/lib/live-api/atis"
 
 const KEY = "test-key-not-real"
@@ -235,6 +235,37 @@ async function main() {
 
     assert.deepEqual(await getAirportLive(client, env, "LFPG"), { state: "no_atis" })
     assert.deepEqual(await getAirportLive(client, env, "EHAM"), { state: "no_atis" })
+
+    // No ATIS with the extras: every runway end, and the wind of the nearest METAR with the ends it favours.
+    {
+      const names: [string, string, number | null][] = [["04", "22", 41], ["09", "27", 87], ["18", "36", null]]
+      const windFor = (result: Awaited<ReturnType<AirportExtras["windAt"]>>): AirportExtras => ({ runwayNames: () => names, windAt: async () => result })
+      const report = { station: "EHAM", distanceNm: 0, observedAt: "2026-10-19T04:53:00.000Z", wind: { from: 90, speedKt: 15, gustKt: 22 } }
+      const live = await getAirportLive(client, env, "LFPG", windFor({ ok: true, report }))
+      assert.equal(live.state, "no_atis")
+      if (live.state === "no_atis" && live.weather?.status === "ok") {
+        assert.deepEqual(live.ends?.map((end) => end.name), ["04", "09", "18", "22", "27", "36"])
+        assert.equal(live.weather.station, "EHAM")
+        assert.deepEqual(live.weather.wind, report.wind)
+        assert.equal(live.weather.pick, "09")
+        assert.deepEqual(live.weather.best, ["09"])
+        assert.equal(live.weather.ranked[0].name, "09")
+        assert.equal(live.weather.ranked[0].headwindKt, 15)
+        assert.ok(live.weather.ranked.every((end) => end.name !== "18" && end.name !== "36")) // no heading: not ranked
+        assert.equal(JSON.stringify(live).includes(KEY), false)
+      } else assert.fail("expected weather")
+      const none = await getAirportLive(client, env, "LFPG", windFor({ ok: true, report: null }))
+      assert.deepEqual(none.state === "no_atis" && none.weather, { status: "none" })
+      assert.ok(none.state === "no_atis" && (none.ends?.length ?? 0) === 6) // the chips are there without weather
+      const down = await getAirportLive(client, env, "LFPG", windFor({ ok: false, reason: "unavailable" }))
+      assert.deepEqual(down.state === "no_atis" && down.weather, { status: "unavailable" })
+      const off = await getAirportLive(client, env, "LFPG", windFor({ ok: false, reason: "disabled" }))
+      assert.deepEqual(off.state === "no_atis" && off.weather, { status: "off" })
+      // An airport with an ATIS never gets weather: the ATIS speaks.
+      const withAtis = await getAirportLive(client, env, "EGLL", windFor({ ok: true, report }))
+      assert.equal(withAtis.state, "atis")
+      assert.equal("weather" in withAtis, false)
+    }
 
     // Many readers of one airport, one call a minute.
     const before = calls.length

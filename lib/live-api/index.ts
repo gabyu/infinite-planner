@@ -1,6 +1,8 @@
 import "server-only"
 import { createLiveClient, liveHealth, type LiveEnv } from "./core"
-import { getAirportLive } from "./airport"
+import { getAirportLive, type AirportExtras } from "./airport"
+import { getRunwayData } from "@/lib/runways"
+import { windAt } from "@/lib/weather"
 
 export type { LiveFailure, LiveHealth, LiveResult } from "./core"
 export type { AirportLive } from "./airport"
@@ -15,4 +17,13 @@ const readEnv = (): LiveEnv => ({
 export const liveClient = createLiveClient({ fetch: (...args) => fetch(...args), now: Date.now, env: readEnv })
 
 export const getLiveHealth = () => liveHealth(liveClient, readEnv(), Date.now)
-export const getAirportAtis = (icao: string) => getAirportLive(liveClient, readEnv(), icao)
+// Where there is no ATIS the answer also carries the airport's runway ends and the wind of the nearest real METAR.
+const extras: AirportExtras = {
+  runwayNames: (icao) => getRunwayData(icao)?.names ?? [],
+  windAt: async (icao) => {
+    const airport = getRunwayData(icao)
+    return airport ? windAt(icao, airport.lat, airport.lng) : { ok: true, report: null }
+  },
+}
+
+export const getAirportAtis = (icao: string) => getAirportLive(liveClient, readEnv(), icao, extras)
