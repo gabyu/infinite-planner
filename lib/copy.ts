@@ -119,13 +119,14 @@ export const copy = {
 /** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
 export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {
   const time = `${report.observedAt.slice(11, 16)}Z`
-  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm} NM away, ${time}` // PROVISIONAL
+  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm}\u00A0NM away, ${time}` // PROVISIONAL
 }
 
 /** "28R: headwind 5 kt, crosswind 3 kt from the right." (tailwind and left likewise). */
 export function runwayComponentsText(runway: string, headwindKt: number, crosswindKt: number) {
-  const head = headwindKt >= 0 ? `headwind ${headwindKt} kt` : `tailwind ${-headwindKt} kt`
-  const cross = crosswindKt === 0 ? "no crosswind" : `crosswind ${Math.abs(crosswindKt)} kt from the ${crosswindKt > 0 ? "right" : "left"}`
+  // Non-breaking spaces keep each word with its number and unit when the line wraps.
+  const head = headwindKt >= 0 ? `headwind\u00A0${headwindKt}\u00A0kt` : `tailwind\u00A0${-headwindKt}\u00A0kt`
+  const cross = crosswindKt === 0 ? "no crosswind" : `crosswind\u00A0${Math.abs(crosswindKt)}\u00A0kt from the ${crosswindKt > 0 ? "right" : "left"}`
   return `${runway}: ${head}, ${cross}.` // PROVISIONAL
 }
 
@@ -133,8 +134,9 @@ export function runwayComponentsText(runway: string, headwindKt: number, crosswi
 export function atisWindText(wind: { from: number | null; speedKt: number; gustKt: number | null }) {
   if (wind.speedKt === 0) return copy.live.windCalm
   const from = wind.from === null ? copy.live.windVariable : `${String(wind.from).padStart(3, "0")}°`
-  const gust = wind.gustKt ? `, gusting ${wind.gustKt} kt` : ""
-  return `${from} at ${wind.speedKt} kt${gust}` // PROVISIONAL
+  const gust = wind.gustKt ? `, gusting\u00A0${wind.gustKt}\u00A0kt` : ""
+  // Non-breaking spaces keep a number with its unit (and "at" with the direction) on one line when the text wraps.
+  return `${from}\u00A0at\u00A0${wind.speedKt}\u00A0kt${gust}` // PROVISIONAL
 }
 
 /** "12 waypoints will be removed" while previewing a trim. */
