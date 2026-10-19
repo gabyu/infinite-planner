@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import airportsJson from "@/lib/data/airports.json"
 import runwaysJson from "@/lib/data/runways.json"
 
-type RunwayEntry = [number | null, number, number, number[][], [string, string][]]
+type RunwayEntry = [number | null, number, number, number[][], [string, string, number | null][]]
 const airports = airportsJson as unknown as Record<string, [string, string, string, string, number]>
 const runways = runwaysJson as unknown as Record<string, RunwayEntry>
 
@@ -21,10 +21,17 @@ for (const [code, entry] of Object.entries(runways)) {
 
 // Names: two digits (1-36), optional L / R / C, exact opposite ends, no duplicates, sorted by number.
 let pairs = 0
+let headed = 0
 for (const [code, entry] of Object.entries(runways)) {
   const seen = new Set<string>()
-  for (const [le, he] of entry[4]) {
+  for (const [le, he, heading] of entry[4]) {
     pairs++
+    // True heading of the first end: whole degrees 0-359 or unknown, and within 45 degrees of the runway number x 10.
+    if (heading !== null) {
+      assert.ok(Number.isInteger(heading) && heading >= 0 && heading < 360, `${code} ${le} heading ${heading}`)
+      assert.ok(Math.abs(((heading - Number.parseInt(le) * 10 + 540) % 360) - 180) <= 45, `${code} ${le} heading ${heading}`)
+      headed++
+    }
     assert.match(le, /^(0[1-9]|[12]\d|3[0-6])[LRC]?$/, `${code} ${le}`)
     assert.match(he, /^(0[1-9]|[12]\d|3[0-6])[LRC]?$/, `${code} ${he}`)
     assert.equal(Math.abs(Number.parseInt(le) - Number.parseInt(he)), 18, `${code} ${le}/${he}`)
@@ -37,6 +44,7 @@ for (const [code, entry] of Object.entries(runways)) {
   assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b), `${code} sorted`)
 }
 assert.ok(pairs > 15_000, `named runways: ${pairs}`)
+assert.ok(headed > 10_000, `runways with a true heading: ${headed}`)
 
 // The runways that real ATIS texts named (2026-10-18/19) are all in the data: the names the airport panel would offer.
 const has = (code: string, ...names: string[]) => {
@@ -55,6 +63,13 @@ assert.ok(!runways.KSFO[4].flat().includes("1L"))
 assert.equal(runways.KDTW[3].length, 6)
 assert.ok(runways.EHAM[3].length >= 6)
 
+// True headings used for the headwind: KDTW 03/21 runs about 029 true, MMUN 12/30 about 124, KSFO 10/28 about 118, EHAM 18C/36C about 183.
+const heading = (code: string, name: string) => runways[code][4].find(([le]) => le === name)?.[2]
+assert.ok(Math.abs((heading("KDTW", "03L") ?? 999) - 29) <= 3)
+assert.ok(Math.abs((heading("MMUN", "12L") ?? 999) - 124) <= 3)
+assert.ok(Math.abs((heading("KSFO", "10L") ?? 999) - 118) <= 3)
+assert.ok(Math.abs((heading("EHAM", "18C") ?? 999) - 183) <= 3)
+
 // An airport can hold two codes (ident and an alias): the runways are on both.
 assert.deepEqual(runways.EGDX[4], runways.EGSY[4])
 
@@ -63,4 +78,4 @@ assert.deepEqual(runways.EGDX[4], runways.EGSY[4])
 assert.equal(airports.BISA[0], "Sandá Airport")
 assert.equal(runways.BISA[0], 1580)
 
-console.log(`airport-data: all checks passed (${Object.keys(airports).length} airports, ${pairs} named runways)`)
+console.log(`airport-data: all checks passed (${Object.keys(airports).length} airports, ${pairs} named runways, ${headed} with a true heading)`)
