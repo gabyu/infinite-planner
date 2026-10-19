@@ -53,6 +53,10 @@ function useAirportLive(icao: string, active: boolean): Live | null {
 // Nothing is shown for a row that is off (feature disabled, or a code that isn't an airport).
 const hidden = (live: Live | null) => !live || live.state === "disabled" || live.state === "unknown"
 
+// The ATIS runs its lists together ("BARII3,CLVIN3,HHOWE4"), which cannot wrap on a narrow panel: a space after each comma
+// lets it flow. Display only; the text itself is unchanged.
+const readableText = (text: string) => text.replace(/,(?=[A-Za-z0-9])/g, ", ")
+
 function Runways({ label, runways }: { label: string; runways: string[] }) {
   if (runways.length === 0) return null
   return (
@@ -71,7 +75,11 @@ function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arr
   const [open, setOpen] = useState(false)
   const Icon = end === "departure" ? PlaneTakeoff : PlaneLanding
   const label = end === "departure" ? copy.live.departure : copy.live.arrival
-  const notRead = live.state === "atis" && live.landing.length === 0 && live.departing.length === 0
+  // Each row shows the runways of its own end only: the ones taking off at the departure airport, the ones landing at the
+  // arrival airport. The other list stays in the ATIS text.
+  const runways = live.state === "atis" ? (end === "departure" ? live.departing : live.landing) : []
+  const runwaysLabel = end === "departure" ? copy.live.departing : copy.live.landing
+  const notRead = live.state === "atis" && runways.length === 0
 
   return (
     <div className="space-y-2 rounded-lg border p-3" aria-live="polite">
@@ -97,8 +105,7 @@ function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arr
 
       {live.state === "atis" && (
         <>
-          <Runways label={copy.live.landing} runways={live.landing} />
-          <Runways label={copy.live.departing} runways={live.departing} />
+          <Runways label={runwaysLabel} runways={runways} />
           {live.wind && (
             <div className="flex items-center gap-1.5 text-sm">
               <span className="w-20 shrink-0 text-xs text-muted-foreground">{copy.live.wind}</span>
@@ -106,7 +113,11 @@ function AirportRow({ icao, end, live }: { icao: string; end: "departure" | "arr
             </div>
           )}
           {notRead && <p className="text-xs text-muted-foreground">{copy.live.runwaysNotRead}</p>}
-          {(open || notRead) && <p className="rounded-md bg-muted p-2 text-xs leading-relaxed text-muted-foreground">{live.text}</p>}
+          {(open || notRead) && (
+            <p className="whitespace-normal break-words rounded-md bg-muted p-2 text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
+              {readableText(live.text)}
+            </p>
+          )}
           {!notRead && (
             <button
               type="button"
