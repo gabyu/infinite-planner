@@ -4,7 +4,7 @@ import { createLiveClient, liveHealth, type LiveEnv } from "./core"
 export type { LiveFailure, LiveHealth, LiveResult } from "./core"
 
 const readEnv = (): LiveEnv => ({
-  INFINITE_FLIGHT_API_KEY: process.env.INFINITE_FLIGHT_API_KEY,
+  IF_API_KEY: process.env.IF_API_KEY,
   LIVE_API_ENABLED: process.env.LIVE_API_ENABLED,
 })
 
