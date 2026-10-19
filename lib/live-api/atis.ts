@@ -26,13 +26,17 @@ function runwayId(token: string): string | null {
   return `${String(number).padStart(2, "0")}${(match[2] ?? "").toUpperCase()}`
 }
 
-// "30L and 30R", "03", "09, 27L and 27R" -> ["30L","30R"]. One bad token drops the whole list: a half-read
-// runway list is worse than none.
+// "30L and 30R", "03", "09, 27L and 27R" -> ["30L","30R"]. The list ends at the first piece that starts with a letter:
+// the ATIS carries on with ", expect ILS approach" or ", Recommended Departure Procedures, ..." after the runways, and
+// that is not part of the list. A piece that starts with a digit but is not a runway ("13L ILS", "40") drops the whole
+// list instead: a half-read runway list is worse than none. A list that starts with a letter ("ILS 13R") is empty.
 function runwayList(text: string): string[] {
   const ids: string[] = []
   for (const part of text.split(/,|\band\b/i)) {
-    if (!part.trim()) continue
-    const id = runwayId(part)
+    const piece = part.trim()
+    if (!piece) continue
+    if (/^[A-Za-z]/.test(piece)) break
+    const id = runwayId(piece)
     if (!id) return []
     if (!ids.includes(id)) ids.push(id)
   }

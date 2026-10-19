@@ -178,6 +178,20 @@ async function main() {
     assert.deepEqual(parseAtis("Wind calm.").wind, { from: null, speedKt: 0, gustKt: null })
     assert.deepEqual(parseAtis("Wind variable at 3.").wind, { from: null, speedKt: 3, gustKt: null })
 
+    // Real texts of 2026-10-19: extra clauses after the runways must not hide them.
+    const kdtw = parseAtis(
+      "Detroit Metro airport, ATIS information DELTA, time 0430 ZULU, Wind 170 at 5 Visibility 21, Temperature 7, Dew Point 1, Altimeter 3043. Remarks, use of Departure and Arrival procedures recommended. Landing Runways 21L and 22R, Departing Runways 22L and 21R,  Recommended Departure Procedures, BARII3,CLVIN3,HHOWE4. Recommended Arrival Procedures, BONZZ2,HANBL3. Advise on initial contact, you have information DELTA.",
+    )
+    assert.deepEqual([kdtw.letter, kdtw.landing, kdtw.departing], ["DELTA", ["21L", "22R"], ["22L", "21R"]])
+    assert.deepEqual(kdtw.wind, { from: 170, speedKt: 5, gustKt: null })
+    const mmun = parseAtis(
+      "Cancun airport, ATIS information BRAVO, time 0428 ZULU, Wind Calm, Visibility 7, Temperature 26, Dew Point 25, QNH 1015. Remarks, no pattern work, Automated ATC test; no human supervisor is monitoring. This session is time limited.. Landing Runways 12R and 12L, expect ILS approach, Departing Runways 12R and 12L. Advise on initial contact, you have information BRAVO.",
+    )
+    assert.deepEqual([mmun.landing, mmun.departing, mmun.qnh], [["12R", "12L"], ["12R", "12L"], 1015])
+    assert.deepEqual(mmun.wind, { from: null, speedKt: 0, gustKt: null })
+    // A digit-led piece that is not a runway still drops the list.
+    assert.deepEqual(parseAtis("Landing Runways 13R and 13L ILS, Departing Runway 13R.").landing, [])
+
     // Anything unrecognised is left empty, never guessed.
     const odd = parseAtis("Landing Runway ILS 13R, Departing Runway 13R.")
     assert.deepEqual(odd.landing, [])
