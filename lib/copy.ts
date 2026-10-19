@@ -114,7 +114,46 @@ export const copy = {
     toneCaution: "Check the wind.", // PROVISIONAL
     toneAvoid: "Tailwind.", // PROVISIONAL
   },
+
+  // Departure guides (editor, Departure tab). Every line below waits for Gabriel's approval.
+  guides: {
+    heading: "Departure guide", // PROVISIONAL
+    save: "Save as guide", // PROVISIONAL
+    saving: "Saving...", // PROVISIONAL
+    saved: "Saved", // PROVISIONAL
+    needsPlan: "Available once your plan is saved.", // PROVISIONAL
+    lowConfidence: "Couldn't tell which runway this departure used. Tap the runway above, then save.", // PROVISIONAL
+    tapRunway: "Tap a runway above to see your saved guides for it.", // PROVISIONAL
+    noGuides: "You have no saved guides for this runway.", // PROVISIONAL
+    fitSame: "Same runway", // PROVISIONAL
+    fitParallel: "Parallel runway", // PROVISIONAL
+    fitSimilar: "Similar heading", // PROVISIONAL
+    fitOther: "Other runway", // PROVISIONAL
+    preview: "Preview", // PROVISIONAL
+    hidePreview: "Hide preview", // PROVISIONAL
+    use: "Use", // PROVISIONAL
+    remove: "Delete", // PROVISIONAL
+    removeConfirm: "Delete?", // PROVISIONAL
+    joinWarning: "Different heading: check the terrain and obstacles on the joining leg.", // PROVISIONAL
+    needsDraft: "This plan is locked. Duplicate it to use a guide.", // PROVISIONAL
+    savedToast: "Guide saved", // PROVISIONAL
+    appliedToast: "Departure guide applied", // PROVISIONAL
+    errTooMany: "You've reached the limit of 300 saved guides.", // PROVISIONAL
+    errNotSaved: "Save the plan first, then try again.", // PROVISIONAL
+    errNotDraft: "This plan is locked. Duplicate it to change it.", // PROVISIONAL
+    errGeneric: "Something went wrong. Please try again.", // PROVISIONAL
+  },
 } as const
+
+/** "21L · west · 122 NM" for a guide's line: the runway, where it headed, how far to the top of climb. */
+export function guideSummaryText(runway: string | null, direction: string, distanceNm: number) {
+  return `${runway ?? "?"} · ${direction} · ${distanceNm}\u00A0NM` // PROVISIONAL
+}
+
+/** "Your guides for 21R" above the list of saved guides for the runway the pilot tapped. */
+export function guidesForText(runway: string) {
+  return `Your guides for ${runway}` // PROVISIONAL
+}
 
 /** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
 export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {

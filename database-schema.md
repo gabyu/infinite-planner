@@ -153,6 +153,15 @@ CREATE TABLE flight_plans (
   `node scripts/build-airport-data.mjs path/to/airports.csv path/to/runways.csv` (it builds both the airport list and the runway data from the same two files). The Infinite Flight Live API is deliberately not used:
   its terms forbid keeping API data in our own database.
 
+## Runway guides (private)
+
+`runway_guides` (migration `20261020000000_runway_guides.sql`) holds a reusable departure path tied to one runway end, saved from a person's own flight plan. Only derived geometry is stored (metres along / across the runway axis and altitude, at most 60 points within 80 km), never a KML.
+
+- **Private:** a person reads and deletes only their own guides (RLS). Writes go through `save_runway_guide` and `apply_runway_guides`; the client has no direct insert or update.
+- **Provenance:** a guide carries the origin set of the plan it came from (`merge_origin_sources`, it only grows). A guide from a tracker-derived plan can never be shared later (`is_tracker_derived`). Using a guide on a plan merges its origin into that plan, so a plan built on such a guide cannot be published either.
+- **Limits:** 3 to 60 points per path (`is_valid_guide_points`), 300 guides per person, the same path saved twice is one guide.
+- Sharing guides with the community is a later migration, after the legal read.
+
 ## Environments
 
 Production and staging use two separate Supabase projects. Set these in Vercel, scoped to the

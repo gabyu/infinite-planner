@@ -120,6 +120,8 @@ export interface DepartureExtraction {
   tocBearing: number
   tocDistanceNm: number
   direction: (typeof COMPASS)[number]
+  /** True when the pilot named the runway (the detection is then not asked: nothing is guessed). */
+  assigned: boolean
   /** "low": the runway was not matched, or the path is too short: the pilot assigns the runway by hand, nothing is guessed. */
   confidence: "high" | "low"
   reasons: string[]
@@ -173,8 +175,9 @@ function limit(points: FramePoint[]): FramePoint[] {
 /**
  * The departure of a plan: from the line-up point (found like the ground trim does) to the top of climb. `points` is the plan
  * as it stands (a plan already trimmed starts at the line-up point), `split` says where departure ends (route-phases).
+ * `assignedEnd` is a runway end the pilot named ("28L"): the path is then framed on that end whatever the detection says.
  */
-export function extractDeparture(points: TrimPoint[], airport: TrimAirport, split: PhaseSplit): DepartureExtraction | null {
+export function extractDeparture(points: TrimPoint[], airport: TrimAirport, split: PhaseSplit, assignedEnd?: string): DepartureExtraction | null {
   if (points.length < 4) return null
   const trim = planTrim(points, airport, "departure")
   const lineUp = trim.remove.length // planTrim removes indices 0..lineUp-1
@@ -183,23 +186,30 @@ export function extractDeparture(points: TrimPoint[], airport: TrimAirport, spli
   const reasons: string[] = []
   if (trim.approximate) reasons.push("no runway data matched the start of the plan")
 
-  // Which end: the named runway row the line-up point sits on, then the end whose heading matches the way the path leaves.
+  // Which end: the one the pilot named, else the named runway row the line-up point sits on and the end whose heading
+  // matches the way the path leaves.
   const start = points[lineUp]
-  const ahead = points[Math.min(lineUp + 3, toc)]
-  const trackBearing = bearingDeg(start, ahead)
-  let best: { end: RunwayEnd; off: number } | null = null
-  for (const row of airport.runways) {
-    if (!row[6] || !row[7] || !isOnRunway(start, [row])) continue
-    for (const end of runwayEnds({ ...airport, runways: [row] })) {
-      const off = angleBetween(end.headingTrue, trackBearing)
-      if (!best || off < best.off) best = { end, off }
+  let end: RunwayEnd | null = null
+  if (assignedEnd) {
+    end = findRunwayEnd(airport, assignedEnd)
+    if (!end) reasons.push("that runway is not in the airport data")
+  } else {
+    const ahead = points[Math.min(lineUp + 3, toc)]
+    const trackBearing = bearingDeg(start, ahead)
+    let best: { end: RunwayEnd; off: number } | null = null
+    for (const row of airport.runways) {
+      if (!row[6] || !row[7] || !isOnRunway(start, [row])) continue
+      for (const candidate of runwayEnds({ ...airport, runways: [row] })) {
+        const off = angleBetween(candidate.headingTrue, trackBearing)
+        if (!best || off < best.off) best = { end: candidate, off }
+      }
     }
+    end = best && best.off <= HEADING_MATCH_DEG ? best.end : null
+    if (!end) reasons.push(best ? "the path does not leave along a runway heading" : "the line-up point is not on a named runway")
   }
-  const end = best && best.off <= HEADING_MATCH_DEG ? best.end : null
-  if (!end) reasons.push(best ? "the path does not leave along a runway heading" : "the line-up point is not on a named runway")
 
   // The path in the runway frame (or, with no runway, relative to the line-up point, heading along the first leg).
-  const anchor: RunwayEnd = end ?? { name: "", lat: start.lat, lng: start.lng, headingTrue: trackBearing }
+  const anchor: RunwayEnd = end ?? { name: "", lat: start.lat, lng: start.lng, headingTrue: bearingDeg(start, points[Math.min(lineUp + 3, toc)]) }
   const framed: FramePoint[] = []
   for (let i = lineUp; i <= toc; i++) {
     if (distanceM(anchor, points[i]) / NM_M > MAX_GUIDE_RADIUS_NM) break
@@ -219,6 +229,7 @@ export function extractDeparture(points: TrimPoint[], airport: TrimAirport, spli
     tocBearing: Math.round(tocBearing),
     tocDistanceNm: Math.round(tocDistanceNm),
     direction: compassPoint(tocBearing),
+    assigned: Boolean(assignedEnd && end),
     confidence: reasons.length === 0 ? "high" : "low",
     reasons,
   }

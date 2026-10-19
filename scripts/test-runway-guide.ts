@@ -4,6 +4,7 @@ import runwaysJson from "@/lib/data/runways.json"
 import type { RunwayRow, TrimAirport, TrimPoint } from "@/lib/ground-trim"
 import { distanceM } from "@/lib/ground-trim"
 import { splitPhases } from "@/lib/route-phases"
+import { guideErrorKey, pointsToPayload, rowToGuide } from "@/lib/runway-guide-client"
 import {
   angleBetween,
   applyGuide,
@@ -112,6 +113,30 @@ assert.equal(track[tocIndex].altitude, 33_000) // first point at 90% of the 35,0
   assert.equal(extractDeparture(track, KDTW, { departureEnd: 2, arrivalStart: 30 }), null)
 }
 
+// 3b. The pilot names the runway: a drawn route that starts at the airport centre, not on a runway.
+{
+  const drawn: TrimPoint[] = [
+    { lat: KDTW.lat, lng: KDTW.lng, altitude: 0 },
+    ...track.slice(14).map((p) => ({ lat: p.lat, lng: p.lng, altitude: p.altitude })),
+  ]
+  const drawnSplit = splitPhases(drawn)
+  const auto = extractDeparture(drawn, KDTW, drawnSplit)
+  assert.ok(auto)
+  assert.equal(auto!.runwayEnd, null) // not on a runway: nothing guessed
+  assert.equal(auto!.confidence, "low")
+  assert.equal(auto!.assigned, false)
+  const assigned = extractDeparture(drawn, KDTW, drawnSplit, "21L")!
+  assert.equal(assigned.runwayEnd, "21L")
+  assert.equal(assigned.assigned, true)
+  assert.equal(assigned.confidence, "high")
+  assert.ok(assigned.runwayHeadingTrue !== null && angleBetween(assigned.runwayHeadingTrue, 209) < 3)
+  // A runway that does not exist at that airport stays low confidence with no runway.
+  const wrong = extractDeparture(drawn, KDTW, drawnSplit, "99X")!
+  assert.equal(wrong.runwayEnd, null)
+  assert.equal(wrong.confidence, "low")
+  assert.equal(wrong.assigned, false)
+}
+
 // 4. A long, dense departure is thinned to at most 60 points, keeping the shape.
 {
   const dense: TrimPoint[] = [...track.slice(0, 10)]
@@ -183,6 +208,28 @@ assert.equal(track[tocIndex].altitude, 33_000) // first point at 90% of the 35,0
   const used = rankGuides([g("x", "21R", 209, 270, 0), g("y", "21R", 209, 270, 40)], e21L, 270)
   assert.equal(used[0].guide.id, "y")
   assert.deepEqual(rankGuides([], e21L, null), [])
+}
+
+// 6b. The client's shapes: payload, rows, error codes.
+{
+  assert.deepEqual(pointsToPayload([{ along: 10.4, across: -3.6, altitude: 1500.2 }]), [[10, -4, 1500]])
+  const row = { id: "g1", airport: "LFPG", runway_name: "09R", runway_heading_deg: 85, toc_bearing_deg: 19, toc_distance_nm: 122, label: null, points: [[0, 0, 400], [3000, 0, 1500], [9000, -2000, 4000]], use_count: 2, origin_sources: ["Sketch"], created_at: "2026-10-19T00:00:00Z" }
+  const guide = rowToGuide(row)!
+  assert.equal(guide.runwayName, "09R")
+  assert.deepEqual(guide.points[1], { along: 3000, across: 0, altitude: 1500 })
+  assert.deepEqual(guide.originSources, ["Sketch"])
+  assert.equal(guide.useCount, 2)
+  // Rows that are not shaped like a guide are dropped, never half-read.
+  assert.equal(rowToGuide(null), null)
+  assert.equal(rowToGuide({ ...row, points: [[0, 0, 1], [1, 1, 2]] }), null)
+  assert.equal(rowToGuide({ ...row, points: [[0, 0, 1], [1, "x", 2], [2, 2, 3]] }), null)
+  assert.equal(rowToGuide({ ...row, id: 5 }), null)
+  assert.equal(guideErrorKey("too_many_guides"), "tooMany")
+  assert.equal(guideErrorKey("plan_not_found"), "notSaved")
+  assert.equal(guideErrorKey("plan_not_draft"), "notDraft")
+  assert.equal(guideErrorKey("guide_not_found"), "notFound")
+  assert.equal(guideErrorKey("anything else"), "generic")
+  assert.equal(guideErrorKey(null), "generic")
 }
 
 // 7. Bearings.
