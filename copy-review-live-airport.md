@@ -18,7 +18,7 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 | `departure`, `arrival` | Row titles | Departure, Arrival |
 | `loading` | While the first answer is awaited | Looking for the ATIS... |
 | `atisLetter` | Before the ATIS letter, top right of a row | Information (then the letter, e.g. OSCAR) |
-| `wind`, `windCalm`, `windVariable` | Wind row | Wind, Calm, Variable |
+| `windCalm`, `windVariable` | Inside the wind text of the collapsed line (the separate "Wind" row is gone, the line already says it) | Calm, Variable |
 | `atisWindText` | Wind value | 240° at 5 kt / Variable at 5 kt / 240° at 12 kt, gusting 25 kt |
 | `noAtis` | No ATIS (no air traffic control with an ATIS online) | No ATIS at this airport right now. |
 | `unavailable` | Infinite Flight did not answer, key refused, or too many airports followed | Live data isn't available right now. |
@@ -34,8 +34,10 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 | `lightWind` | Wind under 3 kt or variable: nothing is marked or chosen | Light wind: any runway. |
 | `noWeather` | No ATIS and no METAR within 25 NM | No recent weather report nearby. |
 | `weatherUnavailable` | No ATIS and NOAA could not be reached | Weather isn't available right now. |
-| `weatherCredit` | After the source line, when a METAR wind is shown. Names the source only; NOAA's disclaimer forbids implying its endorsement, so keep it to this | Weather: NOAA Aviation Weather Center. |
-| `weatherSourceText` | Source line: the airport's own METAR, or a neighbouring station with its distance | METAR KSFO, 04:53Z. / From KOAK, 12 NM away, 04:53Z. |
+| `weatherCredit` | End of the one-line source under the chips, in the same grey as the tracker marks. Its tooltip is `weatherCreditFull`. NOAA's emblem/logo is a registered trademark that needs NOAA's written consent on any non-NOAA webpage, so the credit is plain text | NOAA |
+| `weatherCreditFull` | Tooltip of that credit | Weather: NOAA Aviation Weather Center. |
+| `toneGood`, `toneCaution`, `toneAvoid` | Tooltip of a green / yellow / red chip, after the headwind sentence (green = best headwind, yellow = not the best or a strong crosswind of 15 kt or more, red = a tailwind of 2 kt or more; nothing in light wind) | Best headwind. / Check the wind. / Tailwind. |
+| `weatherSourceText` | Source line: the airport's own METAR, or a neighbouring station with its distance | METAR KSFO, 04:53Z / From KOAK, 12 NM away, 04:53Z |
 | `runwayComponentsText` | The wind on the chosen runway (also the tooltip of each chip) | 28R: headwind 5 kt, crosswind 3 kt from the right. (tailwind / left likewise) |
 | `source` | Foot of the block | Live from the Infinite Flight Expert Server. Simulation only. |
 
