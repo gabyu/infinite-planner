@@ -79,6 +79,8 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_URL` | public | Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | Supabase publishable (anon) key. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **server only, secret** | Used by the admin and shared-plan API routes. Never prefix it with `NEXT_PUBLIC_`. |
+| `INFINITE_FLIGHT_API_KEY` | **server only, secret** | Infinite Flight Live API key (one per environment). Sent only from server code in an `Authorization` header; never logged, never in the repository or a client bundle. |
+| `LIVE_API_ENABLED` | server | Set to `false` to turn off every live Infinite Flight feature. Unset means on (when a key is present). |
 | `NEXT_PUBLIC_ENV` | public | Set to `staging` on staging (adds `noindex` and the staging OpenGraph URL). Leave unset in production. |
 
 On Vercel, scope each set to its environment: production variables to Production, staging ones to the `staging` branch only (not the general Preview environment).
