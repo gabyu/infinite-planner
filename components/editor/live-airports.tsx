@@ -63,13 +63,11 @@ const hidden = (live: Live | null) => !live || live.state === "disabled" || live
 const readableText = (text: string) => text.replace(/,(?=[A-Za-z0-9])/g, ", ")
 
 function Runways({
-  label,
   runways,
   choice,
   onTap,
   titles,
 }: {
-  label: string
   runways: string[]
   choice: EndChoice | null
   onTap: (runway: string) => void
@@ -79,7 +77,6 @@ function Runways({
   if (runways.length === 0) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-sm">
-      <span className="w-20 shrink-0 text-xs text-muted-foreground">{label}</span>
       {runways.map((runway) => {
         const chosen = choice?.runway === runway
         return (
@@ -137,7 +134,6 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
   const windOrder = weather ? weather.ranked.map((rank) => rank.name) : []
   const everyEnd = noAtis ? [...windOrder, ...(noAtis.ends ?? []).map((e) => e.name).filter((name) => !windOrder.includes(name))] : []
   const runways = atis ? (end === "departure" ? atis.departing : atis.landing) : everyEnd
-  const runwaysLabel = end === "departure" ? copy.live.departing : copy.live.landing
   const notRead = atis !== null && runways.length === 0
   // The pilot's tap; else the ATIS's single runway; else (no ATIS) the end the wind clearly favours. The pilot's own is
   // kept even when the ATIS stops listing it.
@@ -178,7 +174,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
       ? copy.live.loading
       : noAtis
         ? weather
-          ? [copy.live.noAtisShort, atisWindText(weather.wind), choice ? `${runwaysLabel} ${choice.runway}` : null].filter(Boolean).join(" · ")
+          ? [copy.live.noAtisShort, atisWindText(weather.wind), choice ? choice.runway : null].filter(Boolean).join(" · ")
           : copy.live.noAtis
         : live.state === "unavailable"
           ? copy.live.unavailable
@@ -186,7 +182,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
             ? ""
             : [
                 atis.letter ? `${copy.live.atisLetter} ${atis.letter}` : null,
-                chips.length > 0 ? `${runwaysLabel} ${choice ? choice.runway : chips.join(" ")}` : null,
+                chips.length > 0 ? (choice ? choice.runway : chips.join(" ")) : null,
                 atis.wind ? atisWindText(atis.wind) : null,
               ]
                 .filter(Boolean)
@@ -210,8 +206,8 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
 
       {atis && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
-          <Runways label={runwaysLabel} runways={chips} choice={choice} onTap={onTap} />
-          {choiceNote && <p className="pl-[5.5rem] text-xs text-muted-foreground">{choiceNote}</p>}
+          <Runways runways={chips} choice={choice} onTap={onTap} />
+          {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
           {atis.wind && (
             <div className="flex items-center gap-1.5 text-sm">
               <span className="w-20 shrink-0 text-xs text-muted-foreground">{copy.live.wind}</span>
@@ -240,10 +236,10 @@ export function AirportCard({ icao, valid, end, hand, onTap, defaultOpen, classN
 
       {noAtis && expandable && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
-          <Runways label={runwaysLabel} runways={chips} choice={choice} onTap={onTap} titles={titles} />
-          {choiceNote && <p className="pl-[5.5rem] text-xs text-muted-foreground">{choiceNote}</p>}
+          <Runways runways={chips} choice={choice} onTap={onTap} titles={titles} />
+          {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
           {choice && chosenRank && (
-            <p className="pl-[5.5rem] text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {runwayComponentsText(choice.runway, chosenRank.headwindKt, chosenRank.crosswindKt)}
             </p>
           )}

@@ -91,8 +91,6 @@ export const copy = {
     arrival: "Arrival", // PROVISIONAL
     loading: "Looking for the ATIS...", // PROVISIONAL
     atisLetter: "Information", // PROVISIONAL
-    landing: "Landing", // PROVISIONAL
-    departing: "Departing", // PROVISIONAL
     wind: "Wind", // PROVISIONAL
     windCalm: "Calm", // PROVISIONAL
     windVariable: "Variable", // PROVISIONAL
