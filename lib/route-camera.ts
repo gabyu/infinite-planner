@@ -301,6 +301,7 @@ export function rampColor(ramp: string[], feet: number): string {
   return `rgb(${[0, 1, 2].map((c) => Math.round(a[c] + (b[c] - a[c]) * mix)).join(",")})`
 }
 
+const SHORT_FLIGHT_LAND_ALPHA = 0.6
 const SPACINGS = [0.25, 0.5, 1, 2, 4] // degrees, finest first
 
 // Draws one frame. Everything is computed from the world each time (the land lattice is anchored to the world, so it
@@ -324,7 +325,9 @@ export function drawFrame(
   // --- Ground: the land as dots while the picture is wide, a faint lattice once it is close (the land data
   // is half-degree cells, too coarse to look right up close).
   const overScale = flight.cams.over.scale
-  const landAlpha = clamp01((overScale * 4 - cam.scale) / (overScale * 2.5))
+  // A short flight has no zoom, so it stays in the overview: that picture gets the larger, airier dots of a close shot
+  // instead of the fine ones of a continent-wide view, which would be tiny at its size.
+  const landAlpha = Math.min(clamp01((overScale * 4 - cam.scale) / (overScale * 2.5)), flight.hasZoom ? 1 : SHORT_FLIGHT_LAND_ALPHA)
   const latMin = -(cam.cy + h / 2 / cam.scale)
   const latMax = -(cam.cy - h / 2 / cam.scale)
   const lngMin = (cam.cx - w / 2 / cam.scale) / k
@@ -337,7 +340,7 @@ export function drawFrame(
   const wide = 11
   const close = 110
   const spacingPx = wide * Math.pow(close / wide, 1 - landAlpha)
-  const size = 2.6 + (1 - landAlpha) * 38
+  const wanted = 2.6 + (1 - landAlpha) * 38
   // The bigger the dots get, the lighter they are, so the close shots stay soft instead of heavy.
   const base = 0.3 - (1 - landAlpha) * 0.17
   const u = clamp01(Math.log2(Math.max(spacingPx / cam.scale, SPACINGS[0]) / SPACINGS[0]) / (SPACINGS.length - 1)) * (SPACINGS.length - 1)
@@ -346,6 +349,10 @@ export function drawFrame(
   // the zoom every dot has the same opacity.
   const fine = lower + 1 < SPACINGS.length ? 1 - clamp01((u - lower - 0.75) / 0.25) : 1
   const spacing = SPACINGS[lower]
+  // The lattice is in degrees (with a floor), and a degree of longitude is shorter than one of latitude (k), so the real
+  // gap on screen can end up smaller than the dot wanted: the dot never gets bigger than that gap, so they never overlap.
+  const gapPx = spacing * cam.scale * Math.min(1, k)
+  const size = Math.min(wanted, gapPx * 0.7)
   const seaAlpha = 1 - landAlpha
   // Four groups by opacity: (kept dots | dots of the finer level only) x (land | sea).
   const groups = [
