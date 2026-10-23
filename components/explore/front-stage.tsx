@@ -39,8 +39,6 @@ export interface FrontDisplay {
   likeCount: number
   downloadCount: number
   route: { lat: number; lng: number; altitude: number }[]
-  headN: number
-  tailN: number
 }
 
 // The same colours as the homepage's globe: its altitude ramp (a light and a dark one).
@@ -126,7 +124,7 @@ export function FrontStage({ items }: { items: FrontDisplay[] }) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !item || size.w < 10) return
-    const flight: Flight | null = prepareFlight(item.route, item.headN, item.tailN, size.w, size.h)
+    const flight: Flight | null = prepareFlight(item.route, size.w, size.h)
     const ctx = canvas.getContext("2d")
     if (!flight || !ctx) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)

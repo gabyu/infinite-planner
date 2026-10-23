@@ -88,13 +88,28 @@ function fit(points: World[], width: number, height: number, pad: number, minSpa
   }
 }
 
-export function prepareFlight(
-  points: FlightPoint[],
-  headN: number,
-  tailN: number,
-  width: number,
-  height: number,
-): Flight | null {
+// The close shots are on the first and the last ZOOM_NM of the route, whatever the number of waypoints. A world unit is
+// a degree of latitude, about 60 NM.
+const ZOOM_NM = 50
+const NM_WORLD = 1 / 60
+
+// The route's point at an arc length.
+function pointOn(world: World[], cum: number[], len: number): World {
+  for (let i = 1; i < world.length; i++) {
+    if (cum[i] >= len) {
+      const f = clamp01((len - cum[i - 1]) / (cum[i] - cum[i - 1] || 1))
+      return { x: lerp(world[i - 1].x, world[i].x, f), y: lerp(world[i - 1].y, world[i].y, f) }
+    }
+  }
+  return world[world.length - 1]
+}
+
+// The part of the route between two arc lengths, both ends exact.
+function between(world: World[], cum: number[], from: number, to: number): World[] {
+  return [pointOn(world, cum, from), ...world.filter((_, i) => cum[i] > from && cum[i] < to), pointOn(world, cum, to)]
+}
+
+export function prepareFlight(points: FlightPoint[], width: number, height: number): Flight | null {
   if (points.length < 2 || width < 10 || height < 10) return null
   const route = unwrapLongitudes(points)
   const lats = route.map((p) => p.lat)
@@ -106,21 +121,20 @@ export function prepareFlight(
     cum.push(cum[i - 1] + Math.hypot(world[i].x - world[i - 1].x, world[i].y - world[i - 1].y))
   }
   const total = cum[cum.length - 1] || 1
+  const zoomLen = ZOOM_NM * NM_WORLD
 
   const over = fit(world, width, height, Math.min(width, height) * 0.1, 6 * k)
-  const head = world.slice(0, Math.max(headN, 2))
-  const tail = world.slice(world.length - Math.max(tailN, 2))
-  const dep = fit(head, width, height, Math.min(width, height) * 0.16, 1.4)
-  const arr = fit(tail, width, height, Math.min(width, height) * 0.16, 1.4)
+  const dep = fit(between(world, cum, 0, zoomLen), width, height, Math.min(width, height) * 0.16, 0.6)
+  const arr = fit(between(world, cum, total - zoomLen, total), width, height, Math.min(width, height) * 0.16, 0.6)
 
-  // Zooming only makes sense if the close shots really are closer than the overview.
-  const hasZoom = headN > 0 && tailN > 0 && dep.scale > over.scale * 1.8 && arr.scale > over.scale * 1.8
+  // Zooming only makes sense if the two ends are apart and the close shots really are closer than the overview.
+  const hasZoom = total >= zoomLen * 2.4 && dep.scale > over.scale * 1.8 && arr.scale > over.scale * 1.8
   return {
     world,
     cum,
     total,
-    headLen: cum[Math.max(headN, 2) - 1] ?? 0,
-    tailStartLen: cum[world.length - Math.max(tailN, 2)] ?? total,
+    headLen: zoomLen,
+    tailStartLen: total - zoomLen,
     overFocusLen: cum[nearest(world, over.cx, over.cy)] ?? 0,
     hasZoom,
     alts: points.map((p) => p.altitude ?? 0),
@@ -330,8 +344,8 @@ export function drawFrame(
   const landAlpha = Math.min(clamp01((overScale * 4 - cam.scale) / (overScale * 2.5)), flight.hasZoom ? 1 : SHORT_FLIGHT_LAND_ALPHA)
   const latMin = -(cam.cy + h / 2 / cam.scale)
   const latMax = -(cam.cy - h / 2 / cam.scale)
-  const lngMin = (cam.cx - w / 2 / cam.scale) / k
-  const lngMax = (cam.cx + w / 2 / cam.scale) / k
+  const xMin = cam.cx - w / 2 / cam.scale
+  const xMax = cam.cx + w / 2 / cam.scale
 
   // One lattice for the whole ground, so every dot has the same size and, at rest, the same colour. The wide shot keeps
   // only the land dots; as the camera closes in, the dots grow and spread, and the sea dots fade in. Neighbouring
@@ -349,9 +363,10 @@ export function drawFrame(
   // the zoom every dot has the same opacity.
   const fine = lower + 1 < SPACINGS.length ? 1 - clamp01((u - lower - 0.75) / 0.25) : 1
   const spacing = SPACINGS[lower]
-  // The lattice is in degrees (with a floor), and a degree of longitude is shorter than one of latitude (k), so the real
-  // gap on screen can end up smaller than the dot wanted: the dot never gets bigger than that gap, so they never overlap.
-  const gapPx = spacing * cam.scale * Math.min(1, k)
+  // The lattice is square on screen (a step in world units, so longitude steps are wider by 1/k: a degree of longitude is
+  // shorter than one of latitude). It has a floor, so the gap can end up smaller than the dot wanted: the dot never gets
+  // bigger than that gap, so they never overlap.
+  const gapPx = spacing * cam.scale
   const size = Math.min(wanted, gapPx * 0.7)
   const seaAlpha = 1 - landAlpha
   // Four groups by opacity: (kept dots | dots of the finer level only) x (land | sea).
@@ -363,8 +378,8 @@ export function drawFrame(
   ]
   const i0 = Math.floor(latMin / spacing)
   const i1 = Math.ceil(latMax / spacing)
-  const j0 = Math.floor(lngMin / spacing)
-  const j1 = Math.ceil(lngMax / spacing)
+  const j0 = Math.floor(xMin / spacing)
+  const j1 = Math.ceil(xMax / spacing)
   ctx.strokeStyle = palette.ink
   ctx.lineWidth = size
   ctx.lineCap = "round"
@@ -378,9 +393,9 @@ export function drawFrame(
       for (let j = j0; j <= j1; j++) {
         if ((((i & 1) === 0 && (j & 1) === 0) || lower + 1 >= SPACINGS.length) !== group.shared) continue
         const lat = i * spacing
-        const lng = j * spacing
-        if (isLand(lat, lng) !== group.land) continue
-        const x = sx(lng * k)
+        const worldX = j * spacing
+        if (isLand(lat, worldX / k) !== group.land) continue
+        const x = sx(worldX)
         const y = sy(-lat)
         ctx.moveTo(x, y)
         ctx.lineTo(x, y)

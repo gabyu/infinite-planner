@@ -38,8 +38,6 @@ export async function getExploreFront(): Promise<{ node: React.ReactNode; ids: s
       likeCount: plan.likeCount,
       downloadCount: plan.downloadCount,
       route: plan.route,
-      headN: plan.headN,
-      tailN: plan.tailN,
     }
   })
   return { node: <FrontStage items={display} />, ids: items.map((plan) => plan.id) }
