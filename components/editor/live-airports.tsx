@@ -107,14 +107,19 @@ function RunwayTiles({
             title={titles?.[runway]}
             onClick={() => onTap(runway)}
             className={cn(
-              "flex w-[4.5rem] flex-col items-center gap-0.5 rounded-md border px-1 py-2 text-center transition-colors",
+              "flex min-w-[3.25rem] max-w-[5rem] flex-1 basis-[3.5rem] flex-col items-center gap-0.5 rounded-md border px-1 py-2 text-center transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               tones?.[runway] ? TONE_CLASSES[tones[runway]] : "bg-muted hover:bg-accent",
               chosen && "border-primary ring-1 ring-primary",
             )}
           >
             <span className="font-mono text-sm font-medium tabular-nums">{runway}</span>
-            {rank && <span className="text-[11px] leading-tight text-muted-foreground">{tileWindText(rank.headwindKt, rank.crosswindKt)}</span>}
+            {rank &&
+              tileWindText(rank.headwindKt, rank.crosswindKt).map((line) => (
+                <span key={line} className="text-[11px] leading-tight text-muted-foreground">
+                  {line}
+                </span>
+              ))}
             {tag && <span className="text-[11px] leading-tight text-muted-foreground">{tag}</span>}
           </button>
         )
