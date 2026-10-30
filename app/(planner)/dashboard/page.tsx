@@ -38,7 +38,7 @@ export default async function DashboardPage() {
 
   if (!supabase) {
     return (
-      <PageShell title="Dashboard" description="Your flight plans and your activity.">
+      <PageShell noBack title="Dashboard" description="Your flight plans and your activity.">
         <p className="text-sm text-muted-foreground">Accounts aren&apos;t available right now.</p>
       </PageShell>
     )
@@ -46,7 +46,7 @@ export default async function DashboardPage() {
 
   if (!user) {
     return (
-      <PageShell title="Dashboard" description="Your flight plans and your activity.">
+      <PageShell noBack title="Dashboard" description="Your flight plans and your activity.">
         <SignInPrompt message="Your flight plans are tied to your Discord account. Sign in to see them." />
       </PageShell>
     )
@@ -80,6 +80,7 @@ export default async function DashboardPage() {
 
   return (
     <PageShell
+      noBack
       title={name ? `Welcome, ${name}` : "Welcome"}
       description="Your flight plans and your activity."
       actions={
