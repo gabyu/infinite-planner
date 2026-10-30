@@ -20,7 +20,10 @@ interface ListWaypoint {
 }
 
 interface WaypointListProps {
+  /** The waypoints to show: one part of the route. */
   waypoints: ListWaypoint[]
+  /** Where the first of them sits in the whole plan, so numbers and range selection stay global. */
+  offset: number
   isLoading: boolean
   hoveredId: string | null
   onHover: (id: string | null) => void
@@ -46,6 +49,7 @@ const quietInput =
 // highlights its point on the map; clicking a point on the map scrolls the list to its row.
 export function WaypointList({
   waypoints,
+  offset,
   isLoading,
   hoveredId,
   onHover,
@@ -78,7 +82,9 @@ export function WaypointList({
             checked={waypoints.length > 0 && waypoints.every((wp) => wp.selected)}
             onCheckedChange={(checked) => onToggleSelectAll(!!checked)}
           />
-          <h3 className="sr-only">{copy.editor.waypointsHeading}</h3>
+          <h3 className="text-xs text-muted-foreground">
+            {copy.editor.waypointsHeading} · {waypoints.length}
+          </h3>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -112,7 +118,7 @@ export function WaypointList({
             key={waypoint.id}
             data-wp-row={waypoint.id}
             data-state={waypoint.selected ? "selected" : undefined}
-            onClick={(e) => onRowClick(e, waypoint.id, index)}
+            onClick={(e) => onRowClick(e, waypoint.id, offset + index)}
             onMouseEnter={() => onHover(waypoint.id)}
             onMouseLeave={() => onHover(null)}
             className={cn(
@@ -123,7 +129,7 @@ export function WaypointList({
               ghostIds?.has(waypoint.id) && "opacity-40",
             )}
           >
-            <span className="text-right font-mono text-[11px] text-muted-foreground">{index + 1}</span>
+            <span className="text-right font-mono text-[11px] text-muted-foreground">{offset + index + 1}</span>
             <Input
               id={`name-${waypoint.id}`}
               aria-label={copy.editor.waypointName}

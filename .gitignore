@@ -44,3 +44,6 @@ pnpm-workspace.yaml
 # local Claude Code dev-server launch config (machine-specific)
 .claude/
 *.local.sql
+
+# real tracker KMLs dropped in for local detection tests: never committed
+/test-kml/

@@ -150,8 +150,17 @@ CREATE TABLE flight_plans (
 - **Airport names** come from [OurAirports](https://ourairports.com/data/) (released to the public domain),
   filtered to 4-letter ICAO codes and bundled as `lib/data/airports.json` (about 20,000 entries, 650 KB). It is
   only imported by server code (`lib/airports.ts`), so it never reaches the browser. Regenerate it with
-  `node scripts/build-airports.mjs path/to/airports.csv`. The Infinite Flight Live API is deliberately not used:
+  `node scripts/build-airport-data.mjs path/to/airports.csv path/to/runways.csv` (it builds both the airport list and the runway data from the same two files). The Infinite Flight Live API is deliberately not used:
   its terms forbid keeping API data in our own database.
+
+## Runway guides (private)
+
+`runway_guides` (migration `20261020000000_runway_guides.sql`) holds a reusable departure path tied to one runway end, saved from a person's own flight plan. Only derived geometry is stored (metres along / across the runway axis and altitude, at most 60 points within 80 km), never a KML.
+
+- **Private:** a person reads and deletes only their own guides (RLS). Writes go through `save_runway_guide` and `apply_runway_guides`; the client has no direct insert or update.
+- **Provenance:** a guide carries the origin set of the plan it came from (`merge_origin_sources`, it only grows). A guide from a tracker-derived plan can never be shared later (`is_tracker_derived`). Using a guide on a plan merges its origin into that plan, so a plan built on such a guide cannot be published either.
+- **Limits:** 3 to 60 points per path (`is_valid_guide_points`), 300 guides per person, the same path saved twice is one guide.
+- Sharing guides with the community is a later migration, after the legal read.
 
 ## Environments
 

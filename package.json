@@ -10,7 +10,14 @@
     "start": "next start",
     "check:seo": "esbuild scripts/check-seo.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "check:copy": "node scripts/check-copy.mjs",
-    "test:ground-trim": "esbuild scripts/test-ground-trim.ts --bundle --platform=node --format=cjs --alias:@=. | node"
+    "test:ground-trim": "esbuild scripts/test-ground-trim.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:live-api": "esbuild scripts/test-live-api.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:runway-choice": "esbuild scripts/test-runway-choice.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:route-phases": "esbuild scripts/test-route-phases.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:airport-data": "esbuild scripts/test-airport-data.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:weather": "esbuild scripts/test-weather.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:runway-wind": "esbuild scripts/test-runway-wind.ts --bundle --platform=node --format=cjs --alias:@=. | node",
+    "test:runway-guide": "esbuild scripts/test-runway-guide.ts --bundle --platform=node --format=cjs --alias:@=. | node"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

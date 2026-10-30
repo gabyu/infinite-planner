@@ -57,6 +57,9 @@ export interface MapPreviewProps {
   /** Zoom to these waypoints (and the kept ones next to them). A new `nonce` asks again. The view then stays where it is
    *  (no refit when the plan changes) until "Fit route" is pressed. */
   focus?: { ids: string[]; nonce: number } | null
+  /** A path being previewed (a departure guide laid onto the plan): drawn as a dashed amber line over the route, and framed
+   *  when it appears. Nothing is added to the plan. */
+  ghostPath?: { lat: number; lng: number }[] | null
 }
 
 // Back into -180..180 (a point dragged or inserted beyond the date line).
@@ -91,6 +94,7 @@ export default function MapPreview({
   toolbarLeading,
   ghostIds,
   focus,
+  ghostPath,
 }: MapPreviewProps) {
   // A route that crosses the antimeridian (Tokyo to San Francisco) has longitudes that jump from +140 to -122. The map
   // draws it continuous by carrying on past 180 (the tiles repeat), so the line goes over the Pacific and not across
@@ -480,6 +484,27 @@ export default function MapPreview({
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce, L, isMapReady])
+
+  // A previewed path (a guide laid onto the plan): a dashed amber line over the route, removed when the preview ends.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !ghostPath || ghostPath.length < 2) return
+    const line = L.polyline(
+      ghostPath.map((point) => [point.lat, point.lng]),
+      { color: "#f59e0b", weight: 5, dashArray: "2 9", lineCap: "round", opacity: 0.95, interactive: false },
+    )
+    line.addTo(map)
+    const phone = window.innerWidth < 1024
+    viewLockedRef.current = true
+    map.fitBounds(line.getBounds(), {
+      paddingTopLeft: [phone ? 24 : 392, phone ? 80 : 64],
+      paddingBottomRight: [phone ? 24 : 80, phone ? 260 : 64],
+      maxZoom: 14,
+    })
+    return () => {
+      line.remove()
+    }
+  }, [ghostPath, L, isMapReady])
 
   // Fit the route when a plan appears or its length changes (not while the person is editing it).
   const fitRoute = useCallback(() => {
