@@ -27,9 +27,9 @@ export const copy = {
     waypointLongitude: "Longitude",
     waypointLimit: "Over the 250 waypoint limit",
     optionsHeading: "Options",
-    tabDeparture: "Departure", // PROVISIONAL
-    tabCruise: "Cruise", // PROVISIONAL
-    tabArrival: "Arrival", // PROVISIONAL
+    tabDeparture: "Departure",
+    tabCruise: "Cruise",
+    tabArrival: "Arrival",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
     addFlightNumber: "Add a flight number",
@@ -41,7 +41,7 @@ export const copy = {
     sheetHandle: "Drag to resize the panel",
 
     // Ground movements (Options)
-    groundWaypoints: "Ground movement waypoints", // PROVISIONAL
+    groundWaypoints: "Ground movement waypoints",
     groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.",
     trimApply: "Apply",
     trimCancel: "Cancel",
@@ -85,89 +85,89 @@ export const copy = {
 
   // Live airport information (editor Options). Every line below waits for Gabriel's approval.
   live: {
-    heading: "Live airport info", // PROVISIONAL
-    source: "Live from the Infinite Flight Expert Server. Simulation only.", // PROVISIONAL
-    departure: "Departure", // PROVISIONAL
-    arrival: "Arrival", // PROVISIONAL
-    loading: "Looking for the ATIS...", // PROVISIONAL
-    atisLetter: "Information", // PROVISIONAL
-    windCalm: "Calm", // PROVISIONAL
-    windVariable: "Variable", // PROVISIONAL
-    noAtis: "No ATIS at this airport right now.", // PROVISIONAL
-    unavailable: "Live data isn't available right now.", // PROVISIONAL
-    runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.", // PROVISIONAL
-    showText: "Show the ATIS text", // PROVISIONAL
-    hideText: "Hide the ATIS text", // PROVISIONAL
-    runwayTap: "Tap the runway you'll use.", // PROVISIONAL
-    runwayFromAtis: "From the ATIS.", // PROVISIONAL
-    runwayYours: "Your choice.", // PROVISIONAL
-    runwayYoursNotInAtis: "Your choice. Not in the ATIS now.", // PROVISIONAL
-    noAtisShort: "No ATIS", // PROVISIONAL
-    runwayIntoWind: "Into the wind.", // PROVISIONAL
-    bestHeadwind: "Best headwind:", // PROVISIONAL
-    lightWind: "Light wind: any runway.", // PROVISIONAL
-    noWeather: "No recent weather report nearby.", // PROVISIONAL
-    weatherUnavailable: "Weather isn't available right now.", // PROVISIONAL
-    weatherCredit: "NOAA", // PROVISIONAL
-    weatherCreditFull: "Weather: NOAA Aviation Weather Center.", // PROVISIONAL
-    toneGood: "Best headwind.", // PROVISIONAL
-    toneCaution: "Check the wind.", // PROVISIONAL
-    toneAvoid: "Tailwind.", // PROVISIONAL
+    heading: "Live airport info",
+    source: "Live from the Infinite Flight Expert Server. Simulation only.",
+    departure: "Departure",
+    arrival: "Arrival",
+    loading: "Looking for the ATIS...",
+    atisLetter: "Information",
+    windCalm: "Calm",
+    windVariable: "Variable",
+    noAtis: "No ATIS at this airport right now.",
+    unavailable: "Live data isn't available right now.",
+    runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.",
+    showText: "Show the ATIS text",
+    hideText: "Hide the ATIS text",
+    runwayTap: "Tap the runway you'll use.",
+    runwayFromAtis: "From the ATIS.",
+    runwayYours: "Your choice.",
+    runwayYoursNotInAtis: "Your choice. Not in the ATIS now.",
+    noAtisShort: "No ATIS",
+    runwayIntoWind: "Into the wind.",
+    bestHeadwind: "Best headwind:",
+    lightWind: "Light wind: any runway.",
+    noWeather: "No recent weather report nearby.",
+    weatherUnavailable: "Weather isn't available right now.",
+    weatherCredit: "NOAA",
+    weatherCreditFull: "Weather: NOAA Aviation Weather Center.",
+    toneGood: "Best headwind.",
+    toneCaution: "Check the wind.",
+    toneAvoid: "Tailwind.",
   },
 
   // Departure guides (editor, Departure tab). Every line below waits for Gabriel's approval.
   guides: {
-    save: "Save procedure", // PROVISIONAL
-    saving: "Saving...", // PROVISIONAL
-    saved: "Saved", // PROVISIONAL
-    yourProcedure: "Your procedure", // PROVISIONAL
-    suggested: "Suggested procedures for", // PROVISIONAL
-    needsPlan: "Available once your plan is saved.", // PROVISIONAL
-    lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.", // PROVISIONAL
-    tapRunway: "Pick a runway above to see suggested procedures for it.", // PROVISIONAL
-    noGuides: "No suggested procedures for this runway yet.", // PROVISIONAL
-    north: "North", // PROVISIONAL
-    east: "East", // PROVISIONAL
-    south: "South", // PROVISIONAL
-    west: "West", // PROVISIONAL
-    from: "from", // PROVISIONAL
-    previewing: "Previewing on the map", // PROVISIONAL
-    apply: "Apply", // PROVISIONAL
-    cancel: "Cancel", // PROVISIONAL
-    remove: "Delete", // PROVISIONAL
-    removeConfirm: "Delete?", // PROVISIONAL
-    joinWarning: "Different heading: check the terrain and obstacles on the joining leg.", // PROVISIONAL
-    needsDraft: "This plan is locked. Duplicate it to apply a procedure.", // PROVISIONAL
-    savedToast: "Procedure saved", // PROVISIONAL
-    appliedToast: "Procedure applied", // PROVISIONAL
-    errTooMany: "You've reached the limit of 300 saved procedures.", // PROVISIONAL
-    errNotSaved: "Save the plan first, then try again.", // PROVISIONAL
-    errNotDraft: "This plan is locked. Duplicate it to change it.", // PROVISIONAL
-    errGeneric: "Something went wrong. Please try again.", // PROVISIONAL
+    save: "Save procedure",
+    saving: "Saving...",
+    saved: "Saved",
+    yourProcedure: "Your procedure",
+    suggested: "Suggested procedures for",
+    needsPlan: "Available once your plan is saved.",
+    lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
+    tapRunway: "Pick a runway above to see suggested procedures for it.",
+    noGuides: "No suggested procedures for this runway yet.",
+    north: "North",
+    east: "East",
+    south: "South",
+    west: "West",
+    from: "from",
+    previewing: "Previewing on the map",
+    apply: "Apply",
+    cancel: "Cancel",
+    remove: "Delete",
+    removeConfirm: "Delete?",
+    joinWarning: "Different heading: check the terrain and obstacles on the joining leg.",
+    needsDraft: "This plan is locked. Duplicate it to apply a procedure.",
+    savedToast: "Procedure saved",
+    appliedToast: "Procedure applied",
+    errTooMany: "You've reached the limit of 300 saved procedures.",
+    errNotSaved: "Save the plan first, then try again.",
+    errNotDraft: "This plan is locked. Duplicate it to change it.",
+    errGeneric: "Something went wrong. Please try again.",
   },
 } as const
 
 /** "Replaces your procedure (22L, 122 NM) with 22R, 98 NM. You can undo it." before an Apply. */
 export function replaceText(current: { runway: string | null; nm: number } | null, next: { runway: string | null; nm: number }) {
   const label = (p: { runway: string | null; nm: number }) => `${p.runway ?? "?"}, ${p.nm}\u00A0NM`
-  return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.` // PROVISIONAL
+  return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.`
 }
 
 /** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
 export function guideLegText(distanceNm: number, bearing: number) {
-  return `${distanceNm}\u00A0NM · ${String(Math.round(bearing) % 360).padStart(3, "0")}°` // PROVISIONAL
+  return `${distanceNm}\u00A0NM · ${String(Math.round(bearing) % 360).padStart(3, "0")}°`
 }
 
 /** "hw 11 · xw 4" under a runway tile ("tail 5 · xw 3" for a tailwind). */
 export function tileWindText(headwindKt: number, crosswindKt: number) {
   const head = headwindKt >= 0 ? `hw\u00A0${Math.round(headwindKt)}` : `tail\u00A0${Math.round(-headwindKt)}`
-  return `${head} · xw\u00A0${Math.round(Math.abs(crosswindKt))}` // PROVISIONAL
+  return `${head} · xw\u00A0${Math.round(Math.abs(crosswindKt))}`
 }
 
 /** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
 export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {
   const time = `${report.observedAt.slice(11, 16)}Z`
-  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm}\u00A0NM away, ${time}` // PROVISIONAL
+  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm}\u00A0NM away, ${time}`
 }
 
 /** "28R: headwind 5 kt, crosswind 3 kt from the right." (tailwind and left likewise). */
@@ -175,7 +175,7 @@ export function runwayComponentsText(runway: string, headwindKt: number, crosswi
   // Non-breaking spaces keep each word with its number and unit when the line wraps.
   const head = headwindKt >= 0 ? `headwind\u00A0${headwindKt}\u00A0kt` : `tailwind\u00A0${-headwindKt}\u00A0kt`
   const cross = crosswindKt === 0 ? "no crosswind" : `crosswind\u00A0${Math.abs(crosswindKt)}\u00A0kt from the ${crosswindKt > 0 ? "right" : "left"}`
-  return `${runway}: ${head}, ${cross}.` // PROVISIONAL
+  return `${runway}: ${head}, ${cross}.`
 }
 
 /** "240° at 5 kt", "Variable at 5 kt", "240° at 12 kt, gusting 25 kt", or "Calm", for the ATIS wind. */
@@ -184,7 +184,7 @@ export function atisWindText(wind: { from: number | null; speedKt: number; gustK
   const from = wind.from === null ? copy.live.windVariable : `${String(wind.from).padStart(3, "0")}°`
   const gust = wind.gustKt ? `, gusting\u00A0${wind.gustKt}\u00A0kt` : ""
   // Non-breaking spaces keep a number with its unit (and "at" with the direction) on one line when the text wraps.
-  return `${from}\u00A0at\u00A0${wind.speedKt}\u00A0kt${gust}` // PROVISIONAL
+  return `${from}\u00A0at\u00A0${wind.speedKt}\u00A0kt${gust}`
 }
 
 /** "12 waypoints will be removed" while previewing a trim. */
