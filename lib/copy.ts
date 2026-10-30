@@ -117,42 +117,51 @@ export const copy = {
 
   // Departure guides (editor, Departure tab). Every line below waits for Gabriel's approval.
   guides: {
-    heading: "Departure guide", // PROVISIONAL
-    save: "Save as guide", // PROVISIONAL
+    save: "Save procedure", // PROVISIONAL
     saving: "Saving...", // PROVISIONAL
     saved: "Saved", // PROVISIONAL
+    yourProcedure: "Your procedure", // PROVISIONAL
+    suggested: "Suggested procedures for", // PROVISIONAL
     needsPlan: "Available once your plan is saved.", // PROVISIONAL
-    lowConfidence: "Couldn't tell which runway this departure used. Tap the runway above, then save.", // PROVISIONAL
-    tapRunway: "Tap a runway above to see your saved guides for it.", // PROVISIONAL
-    noGuides: "You have no saved guides for this runway.", // PROVISIONAL
-    fitSame: "Same runway", // PROVISIONAL
-    fitParallel: "Parallel runway", // PROVISIONAL
-    fitSimilar: "Similar heading", // PROVISIONAL
-    fitOther: "Other runway", // PROVISIONAL
-    preview: "Preview", // PROVISIONAL
-    hidePreview: "Hide preview", // PROVISIONAL
-    use: "Use", // PROVISIONAL
+    lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.", // PROVISIONAL
+    tapRunway: "Pick a runway above to see suggested procedures for it.", // PROVISIONAL
+    noGuides: "No suggested procedures for this runway yet.", // PROVISIONAL
+    north: "North", // PROVISIONAL
+    east: "East", // PROVISIONAL
+    south: "South", // PROVISIONAL
+    west: "West", // PROVISIONAL
+    from: "from", // PROVISIONAL
+    previewing: "Previewing on the map", // PROVISIONAL
+    apply: "Apply", // PROVISIONAL
+    cancel: "Cancel", // PROVISIONAL
     remove: "Delete", // PROVISIONAL
     removeConfirm: "Delete?", // PROVISIONAL
     joinWarning: "Different heading: check the terrain and obstacles on the joining leg.", // PROVISIONAL
-    needsDraft: "This plan is locked. Duplicate it to use a guide.", // PROVISIONAL
-    savedToast: "Guide saved", // PROVISIONAL
-    appliedToast: "Departure guide applied", // PROVISIONAL
-    errTooMany: "You've reached the limit of 300 saved guides.", // PROVISIONAL
+    needsDraft: "This plan is locked. Duplicate it to apply a procedure.", // PROVISIONAL
+    savedToast: "Procedure saved", // PROVISIONAL
+    appliedToast: "Procedure applied", // PROVISIONAL
+    errTooMany: "You've reached the limit of 300 saved procedures.", // PROVISIONAL
     errNotSaved: "Save the plan first, then try again.", // PROVISIONAL
     errNotDraft: "This plan is locked. Duplicate it to change it.", // PROVISIONAL
     errGeneric: "Something went wrong. Please try again.", // PROVISIONAL
   },
 } as const
 
-/** "21L · west · 122 NM" for a guide's line: the runway, where it headed, how far to the top of climb. */
-export function guideSummaryText(runway: string | null, direction: string, distanceNm: number) {
-  return `${runway ?? "?"} · ${direction} · ${distanceNm}\u00A0NM` // PROVISIONAL
+/** "Replaces your procedure (22L, 122 NM) with 22R, 98 NM. You can undo it." before an Apply. */
+export function replaceText(current: { runway: string | null; nm: number } | null, next: { runway: string | null; nm: number }) {
+  const label = (p: { runway: string | null; nm: number }) => `${p.runway ?? "?"}, ${p.nm}\u00A0NM`
+  return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.` // PROVISIONAL
 }
 
-/** "Your guides for 21R" above the list of saved guides for the runway the pilot tapped. */
-export function guidesForText(runway: string) {
-  return `Your guides for ${runway}` // PROVISIONAL
+/** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
+export function guideLegText(distanceNm: number, bearing: number) {
+  return `${distanceNm}\u00A0NM · ${String(Math.round(bearing) % 360).padStart(3, "0")}°` // PROVISIONAL
+}
+
+/** "hw 11 · xw 4" under a runway tile ("tail 5 · xw 3" for a tailwind). */
+export function tileWindText(headwindKt: number, crosswindKt: number) {
+  const head = headwindKt >= 0 ? `hw\u00A0${Math.round(headwindKt)}` : `tail\u00A0${Math.round(-headwindKt)}`
+  return `${head} · xw\u00A0${Math.round(Math.abs(crosswindKt))}` // PROVISIONAL
 }
 
 /** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */

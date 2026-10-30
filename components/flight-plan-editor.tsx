@@ -1967,26 +1967,31 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                             [activeTab]: tapRunway(current[activeTab], activeTab === "departure" ? originAirport : destinationAirport, runway),
                           }))
                         }
+                        loadAirport={loadAirport}
                         defaultOpen={!isMobile}
                         className="mx-4 mb-3"
-                      />
-                      {activeTab === "departure" && (
-                        <RunwayGuides
-                          supabase={guideSupabase}
-                          icao={originAirport}
-                          valid={icaoValidation.origin}
-                          waypoints={waypoints}
-                          split={phaseSplit}
-                          loadAirport={loadAirport}
-                          planId={savedPlanId}
-                          planIsDraft={savedStatus === "draft"}
-                          targetRunway={handRunways.departure?.icao === originAirport ? handRunways.departure.runway : null}
-                          onPreview={setGuidePreview}
-                          onApply={applyGuideToPlan}
-                          onNotify={(title, description) => toast({ title, description })}
-                          className="mx-4 mb-3"
-                        />
-                      )}
+                      >
+                        {(embedded, runway, toneOf) =>
+                          activeTab === "departure" ? (
+                            <RunwayGuides
+                              supabase={guideSupabase}
+                              icao={originAirport}
+                              valid={icaoValidation.origin}
+                              waypoints={waypoints}
+                              split={phaseSplit}
+                              loadAirport={loadAirport}
+                              planId={savedPlanId}
+                              planIsDraft={savedStatus === "draft"}
+                              targetRunway={runway}
+                              onPreview={setGuidePreview}
+                              onApply={applyGuideToPlan}
+                              onNotify={(title, description) => toast({ title, description })}
+                              toneOf={toneOf}
+                              embedded={embedded}
+                            />
+                          ) : null
+                        }
+                      </AirportCard>
                       <GroundMovements
                         end={activeTab}
                         compact={isMobile}

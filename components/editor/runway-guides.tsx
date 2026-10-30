@@ -2,19 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { Eye, EyeOff, Loader2, PlaneTakeoff, Trash2 } from "lucide-react"
-import { copy, guideSummaryText, guidesForText } from "@/lib/copy"
+import { Loader2 } from "lucide-react"
+import { TONE_CLASSES } from "@/components/editor/live-airports"
+import { copy, guideLegText, replaceText } from "@/lib/copy"
+import type { EndTone } from "@/lib/runway-wind"
 import type { TrimAirport, TrimPoint } from "@/lib/ground-trim"
 import type { PhaseSplit } from "@/lib/route-phases"
 import {
   applyGuide,
-  compassPoint,
   extractDeparture,
   findRunwayEnd,
   rankGuides,
   type ApplyMode,
   type DepartureExtraction,
-  type GuideFit,
   type GuidePoint,
 } from "@/lib/runway-guide"
 import { deleteGuide, fetchGuides, GuideError, saveGuide, type GuideErrorKey, type StoredGuide } from "@/lib/runway-guide-client"
@@ -27,13 +27,15 @@ const ERROR_TEXT: Record<GuideErrorKey, string> = {
   notFound: copy.guides.errGeneric,
   generic: copy.guides.errGeneric,
 }
-const FIT_TEXT: Record<GuideFit, string> = {
-  "same end": copy.guides.fitSame,
-  parallel: copy.guides.fitParallel,
-  "similar heading": copy.guides.fitSimilar,
-  other: copy.guides.fitOther,
-}
-const MAX_LISTED = 4
+const MAX_LISTED = 8
+const SIDES = [
+  { key: "north", text: copy.guides.north },
+  { key: "east", text: copy.guides.east },
+  { key: "south", text: copy.guides.south },
+  { key: "west", text: copy.guides.west },
+] as const
+// Which side of the compass a bearing heads to (north is 315-45, and so on).
+const sideOf = (bearing: number) => Math.floor((((bearing % 360) + 360 + 45) % 360) / 90)
 
 interface RunwayGuidesProps {
   /** Signed in, and the database is reachable. Guides are private to their owner, so nothing is shown otherwise. */
@@ -57,6 +59,10 @@ interface RunwayGuidesProps {
   /** Puts a guide's path into the plan in place of its departure. Throws when it could not be done. */
   onApply: (points: GuidePoint[], guide: StoredGuide, mode: ApplyMode) => Promise<void>
   onNotify: (title: string, description?: string) => void
+  /** How the wind favours a runway (the colour of its tile), or null. */
+  toneOf?: (runway: string) => EndTone | null
+  /** Inside the airport card (no frame of its own) rather than a card of its own. */
+  embedded?: boolean
   className?: string
 }
 
@@ -76,6 +82,8 @@ export function RunwayGuides({
   onPreview,
   onApply,
   onNotify,
+  toneOf = () => null,
+  embedded = false,
   className,
 }: RunwayGuidesProps) {
   const [airport, setAirport] = useState<TrimAirport | null>(null)
@@ -85,6 +93,7 @@ export function RunwayGuides({
   const [busyId, setBusyId] = useState<string | null>(null)
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [confirmApply, setConfirmApply] = useState<string | null>(null)
   const enabled = supabase !== null && valid && /^[A-Z]{4}$/.test(icao)
 
   useEffect(() => {
@@ -141,6 +150,7 @@ export function RunwayGuides({
   }
 
   const togglePreview = (guide: StoredGuide) => {
+    setConfirmApply(null)
     if (previewId === guide.id) {
       setPreviewId(null)
       return onPreview(null)
@@ -174,6 +184,7 @@ export function RunwayGuides({
     setBusyId(guide.id)
     try {
       await onApply(applied.points, guide, applied.mode)
+      setConfirmApply(null)
       setPreviewId(null)
       onPreview(null)
       await refresh()
@@ -206,88 +217,124 @@ export function RunwayGuides({
   const justSaved = shown && planId && savedFor === `${planId}:${shown.runwayEnd}:${shown.points.length}`
   const hasGuides = (guides?.length ?? 0) > 0
 
-  return (
-    <div className={cn("space-y-2 rounded-lg border px-3 py-2.5 text-xs", className)}>
-      <div className="flex items-start gap-2">
-        <PlaneTakeoff className="mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">{copy.guides.heading}</p>
-          {shown?.runwayEnd ? (
-            <p className="text-muted-foreground">{guideSummaryText(shown.runwayEnd, shown.direction, shown.tocDistanceNm)}</p>
-          ) : (
-            shown && <p className="text-muted-foreground">{copy.guides.lowConfidence}</p>
-          )}
-        </div>
-        {shown && (
-          <button
-            type="button"
-            disabled={!canSave || saving || Boolean(justSaved)}
-            onClick={save}
-            title={!planId ? copy.guides.needsPlan : undefined}
-            className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
-            {saving ? copy.guides.saving : justSaved ? copy.guides.saved : copy.guides.save}
-          </button>
-        )}
-      </div>
-      {shown && !planId && <p className="text-muted-foreground">{copy.guides.needsPlan}</p>}
+  const pill = (runway: string) => (
+    <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums", toneOf(runway) ? TONE_CLASSES[toneOf(runway) as EndTone] : "bg-muted")}>
+      {runway}
+    </span>
+  )
+  const sides = SIDES.map((side, index) => ({ ...side, items: ranked.filter(({ guide }) => sideOf(guide.guide.tocBearingDeg) === index) })).filter((side) => side.items.length > 0)
 
-      {target && guides && (
-        <div className="space-y-1.5 border-t pt-2">
-          <p className="text-muted-foreground">{guidesForText(target.name)}</p>
-          {ranked.length === 0 && <p className="text-muted-foreground">{copy.guides.noGuides}</p>}
-          {ranked.map(({ guide, fit }) => {
-            const applied = layOnto(guide.guide)
-            const previewing = previewId === guide.id
-            return (
-              <div key={guide.id} className={cn("rounded-md border px-2 py-1.5", previewing && "border-amber-500/60 bg-amber-500/10")}>
-                <div className="flex items-center gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-foreground">
-                      {guideSummaryText(guide.guide.runwayName, compassPoint(guide.guide.tocBearingDeg), guide.guide.tocDistanceNm)}
-                    </p>
-                    <p className="text-muted-foreground">{FIT_TEXT[fit]}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => togglePreview(guide.guide)}
-                    aria-pressed={previewing}
-                    className="flex h-7 items-center gap-1 rounded-md px-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  >
-                    {previewing ? <EyeOff className="h-3.5 w-3.5" aria-hidden /> : <Eye className="h-3.5 w-3.5" aria-hidden />}
-                    {previewing ? copy.guides.hidePreview : copy.guides.preview}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId !== null || !planId || !planIsDraft}
-                    onClick={() => use(guide.guide)}
-                    title={!planId ? copy.guides.needsPlan : !planIsDraft ? copy.guides.needsDraft : undefined}
-                    className="flex h-7 items-center gap-1 rounded-md bg-primary px-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {busyId === guide.id && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
-                    {copy.guides.use}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(guide.guide)}
-                    aria-label={copy.guides.remove}
-                    title={copy.guides.remove}
-                    className={cn(
-                      "flex h-7 items-center justify-center rounded-md px-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
-                      confirmDelete === guide.id && "bg-destructive/10 text-destructive",
-                    )}
-                  >
-                    {confirmDelete === guide.id ? copy.guides.removeConfirm : <Trash2 className="h-3.5 w-3.5" aria-hidden />}
-                  </button>
-                </div>
-                {applied?.mode === "joined" && <p className="mt-1 text-amber-700 dark:text-amber-300">{copy.guides.joinWarning}</p>}
-              </div>
-            )
-          })}
+  return (
+    <div className={cn("text-xs", embedded ? "border-t" : "space-y-2 rounded-lg border px-3 py-2.5", className)}>
+      {shown && (
+        <div className={cn("space-y-1.5", embedded && "px-3 py-2.5")}>
+          <p className="text-muted-foreground">{copy.guides.yourProcedure}</p>
+          <div className="flex items-center gap-2">
+            {shown.runwayEnd ? (
+              <>
+                {pill(shown.runwayEnd)}
+                <p className="min-w-0 flex-1 font-medium text-foreground">
+                  {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
+                </p>
+              </>
+            ) : (
+              <p className="min-w-0 flex-1 text-muted-foreground">{copy.guides.lowConfidence}</p>
+            )}
+            <button
+              type="button"
+              disabled={!canSave || saving || Boolean(justSaved)}
+              onClick={save}
+              title={!planId ? copy.guides.needsPlan : undefined}
+              className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+              {saving ? copy.guides.saving : justSaved ? copy.guides.saved : copy.guides.save}
+            </button>
+          </div>
+          {!planId && <p className="text-muted-foreground">{copy.guides.needsPlan}</p>}
         </div>
       )}
-      {!target && hasGuides && <p className="text-muted-foreground">{copy.guides.tapRunway}</p>}
+
+      {target && guides && (
+        <div className={cn("space-y-1 border-t", embedded ? "px-3 py-2.5" : "pt-2")}>
+          <p className="text-muted-foreground">{`${copy.guides.suggested} ${target.name}`}</p>
+          {ranked.length === 0 && <p className="text-muted-foreground">{copy.guides.noGuides}</p>}
+          {sides.map((side) => (
+            <div key={side.key} className="space-y-1.5">
+              <p className="pt-1.5 text-muted-foreground">{side.text}</p>
+              {side.items.map(({ guide }) => {
+                const applied = layOnto(guide.guide)
+                const previewing = previewId === guide.id
+                const foreign = guide.guide.runwayName && guide.guide.runwayName !== target.name ? guide.guide.runwayName : null
+                return (
+                  <div key={guide.id} className={cn("overflow-hidden rounded-md border", previewing && "border-primary")}>
+                    <button
+                      type="button"
+                      aria-expanded={previewing}
+                      onClick={() => togglePreview(guide.guide)}
+                      className="flex w-full items-center gap-2 px-2 py-1.5 text-left hover:bg-accent/50"
+                    >
+                      {pill(target.name)}
+                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">{guideLegText(guide.guide.tocDistanceNm, guide.guide.tocBearingDeg)}</span>
+                      {foreign && <span className="text-muted-foreground">{`${copy.guides.from} ${foreign}`}</span>}
+                    </button>
+                    {previewing && (
+                      <div className="space-y-1.5 border-t px-2 py-1.5">
+                        {confirmApply === guide.id ? (
+                          <div className="space-y-1.5 rounded-md bg-amber-500/10 p-1.5">
+                            <p className="text-amber-800 dark:text-amber-200">
+                              {replaceText(
+                                shown?.runwayEnd ? { runway: shown.runwayEnd, nm: shown.tocDistanceNm } : null,
+                                { runway: target.name, nm: guide.guide.tocDistanceNm },
+                              )}
+                            </p>
+                            <div className="flex justify-end gap-1.5">
+                              <button type="button" onClick={() => setConfirmApply(null)} className="h-7 rounded-md border px-2 hover:bg-accent">
+                                {copy.guides.cancel}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId !== null}
+                                onClick={() => use(guide.guide)}
+                                className="flex h-7 items-center gap-1 rounded-md bg-primary px-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                              >
+                                {busyId === guide.id && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+                                {copy.guides.apply}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="min-w-0 flex-1 text-muted-foreground">{copy.guides.previewing}</span>
+                            <button
+                              type="button"
+                              onClick={() => remove(guide.guide)}
+                              className={cn("h-7 rounded-md px-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive", confirmDelete === guide.id && "bg-destructive/10 text-destructive")}
+                            >
+                              {confirmDelete === guide.id ? copy.guides.removeConfirm : copy.guides.remove}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!planId || !planIsDraft}
+                              onClick={() => setConfirmApply(guide.id)}
+                              title={!planId ? copy.guides.needsPlan : !planIsDraft ? copy.guides.needsDraft : undefined}
+                              className="h-7 rounded-md bg-primary px-2 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {copy.guides.apply}
+                            </button>
+                          </div>
+                        )}
+                        {applied?.mode === "joined" && <p className="text-amber-700 dark:text-amber-300">{copy.guides.joinWarning}</p>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      {!target && hasGuides && <p className={cn("text-muted-foreground", embedded && "px-3 py-2.5")}>{copy.guides.tapRunway}</p>}
     </div>
   )
 }
