@@ -1352,7 +1352,20 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
 
   // Departure guides: a guide being previewed on the map, and putting a guide's path into the plan.
   const [guidePreview, setGuidePreview] = useState<{ lat: number; lng: number }[] | null>(null)
-  const guideSupabase = useMemo(() => (authUser ? getBrowserSupabase() : null), [authUser])
+  // The procedures follow the live card's access (admins and contributors only while LIVE_REQUIRES_ROLE is on).
+  const [liveAllowed, setLiveAllowed] = useState(false)
+  useEffect(() => {
+    if (!authUser) return setLiveAllowed(false)
+    let cancelled = false
+    fetch("/api/live/access", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { allowed?: boolean }) => !cancelled && setLiveAllowed(data.allowed === true))
+      .catch(() => !cancelled && setLiveAllowed(false))
+    return () => {
+      cancelled = true
+    }
+  }, [authUser])
+  const guideSupabase = useMemo(() => (authUser && liveAllowed ? getBrowserSupabase() : null), [authUser, liveAllowed])
   // The database is told first (the plan takes the guide's origin, so a plan built on a tracker-derived guide cannot be
   // published), then the departure part of the plan is replaced in one undo step. Throws when the database refuses.
   const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide) => {
