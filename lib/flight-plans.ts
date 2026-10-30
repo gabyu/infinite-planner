@@ -76,8 +76,8 @@ export interface FlightPlanSummary {
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
   "id, status, source, origin_sources, moderation_status, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
 
-// How many dashboard rows are loaded at a time ("Load more" fetches the next page).
-export const HISTORY_PAGE_SIZE = 50
+// How many dashboard rows one page of My flights shows.
+export const HISTORY_PAGE_SIZE = 25
 
 // Anyone can hold on to this many plans; past it, saving asks them to delete some.
 // Keeps one account from filling the database (a plan is at most ~200 KB, usually far less).

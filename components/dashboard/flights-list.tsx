@@ -1,13 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Copy, Download, Eye, Info, MoreHorizontal, Pencil, PencilRuler, Star, Trash2, Upload } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Download, Eye, Info, MoreHorizontal, Pencil, PencilRuler, Search, Star, Trash2, Upload, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -84,6 +85,12 @@ const shareOf = (plan: FlightPlanSummary) => ({ visibility: plan.visibility, pub
 // Tracker-derived plans can't be published (a public one can still be switched off).
 const notPublishable = (plan: FlightPlanSummary) => isTrackerDerived(plan.origin_sources) && plan.visibility !== "public"
 
+// Page numbers to show (0-based): the first, the last and the ones around the current page; null = a gap.
+function pageWindow(current: number, count: number): (number | null)[] {
+  const keep = [...new Set([0, current - 1, current, current + 1, count - 1])].filter((n) => n >= 0 && n < count).sort((a, b) => a - b)
+  return keep.flatMap((n, i) => (i > 0 && n - keep[i - 1] > 1 ? [null, n] : [n]))
+}
+
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
@@ -92,7 +99,12 @@ const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.
 export function FlightsList({ initialPlans, total: initialTotal, library = false }: FlightsListProps) {
   const [plans, setPlans] = useState(initialPlans)
   const [total, setTotal] = useState(initialTotal)
-  const [loadingMore, setLoadingMore] = useState(false)
+  const [page, setPage] = useState(0)
+  const [search, setSearch] = useState("")
+  const [query, setQuery] = useState("") // the search once typing pauses
+  const [paging, setPaging] = useState(false)
+  const latest = useRef(0) // answers to older requests are dropped
+  const firstRun = useRef(true)
   const [deleting, setDeleting] = useState<FlightPlanSummary | null>(null)
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
@@ -126,20 +138,26 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
   const patchPlan = (id: string, patch: Partial<FlightPlanSummary>) =>
     setPlans((current) => current.map((plan) => (plan.id === id ? { ...plan, ...patch } : plan)))
 
-  // Rows come back newest first; `from` is how many are already on screen.
-  async function fetchPlans(from: number, count: number) {
-    return fetchPlansFor(tab, from, count)
-  }
-
-  async function fetchPlansFor(forTab: Tab, from: number, count: number) {
+  // Rows come back newest first. The database does the filtering and the paging, never what happens to be loaded.
+  async function fetchPlansFor(forTab: Tab, from: number, count: number, text: string) {
     const supabase = getBrowserSupabase()
     if (!supabase) return null
-    let query = supabase.from("flight_plans").select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
-    if (forTab === "draft") query = query.eq("status", "draft")
-    else if (forTab === "exported") query = query.eq("status", "exported")
-    else if (forTab === "published") query = query.eq("visibility", "public")
-    else if (forTab === "imported") query = query.eq("is_fork", true)
-    const { data, count: nextTotal, error } = await query
+    let request = supabase.from("flight_plans").select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
+    if (forTab === "draft") request = request.eq("status", "draft")
+    else if (forTab === "exported") request = request.eq("status", "exported")
+    else if (forTab === "published") request = request.eq("visibility", "public")
+    else if (forTab === "imported") request = request.eq("is_fork", true)
+    // Airport search: ICAO code, airport name or flight number (characters that mean something in a filter are dropped).
+    const term = text.replace(/[^\p{L}\p{N} .'-]/gu, "").trim()
+    if (term) {
+      const like = `%${term}%`
+      request = request.or(
+        ["origin_airport", "destination_airport", "origin_airport_name", "destination_airport_name", "flight_number"]
+          .map((column) => `${column}.ilike.${like}`)
+          .join(","),
+      )
+    }
+    const { data, count: nextTotal, error } = await request
       .order("created_at", { ascending: false })
       .range(from, from + count - 1)
     if (error) {
@@ -149,33 +167,54 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
     return { rows: (data ?? []) as unknown as FlightPlanSummary[], total: nextTotal ?? 0 }
   }
 
-  // The list is filtered by the database, not by what happens to be loaded: switching tab reloads from the start.
+  // Loads one page of the current tab and search.
+  async function load(forTab: Tab, forPage: number, text: string) {
+    const id = ++latest.current
+    setPaging(true)
+    const result = await fetchPlansFor(forTab, forPage * HISTORY_PAGE_SIZE, HISTORY_PAGE_SIZE, text)
+    if (id !== latest.current) return
+    setPaging(false)
+    setTabLoading(false)
+    if (!result) return toast({ title: "Couldn't load your flight plans", variant: "destructive" })
+    // A page left empty (the last plan on it was deleted): step back.
+    if (result.rows.length === 0 && forPage > 0) return goTo(Math.max(0, Math.ceil(result.total / HISTORY_PAGE_SIZE) - 1))
+    setPlans(result.rows)
+    setTotal(result.total)
+    setPage(forPage)
+  }
+
+  function goTo(next: number) {
+    load(tab, next, query)
+  }
+
   async function changeTab(next: Tab) {
     if (next === tab) return
     setTab(next)
-    setTabLoading(true)
     if (next === "favorites") {
+      setTabLoading(true)
       const supabase = getBrowserSupabase()
       const { data } = supabase ? await supabase.rpc("get_my_favorites", { p_limit: 100, p_offset: 0 }) : { data: null }
       setFavorites((data as Favorite[] | null) ?? [])
       setTabLoading(false)
       return
     }
-    const result = await fetchPlansFor(next, 0, HISTORY_PAGE_SIZE)
-    setTabLoading(false)
-    if (!result) return toast({ title: "Couldn't load your flight plans", variant: "destructive" })
-    setPlans(result.rows)
-    setTotal(result.total)
+    setTabLoading(true)
+    load(next, 0, query)
   }
 
-  async function loadMore() {
-    setLoadingMore(true)
-    const result = await fetchPlans(plans.length, HISTORY_PAGE_SIZE)
-    setLoadingMore(false)
-    if (!result) return toast({ title: "Couldn't load more", variant: "destructive" })
-    setPlans((current) => [...current, ...result.rows.filter((row) => !current.some((plan) => plan.id === row.id))])
-    setTotal(result.total)
-  }
+  // Search as the user types, once they pause: back to the first page.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search), 300)
+    return () => window.clearTimeout(timer)
+  }, [search])
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false
+      return
+    }
+    if (tab !== "favorites") load(tab, 0, query)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
 
   async function toggleFeatured(plan: FlightPlanSummary) {
     const response = await fetch(`/api/plans/${plan.id}/featured`, {
@@ -196,11 +235,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
       return toast({ title: "Couldn't duplicate", description: body?.error, variant: "destructive" })
     }
     // Reload what's on screen so the copy appears at the top.
-    const result = await fetchPlans(0, Math.max(plans.length + 1, HISTORY_PAGE_SIZE))
-    if (result) {
-      setPlans(result.rows)
-      setTotal(result.total)
-    }
+    await load(tab, 0, query)
     toast({ title: "Draft created", description: `${routeOf(plan)}: a copy you can edit, private.` })
   }
 
@@ -214,13 +249,12 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
       console.error("Deleting a flight plan failed:", response.status)
       return toast({ title: "Couldn't delete", variant: "destructive" })
     }
-    setPlans((current) => current.filter((plan) => plan.id !== deleting.id))
-    setTotal((current) => Math.max(0, current - 1))
     setDeleting(null)
+    await load(tab, page, query) // refill the page
     toast({ title: "Flight plan deleted", description: routeOf(deleting) })
   }
 
-  if (plans.length === 0 && tab === "all") {
+  if (plans.length === 0 && tab === "all" && !query && !paging) {
     return (
       <div className="flex max-w-xl flex-col items-start rounded-lg border bg-card px-6 py-8">
         <h2 className="text-sm font-medium">No flight plans yet</h2>
@@ -252,8 +286,9 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
 
   return (
     <>
-      {library && (
-        <div role="tablist" aria-label="Filter your flight plans" className="mb-3 flex flex-wrap gap-1">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      {library ? (
+        <div role="tablist" aria-label="Filter your flight plans" className="flex flex-wrap gap-1">
           {TABS.map(({ value, label }) => (
             <button
               key={value}
@@ -271,7 +306,36 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
             </button>
           ))}
         </div>
+      ) : (
+        <span />
       )}
+      {tab !== "favorites" && (
+        <div className="relative w-full sm:w-64">
+          <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search airport or flight no."
+            aria-label="Search your flight plans by airport or flight number"
+            className="h-9 pl-9 pr-8"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("")
+                setQuery("")
+              }}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+      </div>
 
       {tabLoading ? (
         <p className="py-8 text-sm text-muted-foreground">Loading...</p>
@@ -304,7 +368,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
           </p>
         )
       ) : plans.length === 0 ? (
-        <p className="py-8 text-sm text-muted-foreground">Nothing here yet.</p>
+        <p className="py-8 text-sm text-muted-foreground">{query ? `No flight plans match "${query}".` : "Nothing here yet."}</p>
       ) : (
       <div className="overflow-hidden rounded-lg border bg-card">
         <div className={cn("studio-label hidden items-center gap-4 border-b bg-muted/40 px-4 py-2.5 md:grid", columns)}>
@@ -330,7 +394,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                 )}
               >
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-x-2 font-mono text-sm font-medium">
+                  <div className="flex flex-wrap items-center gap-x-2 font-mono text-sm font-medium">
                     <span>
                       {plan.origin_airport}
                       <RouteArrow />
@@ -341,7 +405,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         Draft
                       </Badge>
                     )}
-                  </p>
+                  </div>
                   {(names[0] || names[1]) && (
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {names[0] ?? plan.origin_airport}
@@ -505,14 +569,43 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
           })}
         </ul>
 
-        <div className="flex items-center justify-between border-t bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
           <span>
-            {plans.length} of {total} flight plan{total === 1 ? "" : "s"}
+            {page * HISTORY_PAGE_SIZE + 1}–{page * HISTORY_PAGE_SIZE + plans.length} of {total} flight plan{total === 1 ? "" : "s"}
           </span>
-          {plans.length < total && (
-            <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading..." : "Load more"}
-            </Button>
+          {total > HISTORY_PAGE_SIZE && (
+            <nav aria-label="Pages" className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7" disabled={page === 0 || paging} onClick={() => goTo(page - 1)} aria-label="Previous page">
+                <ChevronLeft size={16} />
+              </Button>
+              {pageWindow(page, Math.ceil(total / HISTORY_PAGE_SIZE)).map((entry, i) =>
+                entry === null ? (
+                  <span key={`gap-${i}`} aria-hidden className="px-1">…</span>
+                ) : (
+                  <Button
+                    key={entry}
+                    variant={entry === page ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 min-w-7 px-2 tabular-nums"
+                    aria-current={entry === page ? "page" : undefined}
+                    disabled={paging}
+                    onClick={() => goTo(entry)}
+                  >
+                    {entry + 1}
+                  </Button>
+                ),
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                disabled={(page + 1) * HISTORY_PAGE_SIZE >= total || paging}
+                onClick={() => goTo(page + 1)}
+                aria-label="Next page"
+              >
+                <ChevronRight size={16} />
+              </Button>
+            </nav>
           )}
         </div>
       </div>

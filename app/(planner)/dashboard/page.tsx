@@ -7,7 +7,6 @@ import { ActivityOverview } from "@/components/dashboard/activity-overview"
 import { FlightsList } from "@/components/dashboard/flights-list"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
 import { FLIGHT_PLAN_SUMMARY_COLUMNS, HISTORY_PAGE_SIZE, type FlightPlanSummary } from "@/lib/flight-plans"
-import { LibraryOverview } from "@/components/dashboard/library-overview"
 import { getViewer, isLibraryOpenFor } from "@/lib/library"
 import { getServerSupabase } from "@/lib/supabase/server"
 import { privatePageMetadata } from "@/lib/seo"
@@ -39,7 +38,7 @@ export default async function DashboardPage() {
 
   if (!supabase) {
     return (
-      <PageShell title="Dashboard" description="Your flight plans and your activity.">
+      <PageShell noBack title="Dashboard" description="Your flight plans and your activity.">
         <p className="text-sm text-muted-foreground">Accounts aren&apos;t available right now.</p>
       </PageShell>
     )
@@ -47,17 +46,17 @@ export default async function DashboardPage() {
 
   if (!user) {
     return (
-      <PageShell title="Dashboard" description="Your flight plans and your activity.">
+      <PageShell noBack title="Dashboard" description="Your flight plans and your activity.">
         <SignInPrompt message="Your flight plans are tied to your Discord account. Sign in to see them." />
       </PageShell>
     )
   }
 
-  // Both queries only ever see the signed-in user's own rows (RLS), the same flight_plans table the
+  // The queries only ever see the signed-in user's own rows (RLS), the same flight_plans table the
   // admin overview reads unfiltered.
   const since = new Date(Date.now() - GRAPH_WINDOW_DAYS * 86_400_000).toISOString()
   const libraryOpen = await isLibraryOpenFor(await getViewer())
-  const [plans, exported, library] = await Promise.all([
+  const [plans, exported] = await Promise.all([
     supabase
       .from("flight_plans")
       .select(FLIGHT_PLAN_SUMMARY_COLUMNS, { count: "exact" })
@@ -70,28 +69,18 @@ export default async function DashboardPage() {
       .eq("status", "exported")
       .gte("created_at", since)
       .order("created_at", { ascending: true }),
-    // What the community did with the user's plans (their own rows only, by RLS).
-    libraryOpen
-      ? supabase.from("flight_plans").select("visibility, like_count, import_count, download_count").eq("status", "exported")
-      : Promise.resolve({ data: null }),
   ])
-  const totals = (library.data ?? []).reduce(
-    (sum, row) => ({
-      published: sum.published + (row.visibility === "public" ? 1 : 0),
-      downloads: sum.downloads + row.download_count,
-      likes: sum.likes + row.like_count,
-      imports: sum.imports + row.import_count,
-    }),
-    { published: 0, downloads: 0, likes: 0, imports: 0 },
-  )
   if (plans.error) console.error("Loading the dashboard failed:", plans.error.message)
   if (exported.error) console.error("Loading the activity graph failed:", exported.error.message)
 
+  // New on every render of this page: the list remounts with fresh data each time Dashboard is opened.
+  const renderedAt = Date.now()
   const name = displayNameOf(user.user_metadata)
   const exportTimes = (exported.data ?? []).map((row) => Math.floor(Date.parse(row.created_at as string) / 1000))
 
   return (
     <PageShell
+      noBack
       title={name ? `Welcome, ${name}` : "Welcome"}
       description="Your flight plans and your activity."
       actions={
@@ -111,8 +100,6 @@ export default async function DashboardPage() {
     >
       <ActivityOverview exportTimes={exportTimes} />
 
-      {libraryOpen && <LibraryOverview totals={totals} />}
-
       <section className="mt-8" aria-labelledby="my-flights-title">
         <h2 id="my-flights-title" className="mb-3 text-sm font-semibold">
           My flights
@@ -120,7 +107,7 @@ export default async function DashboardPage() {
         {plans.error ? (
           <p className="text-sm text-muted-foreground">Couldn&apos;t load your flight plans right now.</p>
         ) : (
-          <FlightsList initialPlans={(plans.data ?? []) as unknown as FlightPlanSummary[]} total={plans.count ?? 0} library={libraryOpen} />
+          <FlightsList key={renderedAt} initialPlans={(plans.data ?? []) as unknown as FlightPlanSummary[]} total={plans.count ?? 0} library={libraryOpen} />
         )}
       </section>
     </PageShell>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { resolveTimezone } from "@/lib/admin/timezone"
 import { computeYearActivity, dayNumberToDate, mondayIndex } from "@/lib/activity-stats"
 import { cn } from "@/lib/utils"
+import { RoutesGlobe } from "@/components/dashboard/routes-globe"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const WEEKDAY_LABELS = ["Mon", "", "Wed", "", "Fri", "", "Sun"]
@@ -22,6 +23,7 @@ const plural = (n: number, word: string) => `${n.toLocaleString("en-GB")} ${word
 // times; days are drawn here, in the viewer's own timezone.
 export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
   const [tz, setTz] = useState<string | null>(null)
+  const [view, setView] = useState<"calendar" | "map">("calendar")
   useEffect(() => setTz(resolveTimezone(null)), [])
 
   const model = useMemo(() => {
@@ -65,7 +67,38 @@ export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
   ]
 
   return (
-    <section aria-label="Activity" className="overflow-hidden rounded-lg border bg-card">
+    <section aria-label="Activity">
+      <div role="tablist" aria-label="Activity view" className="mb-3 flex flex-wrap gap-1">
+        {(
+          [
+            ["calendar", "Activity"],
+            ["map", "Map"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            onClick={() => setView(value)}
+            className={cn(
+              "rounded-full px-3 py-1 text-sm transition-colors motion-reduce:transition-none",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              view === value ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-lg border bg-card">
+      {view === "map" ? (
+        <div className="p-5">
+          <RoutesGlobe />
+        </div>
+      ) : (
+      <>
       <dl className="grid grid-cols-2 border-b sm:grid-cols-4">
         {stats.map((stat) => (
           <div
@@ -124,6 +157,9 @@ export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
             More
           </div>
         </div>
+      </div>
+      </>
+      )}
       </div>
     </section>
   )

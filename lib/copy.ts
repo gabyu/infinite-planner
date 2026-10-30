@@ -158,10 +158,10 @@ export function guideLegText(distanceNm: number, bearing: number) {
   return `${distanceNm}\u00A0NM · ${String(Math.round(bearing) % 360).padStart(3, "0")}°`
 }
 
-/** "hw 11 · xw 4" under a runway tile ("tail 5 · xw 3" for a tailwind). */
-export function tileWindText(headwindKt: number, crosswindKt: number) {
+/** ["hw 11", "xw 4"] under a runway tile (["tail 5", "xw 3"] for a tailwind), one line each so four tiles fit a narrow panel. */
+export function tileWindText(headwindKt: number, crosswindKt: number): [string, string] {
   const head = headwindKt >= 0 ? `hw\u00A0${Math.round(headwindKt)}` : `tail\u00A0${Math.round(-headwindKt)}`
-  return `${head} · xw\u00A0${Math.round(Math.abs(crosswindKt))}`
+  return [head, `xw\u00A0${Math.round(Math.abs(crosswindKt))}`]
 }
 
 /** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
