@@ -67,8 +67,8 @@ export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
   ]
 
   return (
-    <section aria-label="Activity" className="overflow-hidden rounded-lg border bg-card">
-      <div role="tablist" aria-label="Activity view" className="flex gap-1 border-b px-5 py-2">
+    <section aria-label="Activity">
+      <div role="tablist" aria-label="Activity view" className="mb-3 flex flex-wrap gap-1">
         {(
           [
             ["calendar", "Activity"],
@@ -92,6 +92,7 @@ export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
         ))}
       </div>
 
+      <div className="overflow-hidden rounded-lg border bg-card">
       {view === "map" ? (
         <div className="p-5">
           <RoutesGlobe />
@@ -159,6 +160,7 @@ export function ActivityOverview({ exportTimes }: { exportTimes: number[] }) {
       </div>
       </>
       )}
+      </div>
     </section>
   )
 }
