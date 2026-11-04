@@ -1368,9 +1368,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const guideSupabase = useMemo(() => (authUser && liveAllowed ? getBrowserSupabase() : null), [authUser, liveAllowed])
   // The database is told first (the plan takes the guide's origin, so a plan built on a tracker-derived guide cannot be
   // published), then the departure part of the plan is replaced in one undo step. Throws when the database refuses.
+  const originalDeparture = useRef<{ airport: string; waypoints: Waypoint[] } | null>(null)
   const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide) => {
     if (!guideSupabase || !savedPlanId) throw new GuideError("plan_not_found")
     setOriginSources(await attachGuideToPlan(guideSupabase, savedPlanId, guide.id))
+    // The plan's own departure is kept the first time a procedure is applied, so it can be put back.
+    if (originalDeparture.current?.airport !== originAirport) {
+      originalDeparture.current = { airport: originAirport, waypoints: waypoints.slice(0, phaseSplit.departureEnd + 1) }
+    }
     const stamp = Date.now()
     const replacement: Waypoint[] = points.map((point, index) => ({
       id: `${stamp}-guide-${index}`,
@@ -1395,6 +1400,26 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         </ToastAction>
       ),
     })
+  }
+
+  // Puts the departure the plan had before the first procedure was applied back (one undo step).
+  const restoreOriginalDeparture = () => {
+    const saved = originalDeparture.current
+    if (!saved || saved.airport !== originAirport) return false
+    const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
+    setWaypoints(applyWaypointNamingRules([...saved.waypoints, ...kept], originAirport, destinationAirport, includeBranding))
+    originalDeparture.current = null
+    setGuidePreview(null)
+    setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    toast({
+      title: copy.guides.restoredToast,
+      action: (
+        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
+    return true
   }
 
   // The toggles are "on" while the ground movements are in the plan. Turning one off previews what goes (Apply
@@ -1984,7 +2009,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         defaultOpen={!isMobile}
                         className="mx-4 mb-3"
                       >
-                        {(embedded, runway, toneOf) =>
+                        {(embedded, runway) =>
                           activeTab === "departure" ? (
                             <RunwayGuides
                               supabase={guideSupabase}
@@ -1999,7 +2024,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                               onPreview={setGuidePreview}
                               onApply={applyGuideToPlan}
                               onNotify={(title, description) => toast({ title, description })}
-                              toneOf={toneOf}
+                              destination={destinationAirport}
+                              onRestore={restoreOriginalDeparture}
                               embedded={embedded}
                             />
                           ) : null

@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { Loader2 } from "lucide-react"
-import { TONE_CLASSES } from "@/components/editor/live-airports"
-import { copy, guideLegText, replaceText } from "@/lib/copy"
-import type { EndTone } from "@/lib/runway-wind"
+import { Check, Loader2 } from "lucide-react"
+import { copy, guideDateText, guideLegText, replaceText } from "@/lib/copy"
 import type { TrimAirport, TrimPoint } from "@/lib/ground-trim"
 import type { PhaseSplit } from "@/lib/route-phases"
 import {
@@ -59,8 +57,10 @@ interface RunwayGuidesProps {
   /** Puts a guide's path into the plan in place of its departure. Throws when it could not be done. */
   onApply: (points: GuidePoint[], guide: StoredGuide, mode: ApplyMode) => Promise<void>
   onNotify: (title: string, description?: string) => void
-  /** How the wind favours a runway (the colour of its tile), or null. */
-  toneOf?: (runway: string) => EndTone | null
+  /** The plan's destination airport: names the original departure in the list ("Original, to KSFO"). */
+  destination: string
+  /** Puts the plan's own departure back, as it was before the first procedure was applied. False when it could not. */
+  onRestore: () => boolean
   /** Inside the airport card (no frame of its own) rather than a card of its own. */
   embedded?: boolean
   className?: string
@@ -82,7 +82,8 @@ export function RunwayGuides({
   onPreview,
   onApply,
   onNotify,
-  toneOf = () => null,
+  destination,
+  onRestore,
   embedded = false,
   className,
 }: RunwayGuidesProps) {
@@ -94,6 +95,8 @@ export function RunwayGuides({
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [confirmApply, setConfirmApply] = useState<string | null>(null)
+  // The departure the plan had before the first procedure was applied (kept until restored or the airport changes).
+  const [original, setOriginal] = useState<{ icao: string; runway: string | null; nm: number; bearing: number; destination: string } | null>(null)
   const enabled = supabase !== null && valid && /^[A-Z]{4}$/.test(icao)
 
   useEffect(() => {
@@ -114,6 +117,9 @@ export function RunwayGuides({
     }
   }, [supabase, enabled, icao])
   useEffect(() => {
+    setOriginal((current) => (current && current.icao === icao ? current : null))
+  }, [icao])
+  useEffect(() => {
     setGuides(null)
     setPreviewId(null)
     onPreview(null)
@@ -132,7 +138,8 @@ export function RunwayGuides({
   const target = airport && targetRunway ? findRunwayEnd(airport, targetRunway) : null
   const ranked = useMemo(() => {
     if (!target || !guides) return []
-    const candidates = guides.map((guide) => ({
+    // Only the procedures saved for the runway picked above; ones from other runways are not offered.
+    const candidates = guides.filter((guide) => guide.runwayName === target.name).map((guide) => ({
       id: guide.id,
       runwayEnd: guide.runwayName,
       runwayHeadingTrue: guide.runwayHeadingDeg,
@@ -182,8 +189,10 @@ export function RunwayGuides({
     const applied = layOnto(guide)
     if (!applied) return
     setBusyId(guide.id)
+    const before = original ?? (shown ? { icao, runway: shown.runwayEnd, nm: shown.tocDistanceNm, bearing: shown.tocBearing, destination } : null)
     try {
       await onApply(applied.points, guide, applied.mode)
+      if (before && !original) setOriginal(before)
       setConfirmApply(null)
       setPreviewId(null)
       onPreview(null)
@@ -193,6 +202,13 @@ export function RunwayGuides({
     } finally {
       setBusyId(null)
     }
+  }
+
+  const restore = () => {
+    if (!onRestore()) return
+    setOriginal(null)
+    setPreviewId(null)
+    onPreview(null)
   }
 
   const remove = async (guide: StoredGuide) => {
@@ -216,17 +232,25 @@ export function RunwayGuides({
   const canSave = Boolean(planId && shown && shown.runwayEnd && shown.confidence === "high")
   const justSaved = shown && planId && savedFor === `${planId}:${shown.runwayEnd}:${shown.points.length}`
   const hasGuides = (guides?.length ?? 0) > 0
+  // A saved guide is the one the plan already flies: same runway, nearly the same bearing and distance to the top of climb.
+  const isInPlan = (guide: StoredGuide) =>
+    Boolean(
+      shown?.runwayEnd &&
+        guide.runwayName === shown.runwayEnd &&
+        Math.abs(((guide.tocBearingDeg - shown.tocBearing + 540) % 360) - 180) <= 2 &&
+        Math.abs(guide.tocDistanceNm - shown.tocDistanceNm) <= 0.5,
+    )
+  const planIsSaved = Boolean(justSaved) || (guides?.some(isInPlan) ?? false)
+  // "Your procedure" and its Save button only matter while the plan's departure is not saved yet and the pilot looks at its
+  // own runway. Once saved, or when another runway is picked, the list below carries the state (the saved one is marked).
+  const showYours = Boolean(shown) && !planIsSaved && (!target || !shown?.runwayEnd || shown.runwayEnd === target.name)
 
-  const pill = (runway: string) => (
-    <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums", toneOf(runway) ? TONE_CLASSES[toneOf(runway) as EndTone] : "bg-muted")}>
-      {runway}
-    </span>
-  )
+  const pill = (runway: string) => <span className="shrink-0 rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium tabular-nums">{runway}</span>
   const sides = SIDES.map((side, index) => ({ ...side, items: ranked.filter(({ guide }) => sideOf(guide.guide.tocBearingDeg) === index) })).filter((side) => side.items.length > 0)
 
   return (
     <div className={cn("text-xs", embedded ? "border-t" : "space-y-2 rounded-lg border px-3 py-2.5", className)}>
-      {shown && (
+      {showYours && shown && (
         <div className={cn("space-y-1.5", embedded && "px-3 py-2.5")}>
           <p className="text-muted-foreground">{copy.guides.yourProcedure}</p>
           <div className="flex items-center gap-2">
@@ -242,13 +266,13 @@ export function RunwayGuides({
             )}
             <button
               type="button"
-              disabled={!canSave || saving || Boolean(justSaved)}
+              disabled={!canSave || saving}
               onClick={save}
               title={!planId ? copy.guides.needsPlan : undefined}
               className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
-              {saving ? copy.guides.saving : justSaved ? copy.guides.saved : copy.guides.save}
+              {saving ? copy.guides.saving : copy.guides.save}
             </button>
           </div>
           {!planId && <p className="text-muted-foreground">{copy.guides.needsPlan}</p>}
@@ -259,15 +283,27 @@ export function RunwayGuides({
         <div className={cn("space-y-1 border-t", embedded ? "px-3 py-2.5" : "pt-2")}>
           <p className="text-muted-foreground">{`${copy.guides.suggested} ${target.name}`}</p>
           {ranked.length === 0 && <p className="text-muted-foreground">{copy.guides.noGuides}</p>}
+          {original && original.runway === target.name && (
+            <div className="flex items-center gap-2 rounded-md border px-2 py-1.5">
+              {pill(target.name)}
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium text-foreground">{guideLegText(original.nm, original.bearing)}</span>
+                <span className="text-muted-foreground">{` · ${copy.guides.original}${original.destination ? `, to ${original.destination}` : ""}`}</span>
+              </span>
+              <button type="button" onClick={restore} className="h-7 shrink-0 rounded-md border px-2 font-medium hover:bg-accent">
+                {copy.guides.restore}
+              </button>
+            </div>
+          )}
           {sides.map((side) => (
             <div key={side.key} className="space-y-1.5">
               <p className="pt-1.5 text-muted-foreground">{side.text}</p>
               {side.items.map(({ guide }) => {
                 const applied = layOnto(guide.guide)
                 const previewing = previewId === guide.id
-                const foreign = guide.guide.runwayName && guide.guide.runwayName !== target.name ? guide.guide.runwayName : null
+                const inPlan = isInPlan(guide.guide)
                 return (
-                  <div key={guide.id} className={cn("overflow-hidden rounded-md border", previewing && "border-primary")}>
+                  <div key={guide.id} className={cn("overflow-hidden rounded-md border", inPlan && "border-foreground/30 bg-muted/50", previewing && "border-primary")}>
                     <button
                       type="button"
                       aria-expanded={previewing}
@@ -276,7 +312,10 @@ export function RunwayGuides({
                     >
                       {pill(target.name)}
                       <span className="min-w-0 flex-1 truncate font-medium text-foreground">{guideLegText(guide.guide.tocDistanceNm, guide.guide.tocBearingDeg)}</span>
-                      {foreign && <span className="text-muted-foreground">{`${copy.guides.from} ${foreign}`}</span>}
+                      <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+                        {inPlan && <Check className="h-3 w-3 text-foreground" aria-label={copy.guides.inPlan} />}
+                        {guideDateText(guide.guide.createdAt)}
+                      </span>
                     </button>
                     {previewing && (
                       <div className="space-y-1.5 border-t px-2 py-1.5">

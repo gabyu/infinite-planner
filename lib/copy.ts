@@ -120,6 +120,10 @@ export const copy = {
     save: "Save procedure",
     saving: "Saving...",
     saved: "Saved",
+    inPlan: "In your plan", // aria-label of the check mark only
+    original: "Original", // PROVISIONAL
+    restore: "Restore", // PROVISIONAL
+    restoredToast: "Original procedure restored", // PROVISIONAL
     yourProcedure: "Your procedure",
     suggested: "Suggested procedures for",
     needsPlan: "Available once your plan is saved.",
@@ -151,6 +155,14 @@ export const copy = {
 export function replaceText(current: { runway: string | null; nm: number } | null, next: { runway: string | null; nm: number }) {
   const label = (p: { runway: string | null; nm: number }) => `${p.runway ?? "?"}, ${p.nm}\u00A0NM`
   return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.`
+}
+
+/** "2 Nov" for the day a saved procedure was created (the year only when it is not this year's). */
+export function guideDateText(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  const sameYear = date.getFullYear() === new Date().getFullYear()
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })
 }
 
 /** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
