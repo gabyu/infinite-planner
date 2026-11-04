@@ -57,14 +57,13 @@ pnpm test:<name>         # route-phases, runway-choice, runway-wind, weather, pr
 `PROD_ROLLOUT.local.md`, `PROD_MIGRATIONS*.local.sql`, `RELEASE_*.local.md` (per-feature release notes,
 useful history), `test-kml/`. Treat the `.local.md` files as sensitive.
 
-## Status (2026-11-02)
-Active. Branch `staging` was checked out with uncommitted work at the last backup: 3 edited files
-(`admin-tabs.tsx`, `airport-input.tsx`, `package.json`) and many **untracked, never-committed files**: the
-airport procedures feature (`lib/procedure-*.ts`, `app/api/admin/procedures`, `app/api/procedures-sync`,
-`components/admin/procedures/`, migration `20261024000000_airport_procedures.sql`), shared plans
-(`app/(planner)/shared`, `app/api/shared`, `lib/shared-plans.ts`, `components/share-dialog.tsx`), admin users/nav,
-FAQ, how-it-works and dev pages. These exist only in `~/Dev`, so ask Gab whether to commit them.
-The production rollout of accounts, dashboard and sharing was prepared
-2026-10-05 (see `PROD_ROLLOUT.local.md`); confirm with Gab how far it got before assuming anything is live.
+## Status (2026-11-04)
+Active. Branch `staging`: the procedures feature, shared plans, admin nav/users and the new pages were committed on
+2026-11-04 (not pushed yet). Runway tiles are small (wind detail only for the selected runway); the procedure list shows
+the picked runway only, with dates and a Restore for the original departure. Pending: `CHANGELOG.md` entry, apply migration
+`20261024000000_airport_procedures.sql` to staging then prod, approve the 3 PROVISIONAL strings in `lib/copy.ts`
+(`guides.original`, `restore`, `restoredToast`; they block production builds only), `public/images/zaidee.webp` is untracked and unreferenced.
+The production rollout of accounts, dashboard and sharing was prepared 2026-10-05 (see `PROD_ROLLOUT.local.md`); confirm
+with Gab how far it got before assuming anything is live.
 
 See also: [RESTORE.md](RESTORE.md).
