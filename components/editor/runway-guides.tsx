@@ -249,16 +249,16 @@ export function RunwayGuides({
   const sides = SIDES.map((side, index) => ({ ...side, items: ranked.filter(({ guide }) => sideOf(guide.guide.tocBearingDeg) === index) })).filter((side) => side.items.length > 0)
 
   return (
-    <div className={cn("text-xs", embedded ? "border-t" : "space-y-2 rounded-lg border px-3 py-2.5", className)}>
+    <div className={cn("text-xs", !embedded && "space-y-2 rounded-lg border px-3 py-2.5", className)}>
       {showYours && shown && (
-        <div className={cn("space-y-1.5", embedded && "px-3 py-2.5")}>
+        <div className={cn("space-y-1.5", embedded && "border-t px-3 py-2.5")}>
           <p className="text-muted-foreground">{copy.guides.yourProcedure}</p>
           <div className="flex items-center gap-2">
             {shown.runwayEnd ? (
               <>
                 {pill(shown.runwayEnd)}
                 <p className="min-w-0 flex-1 font-medium text-foreground">
-                  {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
+                  {copy.guides.departing} {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
                 </p>
               </>
             ) : (
@@ -297,7 +297,7 @@ export function RunwayGuides({
           )}
           {sides.map((side) => (
             <div key={side.key} className="space-y-1.5">
-              <p className="pt-1.5 text-muted-foreground">{side.text}</p>
+              <p className="pt-1.5 text-muted-foreground">{`${copy.guides.departing} ${side.text}`}</p>
               {side.items.map(({ guide }) => {
                 const applied = layOnto(guide.guide)
                 const previewing = previewId === guide.id
@@ -373,7 +373,7 @@ export function RunwayGuides({
           ))}
         </div>
       )}
-      {!target && hasGuides && <p className={cn("text-muted-foreground", embedded && "px-3 py-2.5")}>{copy.guides.tapRunway}</p>}
+      {!target && hasGuides && <p className={cn("text-muted-foreground", embedded && "border-t px-3 py-2.5")}>{copy.guides.tapRunway}</p>}
     </div>
   )
 }

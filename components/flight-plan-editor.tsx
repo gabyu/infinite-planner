@@ -1612,9 +1612,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   field?.focus({ preventScroll: true })
                 }, 80)
               }}
-              className="inline-flex h-6 items-center gap-1 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 font-medium text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200"
+              title="Add the flight number"
+              aria-label="Add the flight number"
+              className="inline-flex h-5 items-center gap-0.5 rounded border border-amber-500/50 bg-amber-500/10 px-1.5 font-mono text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200"
             >
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
+              <AlertTriangle className="h-3 w-3" aria-hidden />
               {copy.editor.addFlightNumber}
             </button>
           ) : (

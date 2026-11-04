@@ -32,7 +32,7 @@ export const copy = {
     tabArrival: "Arrival",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
-    addFlightNumber: "Enter Flight#", // PROVISIONAL
+    addFlightNumber: "#", // PROVISIONAL
     noFlightNumber: "No flight number",
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
@@ -130,6 +130,7 @@ export const copy = {
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
     tapRunway: "Confirm your runway", // PROVISIONAL
     noGuides: "No suggested procedures for this runway yet.",
+    departing: "Departing", // PROVISIONAL
     north: "North",
     east: "East",
     south: "South",

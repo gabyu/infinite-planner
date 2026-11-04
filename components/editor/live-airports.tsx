@@ -94,7 +94,7 @@ function RunwayTiles({
   if (runways.length === 0) return null
   return (
     <div className="space-y-1.5">
-    <div className="flex flex-wrap gap-1.5">
+    <div className="grid grid-cols-6 gap-1.5">
       {runways.map((runway) => {
         const chosen = choice?.runway === runway
         return (
@@ -105,7 +105,7 @@ function RunwayTiles({
             title={titles?.[runway]}
             onClick={() => onTap(runway)}
             className={cn(
-              "flex h-8 w-12 flex-none flex-col items-center justify-center rounded-md border px-1 text-center transition-colors",
+              "flex h-8 w-full flex-col items-center justify-center rounded-md border px-1 text-center transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               tones?.[runway] ? TONE_CLASSES[tones[runway]] : "bg-muted hover:bg-accent",
               chosen && "border-primary ring-1 ring-primary",
