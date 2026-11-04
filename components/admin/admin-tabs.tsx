@@ -8,6 +8,7 @@ const sections = [
   { href: "/admin-dashboard", label: "Activity" },
   { href: "/admin-dashboard/routes", label: "Routes" },
   { href: "/admin-dashboard/explore", label: "Explore" },
+  { href: "/admin-dashboard/procedures", label: "Procedures" },
   { href: "/admin-dashboard/contributors", label: "Contributors" },
   { href: "/admin-dashboard/admins", label: "Admins" },
   { href: "/admin-dashboard/settings", label: "Settings" },
