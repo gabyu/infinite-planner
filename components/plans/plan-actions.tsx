@@ -201,8 +201,6 @@ export function PlanActions({ publicId, path, initial, origin, destination, flig
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
-      <p className="mt-3 text-xs text-muted-foreground">{legalCopy.simulationOnly}</p>
-
       <p className="mt-2 text-sm text-muted-foreground">
         {stats.downloadCount} download{stats.downloadCount === 1 ? "" : "s"} · {stats.importCount} import
         {stats.importCount === 1 ? "" : "s"} · {stats.likeCount} like{stats.likeCount === 1 ? "" : "s"}

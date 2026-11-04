@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronDown,
   HelpCircle,
+  AlertTriangle,
   LassoSelect,
   AlertCircle,
   Info,
@@ -199,6 +200,18 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   }, [curveSegments])
   const isTouchPrimary = useIsTouchPrimary()
   const [simplificationInfo, setSimplificationInfo] = useState<SimplificationInfo | null>(null)
+  // The notices are passing messages: they fade out, then go, together with the "imported" line beside them.
+  const [fadingOut, setFadingOut] = useState(false)
+  useEffect(() => {
+    if (!simplificationInfo) return
+    setFadingOut(false)
+    const fade = window.setTimeout(() => setFadingOut(true), 6500)
+    const gone = window.setTimeout(() => setSimplificationInfo(null), 7000)
+    return () => {
+      window.clearTimeout(fade)
+      window.clearTimeout(gone)
+    }
+  }, [simplificationInfo])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -332,13 +345,19 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     return () => clearTimeout(timeout)
   }, [mode, waypoints, originAirport, destinationAirport])
 
-  // Clear success message after 5 seconds
+  // Clear success message after 5 seconds, fading out first
+  const [successFading, setSuccessFading] = useState(false)
   useEffect(() => {
     if (successMessage) {
+      setSuccessFading(false)
+      const fade = setTimeout(() => setSuccessFading(true), 4500)
       const timer = setTimeout(() => {
         setSuccessMessage(null)
       }, 5000)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(fade)
+        clearTimeout(timer)
+      }
     }
   }, [successMessage])
 
@@ -1593,8 +1612,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   field?.focus({ preventScroll: true })
                 }, 80)
               }}
-              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-amber-500/50 bg-amber-500/10 px-2 font-medium text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200"
             >
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
               {copy.editor.addFlightNumber}
             </button>
           ) : (
@@ -1649,7 +1669,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           Export FPL
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">{legalCopy.simulationOnly}</p>
       {libraryOpen && (
         <div>
           <VisibilitySwitch
@@ -1949,13 +1968,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         </p>
                       )}
                       {successMessage && (
-                        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <p className={cn("flex items-start gap-1.5 text-xs text-muted-foreground transition-opacity duration-500", successFading && "opacity-0")}>
                           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                           {successMessage}
                         </p>
                       )}
                       {simplificationInfo && (
-                        <details className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+                        <details className={cn("rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition-opacity duration-500", fadingOut && "opacity-0")}>
                           <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
                             <Info className="h-3.5 w-3.5 text-primary" />
                             Waypoint simplification applied

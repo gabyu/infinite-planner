@@ -32,7 +32,7 @@ export const copy = {
     tabArrival: "Arrival",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
-    addFlightNumber: "Add a flight number",
+    addFlightNumber: "Enter Flight#", // PROVISIONAL
     noFlightNumber: "No flight number",
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
@@ -98,10 +98,10 @@ export const copy = {
     runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.",
     showText: "Show the ATIS text",
     hideText: "Hide the ATIS text",
-    runwayTap: "Tap the runway you'll use.",
+    runwayTap: "Tap a runway.", // PROVISIONAL
     runwayFromAtis: "From the ATIS.",
     runwayYours: "Your choice.",
-    runwayYoursNotInAtis: "Your choice. Not in the ATIS now.",
+    runwayYoursNotInAtis: "Not in the ATIS now.",
     noAtisShort: "No ATIS",
     runwayIntoWind: "Into the wind.",
     bestHeadwind: "Best headwind:",
@@ -128,7 +128,7 @@ export const copy = {
     suggested: "Suggested procedures for",
     needsPlan: "Available once your plan is saved.",
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
-    tapRunway: "Pick a runway above to see suggested procedures for it.",
+    tapRunway: "Confirm your runway", // PROVISIONAL
     noGuides: "No suggested procedures for this runway yet.",
     north: "North",
     east: "East",
@@ -231,8 +231,6 @@ export const legalCopy = {
   publishOnlyOwnDesigns: "Flight plans converted from FlightRadar24 or FlightAware files can't be published.",
   // A plan an admin took off Explore: the owner sees this, never a reason.
   planNotAvailable: "This flight plan isn't available on Explore right now.",
-  // Short tag beside a view or a download of a plan.
-  simulationOnly: "Simulation only: not the published procedure",
   // The publish dialog, the same from every place a plan can be published. Imported plans add the checkbox.
   // Bump the version in DECLARATION_WORDING_KEY below whenever the title, body or checkbox wording changes.
   declarationTitle: "Do you have the right to share this flight plan?",

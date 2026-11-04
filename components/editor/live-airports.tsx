@@ -105,7 +105,7 @@ function RunwayTiles({
             title={titles?.[runway]}
             onClick={() => onTap(runway)}
             className={cn(
-              "flex h-8 min-w-[2.75rem] max-w-[4rem] flex-1 basis-[2.75rem] flex-col items-center justify-center rounded-md border px-1 text-center transition-colors",
+              "flex h-8 w-12 flex-none flex-col items-center justify-center rounded-md border px-1 text-center transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               tones?.[runway] ? TONE_CLASSES[tones[runway]] : "bg-muted hover:bg-accent",
               chosen && "border-primary ring-1 ring-primary",
@@ -185,10 +185,10 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
       : choice.by === "atis"
         ? copy.live.runwayFromAtis
         : choice.inAtis
-          ? copy.live.runwayYours
+          ? null
           : copy.live.runwayYoursNotInAtis
     : choice?.by === "hand"
-      ? copy.live.runwayYours
+      ? null
       : choice?.by === "wind"
         ? copy.live.runwayIntoWind
         : weather && weather.ranked.length > 0
