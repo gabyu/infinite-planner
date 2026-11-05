@@ -268,27 +268,27 @@ export const legalCopy = {
 
 /** Partner imports (/import): the banner in the editor and the error pages. Not public copy about partnerships. */
 export const partnerImportCopy = {
-  idLabel: "AeroHub ID", // PROVISIONAL
-  viewOnPartner: "View on AeroHub Radar", // PROVISIONAL
-  backToPartner: "Back to AeroHub Radar", // PROVISIONAL
-  errorPageTitle: "Import", // PROVISIONAL
-  unknownPartnerTitle: "This import link isn't available", // PROVISIONAL
-  unknownPartnerBody: "The source in this link is unknown or turned off.", // PROVISIONAL
-  invalidUrlTitle: "This import link isn't valid", // PROVISIONAL
-  invalidUrlBody: "The file address in the link isn't one we can open. Try again from AeroHub Radar.", // PROVISIONAL
-  expiredTitle: "This link has expired", // PROVISIONAL
-  expiredBody: "Click 'Open in Infinite Planner' again on AeroHub Radar.", // PROVISIONAL
-  unreachableTitle: "AeroHub Radar didn't answer", // PROVISIONAL
-  unreachableBody: "The file couldn't be fetched in time. Try again in a moment.", // PROVISIONAL
-  badFileTitle: "This file can't be imported", // PROVISIONAL
-  badFileBody: "It is too large or isn't a KML file. Try again from AeroHub Radar.", // PROVISIONAL
-  invalidKmlTitle: "This KML file isn't valid", // PROVISIONAL
-  invalidKmlBody: "The route in the file couldn't be read. Try again from AeroHub Radar.", // PROVISIONAL
-  invalidAirportsTitle: "Departure or arrival is missing", // PROVISIONAL
-  invalidAirportsBody: "The file needs a known departure and arrival airport to be imported. Nothing was imported.", // PROVISIONAL
-  tooManyTitle: "Too many requests", // PROVISIONAL
-  tooManyBody: "Wait a minute, then try again.", // PROVISIONAL
-  goHome: "Go to Infinite Planner", // PROVISIONAL
+  idLabel: "AeroHub ID",
+  viewOnPartner: "View on AeroHub Radar",
+  backToPartner: "Back to AeroHub Radar",
+  errorPageTitle: "Import",
+  unknownPartnerTitle: "This import link isn't available",
+  unknownPartnerBody: "The source in this link is unknown or turned off.",
+  invalidUrlTitle: "This import link isn't valid",
+  invalidUrlBody: "The file address in the link isn't one we can open. Try again from AeroHub Radar.",
+  expiredTitle: "This link has expired",
+  expiredBody: "Click 'Open in Infinite Planner' again on AeroHub Radar.",
+  unreachableTitle: "AeroHub Radar didn't answer",
+  unreachableBody: "The file couldn't be fetched in time. Try again in a moment.",
+  badFileTitle: "This file can't be imported",
+  badFileBody: "It is too large or isn't a KML file. Try again from AeroHub Radar.",
+  invalidKmlTitle: "This KML file isn't valid",
+  invalidKmlBody: "The route in the file couldn't be read. Try again from AeroHub Radar.",
+  invalidAirportsTitle: "Departure or arrival is missing",
+  invalidAirportsBody: "The file needs a known departure and arrival airport to be imported. Nothing was imported.",
+  tooManyTitle: "Too many requests",
+  tooManyBody: "Wait a minute, then try again.",
+  goHome: "Go to Infinite Planner",
 } as const
 
 /** What is stored with each declaration instead of its text: the checkbox key and the version of its wording. */
