@@ -247,8 +247,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           {progress ? `Reading ${progress.done} of ${progress.total}…` : "Import Flight Plans"}
         </Button>
-        <span className="min-w-0 flex-1 text-sm text-muted-foreground">Drop .kml files or a folder here.</span>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm">
           <input type="checkbox" className="accent-primary" checked={marking} onChange={(e) => setMarking(e.target.checked)} /> Mark directions not needed
         </label>
       </div>
