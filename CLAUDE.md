@@ -78,7 +78,7 @@ as the `preloaded` prop. Nothing public about the partnership: no changelog entr
 useful history), `test-kml/`. Treat the `.local.md` files as sensitive.
 
 ## Status (2026-11-06)
-Branch `feature/aerohub-import`: the AeroHub `/import` flow is implemented and verified locally (not pushed, migration not applied anywhere).
+Branch `feature/aerohub-import`: the AeroHub `/import` flow is implemented and verified locally (PR #2 to staging; migration applied by Gab; partner URLs confirmed).
 The `partnerImportCopy` strings in `lib/copy.ts` were approved by Gab on 2026-11-06. Earlier status (2026-11-04):
 Active. Branch `staging`: the procedures feature, shared plans, admin nav/users and the new pages were committed on
 2026-11-04 (not pushed yet). Runway tiles are small (wind detail only for the selected runway); the procedure list shows
