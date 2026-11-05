@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { resolveBasemap, setBasemap } from "@/lib/map-tiles"
+import { altitudeBucket } from "@/lib/route-render"
 import type { FlightAnalysis, FlightGroup } from "@/lib/procedure-analysis"
-import { useImportDraft } from "@/components/admin/procedures/import-draft"
 
 // Every analysed flight of an airport drawn on a map, coloured by its group, with the runway, direction and profile of each.
 // Read-only apart from removing a flight; merging groups and consensus paths come later.
@@ -30,18 +30,21 @@ interface Props {
   after?: ReactNode
 }
 
-// One procedure drawn over the flights: a thick line through its points, each point with its altitude. Replaces the previous one.
-function drawPreview(L: any, map: any, preview: Props["preview"], dark: boolean, layer: { current: any }) {
+// One procedure drawn over the flights, like the route in the plan editor: a fine line coloured by altitude (cyan to violet), with a
+// small dot and a tooltip (number and altitude) at each point. Replaces the previous one.
+function drawPreview(L: any, map: any, preview: Props["preview"], _dark: boolean, layer: { current: any }) {
   layer.current?.remove()
   layer.current = null
   if (!preview || preview.points.length < 2) return
-  const color = dark ? "#fbbf24" : "#d97706"
   const group = L.featureGroup()
-  const line = L.polyline(preview.points.map((p) => [p.lat, p.lng]), { color, weight: 5, opacity: 0.95 }).addTo(group)
-  line.bindTooltip(preview.label, { sticky: true })
+  for (let i = 1; i < preview.points.length; i++) {
+    const a = preview.points[i - 1]
+    const b = preview.points[i]
+    L.polyline([[a.lat, a.lng], [b.lat, b.lng]], { className: `alt-${altitudeBucket((a.altitude + b.altitude) / 2)}`, weight: 2.5, interactive: false }).addTo(group)
+  }
   preview.points.forEach((p, i) => {
-    L.circleMarker([p.lat, p.lng], { radius: i === 0 ? 5 : 3.5, color, fillColor: dark ? "#0f172a" : "#fff", fillOpacity: 1, weight: 2 })
-      .bindTooltip(`${i + 1} · ${Math.round(p.altitude).toLocaleString("en-US")} ft`)
+    L.circleMarker([p.lat, p.lng], { radius: 3, className: `alt-${altitudeBucket(p.altitude)}`, weight: 1.5, fillOpacity: 1, fillColor: "#fff" })
+      .bindTooltip(`${i + 1} · ${Math.round(p.altitude).toLocaleString("en-US")} ft · ${preview.label}`)
       .addTo(group)
   })
   group.addTo(map)
@@ -56,11 +59,6 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
   const previewRef = useRef(preview)
   previewRef.current = preview
   const isolated = preview !== null
-  const { pending, hoverId } = useImportDraft()
-  const pendingLayers = useRef<Map<string, any>>(new Map())
-  const pendingCount = useRef(0)
-  // Bumped when the map has been built, so what is drawn over it (a review in progress) is drawn again after an airport switch.
-  const [mapReady, setMapReady] = useState(0)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [runwayFilter, setRunwayFilter] = useState<string>("all")
   const [hover, setHover] = useState<string | null>(null)
@@ -105,50 +103,14 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
       if (all.length) map.fitBounds(all, { padding: [30, 30] })
       ;(window as any).__procMap = map
       drawPreview(L, map, previewRef.current, dark, previewLayer)
-      setMapReady((n) => n + 1)
     })()
     return () => {
       cancelled = true
       layers.current.clear()
-      pendingLayers.current.clear()
       previewLayer.current = null
       map?.remove()
     }
   }, [center, dark, flights, groupOf, icao, runways])
-
-  // The procedures of an import being reviewed, in teal over everything else; the one under the pointer in the list is thicker.
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      // @ts-ignore leaflet ships no types in this project
-      const L = (await import("leaflet")).default
-      const map = (window as any).__procMap
-      if (cancelled || !map) return
-      pendingLayers.current.forEach((layer) => layer.remove())
-      pendingLayers.current.clear()
-      if (isolated) return
-      const color = dark ? "#2dd4bf" : "#0d9488"
-      const shown = pending.filter((row) => row.airport === icao && row.kind !== "unknown" && row.include && row.track.length >= 2)
-      shown.forEach((row) => {
-        const line = L.polyline(row.track.map((p) => [p[0], p[1]]), {
-          color,
-          weight: hoverId === row.id ? 6 : 3.5,
-          opacity: hoverId && hoverId !== row.id ? 0.45 : 0.95,
-          dashArray: row.kind === "departure" ? "6 5" : undefined,
-        }).addTo(map)
-        line.bindTooltip(`New · ${row.route} · ${row.kind} ${row.runway ?? "?"}`)
-        pendingLayers.current.set(row.id, line)
-      })
-      // New procedures arrived (or left): frame them all.
-      if (shown.length !== pendingCount.current) {
-        pendingCount.current = shown.length
-        if (shown.length > 0) map.fitBounds(L.featureGroup(Array.from(pendingLayers.current.values())).getBounds(), { padding: [40, 40], maxZoom: 11 })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [pending, hoverId, icao, dark, isolated, flights, mapReady])
 
   // The previewed procedure changes without rebuilding the map.
   const previewId = preview?.id ?? null
@@ -176,7 +138,7 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
       const map = layer._map ?? (window as any).__procMap
       if (show && !layer._map && map) layer.addTo(map)
       if (!show && layer._map) layer.remove()
-      layer.setStyle?.({ weight: hover === f.file ? 5 : 2.5, opacity: hover && hover !== f.file ? 0.35 : 0.85 })
+      layer.setStyle?.({ weight: 2.5, opacity: hover && hover !== f.file ? 0.3 : hover === f.file ? 1 : 0.85 })
     })
   }, [hidden, runwayFilter, hover, flights, groupOf, shownKinds, dark, isolated])
 

@@ -1,4 +1,3 @@
-import { ImportDraftProvider } from "@/components/admin/procedures/import-draft"
 import { AirportList } from "@/components/admin/procedures/airport-list"
 import { AirportPicker } from "@/components/admin/procedures/airport-picker"
 import { CoveragePanel } from "@/components/admin/procedures/coverage-panel"
@@ -80,7 +79,7 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
   const members = <MemberGuides guides={memberGuides} airport={icao} previewId={preview?.id ?? null} />
 
   return (
-    <ImportDraftProvider>
+    <>
       <PageHeader
         title="Procedures"
         description="How real flights arrive at and leave each airport, what is still missing, and the progress. Visible to admins only."
@@ -117,6 +116,6 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
           {members}
         </div>
       )}
-    </ImportDraftProvider>
+    </>
   )
 }

@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation"
 import { Check, Loader2, Plus, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { doneKey, OCTANTS, type Coverage, type CoverageKind, type KindProgress } from "@/lib/procedure-coverage"
-import { ImportReview } from "@/components/admin/procedures/import-review"
-import { useImportDraft, type PendingRow } from "@/components/admin/procedures/import-draft"
+import { ImportWizard, type PendingRow } from "@/components/admin/procedures/import-wizard"
 import { cn } from "@/lib/utils"
 
 // What an airport has and what it still lacks, its progress, and a way to add flight files. Each cell is one direction on one
@@ -55,8 +54,9 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [marking, setMarking] = useState(false)
-  const { setPending } = useImportDraft()
-  // Files that could not be read (the ones that could are in the review below).
+  // The procedures read from the files, being reviewed one screen at a time (nothing is saved before the last screen).
+  const [draft, setDraft] = useState<PendingRow[] | null>(null)
+  // Files that could not be read.
   const [results, setResults] = useState<AnalyzeResult[]>([])
   const [dragging, setDragging] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
@@ -75,7 +75,6 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
     setProgress({ done: 0, total: kml.length })
 
     // Batches: up to 8 files and 3.5 MB each, so one bad file never stops the rest.
-    setPending([])
     const batches: File[][] = []
     let current: File[] = []
     let bytes = 0
@@ -91,6 +90,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
     if (current.length > 0) batches.push(current)
 
     let done = tooLarge.length
+    const collected: PendingRow[] = []
     for (const batch of batches) {
       const form = new FormData()
       batch.forEach((f) => form.append("file", f))
@@ -103,9 +103,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
         const fresh: PendingRow[] = got.flatMap((r, index) =>
           (r.ok ? r.rows ?? [] : []).map((row, n) => ({ ...row, id: `${Date.now()}-${done}-${index}-${n}`, file: r.original, include: row.kind !== "unknown" })),
         )
-        if (fresh.length > 0) {
-          setPending((current) => [...current, ...fresh.filter((row) => !current.some((c) => c.airport === row.airport && c.content_hash === row.content_hash))])
-        }
+        collected.push(...fresh.filter((row) => !collected.some((c) => c.airport === row.airport && c.content_hash === row.content_hash)))
       } catch {
         all.push(...batch.map((f) => ({ ok: false, original: f.name, error: "Upload failed." })))
       }
@@ -116,6 +114,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
     setBusy(false)
     setProgress(null)
     if (input.current) input.current.value = ""
+    if (collected.length > 0) setDraft(collected)
   }
 
   async function mark(key: string, on: boolean) {
@@ -254,7 +253,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
         </label>
       </div>
 
-      <ImportReview />
+      {draft && <ImportWizard rows={draft} onClose={() => setDraft(null)} onSaved={() => router.refresh()} />}
 
       {results.length > 0 && (
         <div className="mt-3 text-sm" aria-live="polite">
