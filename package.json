@@ -20,6 +20,9 @@
     "test:aircraft": "esbuild scripts/test-aircraft.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:runway-guide": "esbuild scripts/test-runway-guide.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:procedures": "esbuild scripts/test-procedures.ts --bundle --platform=node --format=cjs --alias:@=. --conditions=react-server | node",
+    "test:aerohub-parser": "esbuild scripts/test-aerohub-parser.ts --bundle --platform=node --format=cjs --alias:@=. --conditions=react-server | node",
+    "test:partner-url": "esbuild scripts/test-partner-url.ts --bundle --platform=node --format=cjs --alias:@=. --conditions=react-server | node",
+    "test:import-fetch": "esbuild scripts/test-import-fetch.ts --bundle --platform=node --format=cjs --alias:@=. --conditions=react-server | node",
     "analyze:procedures": "esbuild scripts/analyze-procedures.ts --bundle --platform=node --format=cjs --alias:@=. --outfile=/tmp/analyze-procedures.cjs --log-level=error && node /tmp/analyze-procedures.cjs"
   },
   "dependencies": {

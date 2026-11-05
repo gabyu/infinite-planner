@@ -23,6 +23,8 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
+import { PartnerBanner } from "@/components/import/partner-banner"
+import type { PreloadedImport } from "@/lib/partners/preloaded"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { saveFplInBrowser } from "@/lib/fpl-download"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
@@ -187,9 +189,11 @@ interface FlightPlanEditorProps {
   // /sketch (draw from scratch). The chooser between the two now lives on
   // the homepage, not inside this component.
   initialMode: "import" | "draw"
+  // A plan fetched and parsed on the server for a partner link (/import): loaded once, as after a normal KML import.
+  preloaded?: PreloadedImport
 }
 
-export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
+export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorProps) {
   const mode = initialMode
   const [waypoints, setWaypoints, waypointsHistory] = useHistoryState<Waypoint[]>([])
   const [curveSegments, setCurveSegments] = useState<CurveSegment[]>([])
@@ -468,45 +472,54 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     }
   }
 
+  // What happens once a KML has been parsed (a picked file, or a partner link): fills the editor and starts the draft.
+  const applyParsedImport = (result: ReturnType<typeof parseKML>, origin: string, destination: string) => {
+    if (result.waypoints.length === 0) {
+      setError("No valid waypoints found in the KML file. Please check the file format.")
+    } else {
+      const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding)
+      setWaypoints(renamedWaypoints)
+      // A new import is a new plan: it must not overwrite the one saved from the previous import.
+      resetSavedPlan()
+      setFlightNumberOverride(null)
+      setFlightNumberEdit(undefined)
+      setExtraFlightNumbers([])
+      setAircraft("")
+      setDepartureRunway(null)
+      setArrivalRunway(null)
+      setImportSource(
+        result.source === "FlightAware" ||
+          result.source === "FlightRadar24" ||
+          result.source === "AeroHub" ||
+          result.source === "Imported"
+          ? result.source
+          : null,
+      )
+      setSimplificationInfo({
+        originalCount: result.originalCount,
+        simplifiedCount: result.simplifiedCount,
+        reason: result.simplificationReason,
+        source: result.source === "Imported" ? undefined : result.source,
+      })
+
+      // Set hasImported to true to reveal the rest of the UI (the workspace: map first, panel beside it)
+      setHasImported(true)
+      // The draft starts saving right away: there is no map to close any more.
+      setDraftArmed(true)
+
+      setSuccessMessage(
+        `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source && result.source !== "Imported" ? result.source : "KML file"}`,
+      )
+    }
+  }
+
   // Separate function to process the KML file
   const processKMLFile = async (file: File, fileName: string, origin: string, destination: string) => {
     try {
       const text = await file.text()
 
       const result = parseKML(text, file.name, origin, destination)
-
-      if (result.waypoints.length === 0) {
-        setError("No valid waypoints found in the KML file. Please check the file format.")
-      } else {
-        const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding)
-        setWaypoints(renamedWaypoints)
-        // A new import is a new plan: it must not overwrite the one saved from the previous import.
-        resetSavedPlan()
-        setFlightNumberOverride(null)
-        setFlightNumberEdit(undefined)
-        setExtraFlightNumbers([])
-        setAircraft("")
-        setDepartureRunway(null)
-        setArrivalRunway(null)
-        setImportSource(
-          result.source === "FlightAware" || result.source === "FlightRadar24" || result.source === "Imported" ? result.source : null,
-        )
-        setSimplificationInfo({
-          originalCount: result.originalCount,
-          simplifiedCount: result.simplifiedCount,
-          reason: result.simplificationReason,
-          source: result.source === "Imported" ? undefined : result.source,
-        })
-
-        // Set hasImported to true to reveal the rest of the UI (the workspace: map first, panel beside it)
-        setHasImported(true)
-        // The draft starts saving right away: there is no map to close any more.
-        setDraftArmed(true)
-
-        setSuccessMessage(
-          `Successfully imported ${renamedWaypoints.length} waypoints from ${result.source && result.source !== "Imported" ? result.source : "KML file"}`,
-        )
-      }
+      applyParsedImport(result, origin, destination)
     } catch (error) {
       console.error("Error importing KML file:", error)
       setError(`Error importing KML file: ${error instanceof Error ? error.message : String(error)}`)
@@ -514,6 +527,18 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       setIsLoading(false)
     }
   }
+
+  // A partner link (/import) arrives with its route already parsed: load it once, then drop the signed link from the address bar.
+  const preloadedAppliedRef = useRef(false)
+  useEffect(() => {
+    if (!preloaded || preloadedAppliedRef.current) return
+    preloadedAppliedRef.current = true
+    setOriginAirport(preloaded.origin)
+    setDestinationToAirport(preloaded.destination)
+    applyParsedImport(preloaded.route, preloaded.origin, preloaded.destination)
+    window.history.replaceState(null, "", "/convert")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preloaded])
 
   // Handle TXT file import for waypoint names
   const handleTxtImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -860,7 +885,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         if (mode === "import") {
           setHasImported(true)
           setImportSource(
-            body.source === "FlightAware" || body.source === "FlightRadar24" || body.source === "Imported" ? body.source : null,
+            body.source === "FlightAware" || body.source === "FlightRadar24" || body.source === "AeroHub" || body.source === "Imported"
+              ? body.source
+              : null,
           )
           setFlightNumberOverride(body.flight_number ?? null)
           setExtraFlightNumbers(Array.isArray(body.extra_flight_numbers) ? body.extra_flight_numbers : [])
@@ -895,6 +922,12 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       const fileName = fplFileName(originAirport, destinationAirport)
       saveFplInBrowser(fplContent, fileName)
       setExportedFingerprint(currentFingerprint)
+      if (preloaded) {
+        // Lets the server log that this partner import ended in a download (no personal data, just the import id).
+        try {
+          navigator.sendBeacon("/api/import/event", JSON.stringify({ partner: preloaded.partnerId, importId: preloaded.importId }))
+        } catch {}
+      }
 
       // The import flow already records flight_number/origin/destination via
       // saveFlightData() at import time (lib/kml-parser.ts), which is both
@@ -2038,6 +2071,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   {flightSummary}
                 </div>
               </div>
+              {preloaded && <PartnerBanner banner={preloaded.banner} />}
               {/* On a phone there is no bar under the map, so the figures stay here */}
               {isMobile && (
                 <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1">

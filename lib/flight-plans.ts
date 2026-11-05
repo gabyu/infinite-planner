@@ -1,10 +1,10 @@
 // Shared (client + server) types and helpers for saved flight plans.
 // The table and its access rules: supabase/migrations/20261003000000_flight_plans.sql.
 
-export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "Sketch", "Imported"] as const
+export const FLIGHT_PLAN_SOURCES = ["FlightRadar24", "FlightAware", "AeroHub", "Sketch", "Imported"] as const
 export type FlightPlanSource = (typeof FLIGHT_PLAN_SOURCES)[number]
 
-// A plan can be published unless it is recognised as coming from a FlightRadar24 or FlightAware export: plans designed
+// A plan can be published unless it is recognised as coming from a tracker export (FlightRadar24, FlightAware, AeroHub Radar): plans designed
 // here ('Sketch') and plans imported from any other source ('Imported', with a declaration) can. This mirrors the database setting
 // app_settings.shareable_sources, which is the authority: the server refuses everything else whatever this says.
 // This constant only decides what the interface offers.
@@ -104,12 +104,12 @@ export function formatFlightTime(minutes: number | null | undefined): string | n
 }
 
 export function sourceLabel(source: FlightPlanSource): string {
-  return source === "Sketch" ? "Route Sketch" : source === "Imported" ? "Imported file" : source
+  return source === "Sketch" ? "Route Sketch" : source === "Imported" ? "Imported file" : source === "AeroHub" ? "AeroHub Radar" : source
 }
 
 /** The short tag for the dashboard row: "FR24", "FA", "Sketch", "File". `sourceLabel` is the full name (its tooltip). */
 export function sourceShort(source: FlightPlanSource): string {
-  return source === "FlightRadar24" ? "FR24" : source === "FlightAware" ? "FA" : source === "Imported" ? "File" : "Sketch"
+  return source === "FlightRadar24" ? "FR24" : source === "FlightAware" ? "FA" : source === "AeroHub" ? "AeroHub" : source === "Imported" ? "File" : "Sketch"
 }
 
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.
