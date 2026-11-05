@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Check, Loader2, Plus, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { doneKey, OCTANTS, type Coverage, type CoverageKind, type KindProgress } from "@/lib/procedure-coverage"
+import { ImportWizard, type PendingRow } from "@/components/admin/procedures/import-wizard"
 import { cn } from "@/lib/utils"
 
 // What an airport has and what it still lacks, its progress, and a way to add flight files. Each cell is one direction on one
@@ -15,12 +16,12 @@ interface Props {
   coverage: Coverage
 }
 
-interface UploadResult {
+interface AnalyzeResult {
   ok: boolean
   original: string
   error?: string
-  name?: string
-  placed?: { airport: string; kind: string; runway: string | null }[]
+  route?: string
+  rows?: Omit<PendingRow, "id" | "file" | "include" | "status">[]
   checks?: string[]
 }
 
@@ -52,8 +53,10 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
-  const [marking, setMarking] = useState(false)
-  const [results, setResults] = useState<UploadResult[]>([])
+  // The procedures read from the files, being reviewed one screen at a time (nothing is saved before the last screen).
+  const [draft, setDraft] = useState<PendingRow[] | null>(null)
+  // Files that could not be read.
+  const [results, setResults] = useState<AnalyzeResult[]>([])
   const [dragging, setDragging] = useState(false)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
 
@@ -65,7 +68,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
     }
     const tooLarge = kml.filter((f) => f.size > BATCH_BYTES)
     const list = kml.filter((f) => f.size <= BATCH_BYTES)
-    const all: UploadResult[] = tooLarge.map((f) => ({ ok: false, original: f.name, error: "The file is too large to upload (limit 3.5 MB)." }))
+    const all: AnalyzeResult[] = tooLarge.map((f) => ({ ok: false, original: f.name, error: "The file is too large to upload (limit 3.5 MB)." }))
     setBusy(true)
     setResults(all)
     setProgress({ done: 0, total: kml.length })
@@ -86,13 +89,20 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
     if (current.length > 0) batches.push(current)
 
     let done = tooLarge.length
+    const collected: PendingRow[] = []
     for (const batch of batches) {
       const form = new FormData()
       batch.forEach((f) => form.append("file", f))
       try {
-        const response = await fetch("/api/admin/procedures/upload", { method: "POST", body: form })
-        const body = (await response.json().catch(() => null)) as { results?: UploadResult[]; error?: string } | null
-        all.push(...(body?.results ?? batch.map((f) => ({ ok: false, original: f.name, error: body?.error ?? "Upload failed." }))))
+        const response = await fetch("/api/admin/procedures/analyze", { method: "POST", body: form })
+        const body = (await response.json().catch(() => null)) as { results?: AnalyzeResult[]; error?: string } | null
+        const got = body?.results ?? batch.map((f) => ({ ok: false, original: f.name, error: body?.error ?? "Upload failed." }))
+        all.push(...got.filter((r) => !r.ok))
+        // What each readable file holds goes to the review, not to the database: nothing is saved until the admin confirms.
+        const fresh: PendingRow[] = got.flatMap((r, index) =>
+          (r.ok ? r.rows ?? [] : []).map((row, n) => ({ ...row, id: `${Date.now()}-${done}-${index}-${n}`, file: r.original, include: row.kind !== "unknown" })),
+        )
+        collected.push(...fresh.filter((row) => !collected.some((c) => c.airport === row.airport && c.content_hash === row.content_hash)))
       } catch {
         all.push(...batch.map((f) => ({ ok: false, original: f.name, error: "Upload failed." })))
       }
@@ -100,10 +110,10 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
       setProgress({ done, total: kml.length })
       setResults([...all])
     }
-    router.refresh()
     setBusy(false)
     setProgress(null)
     if (input.current) input.current.value = ""
+    if (collected.length > 0) setDraft(collected)
   }
 
   async function mark(key: string, on: boolean) {
@@ -112,11 +122,9 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
   }
 
   const gaps = coverage.needed - coverage.covered
-  const added = results.filter((r) => r.ok).length
-  const refused = results.length - added
 
   return (
-    <section aria-label={`${icao} coverage`} className="mb-6 rounded-lg border bg-card p-4">
+    <section aria-label={`${icao} coverage`} className="rounded-lg border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold">
@@ -185,25 +193,28 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
                       </td>
                     )
                   if (cell.notNeeded)
+                    // Empty directions of a kind marked "done" are n/a and only follow that mark. A single direction marked n/a
+                    // before this was removed can still be clicked to count again.
                     return (
                       <td key={cell.key}>
-                        <button
-                          type="button"
-                          onClick={() => marking && mark(cell.key, false)}
-                          className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")}
-                          title={marking ? "Needed again" : "Not needed"}
-                        >
-                          n/a
-                        </button>
+                        {coverage[row.kind].done ? (
+                          <div className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")} title="Not needed">
+                            n/a
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => mark(cell.key, false)} className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")} title="Not needed. Click to count it again">
+                            n/a
+                          </button>
+                        )}
                       </td>
                     )
                   return (
                     <td key={cell.key}>
                       <button
                         type="button"
-                        onClick={() => (marking ? mark(cell.key, true) : input.current?.click())}
-                        className={cn(base, "border-dashed text-muted-foreground transition-colors hover:bg-accent", marking && "border-amber-500")}
-                        title={marking ? "Mark not needed" : `Missing: ${row.kind} ${row.family} from ${cell.octant}. Add a file.`}
+                        onClick={() => input.current?.click()}
+                        className={cn(base, "border-dashed text-muted-foreground transition-colors hover:bg-accent")}
+                        title={`Missing: ${row.kind} ${row.family} from ${cell.octant}. Add a file.`}
                       >
                         <Plus className="h-3 w-3" aria-hidden />
                         <span className="sr-only">Missing: {row.kind} {row.family} from {cell.octant}</span>
@@ -217,7 +228,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
         </table>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Arrival: where the flight came in from at 40 NM. Departure: where it was heading at the top of climb. Parallel runways (08L, 08R) count as one.
+        Arrival: where the flight came in from at 40 NM. Departure: where it was heading at the top of climb.
       </p>
 
       <div
@@ -236,37 +247,20 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
         <input ref={input} type="file" accept=".kml" multiple hidden onChange={(e) => e.target.files && void upload(e.target.files)} />
         <Button type="button" size="sm" variant="outline" onClick={() => input.current?.click()} disabled={busy}>
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          {progress ? `Adding ${progress.done} of ${progress.total}…` : "Add flight files"}
+          {progress ? `Reading ${progress.done} of ${progress.total}…` : "Import Flight Plans"}
         </Button>
-        <span className="min-w-0 flex-1 text-sm text-muted-foreground">
-          Select as many .kml files as you like, or drop files or a whole folder here. A flight fills both of its airports.
-        </span>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" className="accent-primary" checked={marking} onChange={(e) => setMarking(e.target.checked)} /> Mark directions not needed
-        </label>
       </div>
+
+      {draft && <ImportWizard rows={draft} onClose={() => setDraft(null)} onSaved={() => router.refresh()} />}
 
       {results.length > 0 && (
         <div className="mt-3 text-sm" aria-live="polite">
-          <p className="font-medium">
-            {added} added{refused > 0 ? `, ${refused} not added` : ""}
-          </p>
-          <ul className="mt-1 max-h-60 space-y-1 overflow-y-auto">
+          <p className="font-medium">{results.length} file{results.length === 1 ? "" : "s"} not read</p>
+          <ul className="mt-1 max-h-40 space-y-1 overflow-y-auto">
             {results.map((r, i) => (
-              <li key={i} className={r.ok ? undefined : "text-destructive"}>
-                {r.ok ? (
-                  <>
-                    <span className="font-medium">{r.name}</span>
-                    {" · "}
-                    {r.placed?.map((p) => `${p.airport} ${p.kind} ${p.runway ?? "XX"}`).join(" · ")}
-                    {r.checks && r.checks.length > 0 && <span className="text-amber-600 dark:text-amber-400"> · {r.checks.join("; ")}</span>}
-                  </>
-                ) : (
-                  <>
-                    {r.original && <span className="font-medium">{r.original}: </span>}
-                    {r.error}
-                  </>
-                )}
+              <li key={i} className="text-destructive">
+                {r.original && <span className="font-medium">{r.original}: </span>}
+                {r.error}
               </li>
             ))}
           </ul>

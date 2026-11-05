@@ -77,6 +77,7 @@ import type { GuidePoint } from "@/lib/runway-guide"
 import { attachGuideToPlan, GuideError, type StoredGuide } from "@/lib/runway-guide-client"
 import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
+import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
@@ -267,6 +268,10 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [extraFlightNumbers, setExtraFlightNumbers] = useState<string[]>([])
   // The aircraft of the plan: stored with it, never written into the FPL.
   const [aircraft, setAircraft] = useState("")
+  // The runways the plan departs from and lands on: detected from the route, or picked by the pilot in the airport card. Kept with
+  // the plan (not written into the FPL); not part of the unsaved-changes check, they ride along with the next save.
+  const [departureRunway, setDepartureRunway] = useState<string | null>(null)
+  const [arrivalRunway, setArrivalRunway] = useState<string | null>(null)
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -481,6 +486,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setFlightNumberEdit(undefined)
         setExtraFlightNumbers([])
         setAircraft("")
+        setDepartureRunway(null)
+        setArrivalRunway(null)
         setImportSource(
           result.source === "FlightAware" || result.source === "FlightRadar24" || result.source === "Imported" ? result.source : null,
         )
@@ -709,6 +716,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       includesBranding: effectiveBranding,
       flightTimeMinutes,
       aircraft: aircraft.trim() || null,
+      departureRunway,
+      arrivalRunway,
     })
 
     const send = (url: string, method: "POST" | "PUT") =>
@@ -844,6 +853,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setIncludeBranding(branded)
         setFlightTimeMinutes(body.flight_time_minutes ?? null)
         setAircraft(typeof body.aircraft === "string" ? body.aircraft : "")
+        setDepartureRunway(typeof body.departure_runway === "string" ? body.departure_runway : null)
+        setArrivalRunway(typeof body.arrival_runway === "string" ? body.arrival_runway : null)
         setWaypoints(restored)
         setOriginSources(Array.isArray(body.origin_sources) ? body.origin_sources : [])
         if (mode === "import") {
@@ -1376,6 +1387,44 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       return null
     }
   }, [])
+
+  // The runways of the plan, kept with it: the one the pilot confirmed in the airport card, else the one the route shows (only when
+  // the detection is sure), else the one already saved (while it still exists at that airport).
+  useEffect(() => {
+    if (waypoints.length < 4) return
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      const [origin, destination] = await Promise.all([
+        icaoValidation.origin ? loadAirport(originAirport) : null,
+        icaoValidation.destination ? loadAirport(destinationAirport) : null,
+      ])
+      if (cancelled) return
+      const pick = (
+        hand: HandChoice | null,
+        icao: string,
+        airport: TrimAirport | null,
+        detected: string | null,
+        current: string | null,
+      ): string | null => {
+        if (hand && hand.icao === icao) return hand.runway
+        if (detected) return detected
+        if (current && airport && findRunwayEnd(airport, current)) return current
+        return airport ? null : current
+      }
+      const dep = origin ? extractDeparture(waypoints, origin, phaseSplit) : null
+      const arr = destination ? extractArrival(waypoints, destination, phaseSplit) : null
+      setDepartureRunway((current) =>
+        pick(handRunways.departure, originAirport, origin, dep && dep.confidence === "high" ? dep.runwayEnd : null, current),
+      )
+      setArrivalRunway((current) =>
+        pick(handRunways.arrival, destinationAirport, destination, arr && arr.confidence === "high" ? arr.runwayEnd : null, current),
+      )
+    }, 500)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [waypoints, phaseSplit, originAirport, destinationAirport, icaoValidation, handRunways, loadAirport])
 
   // Departure guides: a guide being previewed on the map, and putting a guide's path into the plan.
   const [guidePreview, setGuidePreview] = useState<{ lat: number; lng: number }[] | null>(null)

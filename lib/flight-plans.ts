@@ -71,10 +71,14 @@ export interface FlightPlanSummary {
   public_id: string | null
   // Shown first on the author's profile (only while public).
   featured: boolean
+  // Kept with the plan, never in the FPL; editable from the dashboard.
+  aircraft: string | null
+  departure_runway: string | null
+  arrival_runway: string | null
 }
 
 export const FLIGHT_PLAN_SUMMARY_COLUMNS =
-  "id, status, source, origin_sources, moderation_status, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
+  "id, status, source, origin_sources, moderation_status, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured, aircraft, departure_runway, arrival_runway"
 
 // How many dashboard rows one page of My flights shows.
 export const HISTORY_PAGE_SIZE = 25
@@ -101,6 +105,11 @@ export function formatFlightTime(minutes: number | null | undefined): string | n
 
 export function sourceLabel(source: FlightPlanSource): string {
   return source === "Sketch" ? "Route Sketch" : source === "Imported" ? "Imported file" : source
+}
+
+/** The short tag for the dashboard row: "FR24", "FA", "Sketch", "File". `sourceLabel` is the full name (its tooltip). */
+export function sourceShort(source: FlightPlanSource): string {
+  return source === "FlightRadar24" ? "FR24" : source === "FlightAware" ? "FA" : source === "Imported" ? "File" : "Sketch"
 }
 
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.

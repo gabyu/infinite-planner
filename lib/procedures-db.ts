@@ -1,7 +1,9 @@
 // Reads of the airport procedures database, for the admin page. Every call goes through an admin_* function that checks
 // is_admin() itself, with the signed-in admin's own client (never the service role).
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { TrimAirport } from "@/lib/ground-trim"
 import { airportFor, groupFlights, type FlightAnalysis } from "@/lib/procedure-analysis"
+import { findRunwayEnd, fromRunwayFrame } from "@/lib/runway-guide"
 import { buildCoverage } from "@/lib/procedure-coverage"
 
 interface OverviewRow {
@@ -44,9 +46,13 @@ const shell = (row: OverviewRow, index: number): FlightAnalysis => ({
 })
 
 /** Every airport that has flights, with its progress, from the light overview (no tracks). */
-export async function loadSummaries(supabase: SupabaseClient): Promise<AirportSummary[]> {
+export async function loadSummaries(supabase: SupabaseClient, memberGuides: MemberGuide[] = []): Promise<AirportSummary[]> {
   const [overview, marks] = await Promise.all([supabase.rpc("admin_procedure_overview"), supabase.rpc("admin_list_procedure_marks", { p_airport: null })])
-  const rows = (overview.data ?? []) as OverviewRow[]
+  // The procedures members saved count like flight files: they fill the same cells and put an airport on the list.
+  const rows = [
+    ...((overview.data ?? []) as OverviewRow[]),
+    ...memberGuides.map((g): OverviewRow => ({ airport: g.airport, kind: g.kind, runway: g.runway, bearing: g.bearingDeg, route: "member" })),
+  ]
   const markRows = (marks.data ?? []) as { airport: string; key: string }[]
   const byAirport = new Map<string, OverviewRow[]>()
   for (const row of rows) byAirport.set(row.airport, [...(byAirport.get(row.airport) ?? []), row])
@@ -93,8 +99,88 @@ export async function loadAirport(supabase: SupabaseClient, icao: string) {
   }
 }
 
-export async function loadSyncState(supabase: SupabaseClient) {
-  const { data } = await supabase.rpc("admin_procedure_sync_state")
-  const row = ((data ?? []) as { copy_allowed: boolean; last_synced_at: string | null; flights_count: number | null }[])[0]
-  return { copyAllowed: row?.copy_allowed === true, lastSyncedAt: row?.last_synced_at ?? null, flightsCount: row?.flights_count ?? null }
+export interface MemberGuide {
+  id: string
+  ownerId: string
+  ownerName: string | null
+  kind: "departure" | "arrival"
+  airport: string
+  runway: string | null
+  headingDeg: number | null
+  bearingDeg: number
+  distanceNm: number
+  label: string | null
+  /** [along, across, altitude] triples in the runway's frame. */
+  points: [number, number, number][]
+  useCount: number
+  originSources: string[]
+  createdAt: string
+}
+
+/** The procedures members saved from their own plans (private to them), for the admin review. Newest first, 500 at most. */
+export async function loadMemberGuides(supabase: SupabaseClient): Promise<MemberGuide[]> {
+  const { data } = await supabase.rpc("admin_list_runway_guides")
+  return ((data ?? []) as Record<string, unknown>[]).flatMap((row) => {
+    const points = Array.isArray(row.points) ? (row.points as unknown[]).filter((p): p is [number, number, number] => Array.isArray(p) && p.length === 3) : []
+    if (typeof row.id !== "string" || typeof row.airport !== "string" || points.length === 0) return []
+    return [
+      {
+        id: row.id,
+        ownerId: String(row.owner_id),
+        ownerName: typeof row.owner_name === "string" ? row.owner_name : null,
+        kind: row.kind === "arrival" ? ("arrival" as const) : ("departure" as const),
+        airport: row.airport,
+        runway: typeof row.runway_name === "string" ? row.runway_name : null,
+        headingDeg: typeof row.runway_heading_deg === "number" ? row.runway_heading_deg : null,
+        bearingDeg: Number(row.toc_bearing_deg) || 0,
+        distanceNm: Number(row.toc_distance_nm) || 0,
+        label: typeof row.label === "string" ? row.label : null,
+        points,
+        useCount: Number(row.use_count) || 0,
+        originSources: Array.isArray(row.origin_sources) ? (row.origin_sources as string[]) : [],
+        createdAt: String(row.created_at),
+      },
+    ]
+  })
+}
+
+/**
+ * Member procedures of one airport as flights, so they count in the coverage grid and are drawn on the map with the flight files
+ * (`file` = "guide:<id>"). The path is laid back onto the runway it was saved from; without a runway there is nothing to draw.
+ */
+export function guidesAsFlights(guides: MemberGuide[], icao: string, airport: TrimAirport | null = null): FlightAnalysis[] {
+  return guides
+    .filter((g) => g.airport === icao)
+    .map((g) => {
+      const end = airport && g.runway ? findRunwayEnd(airport, g.runway) : null
+      const track: [number, number, number][] = end
+        ? g.points.map(([along, across, altitude]) => {
+            const point = fromRunwayFrame({ along, across, altitude }, end)
+            return [point.lat, point.lng, altitude]
+          })
+        : []
+      return {
+        file: `guide:${g.id}`,
+        kind: g.kind,
+        runway: g.runway,
+        bearing: g.bearingDeg,
+        turnNm: g.distanceNm,
+        altAt: {},
+        establishedNm: null,
+        flags: g.runway ? [] : ["member procedure without a runway"],
+        route: `saved by ${g.ownerName ?? "a member"}`,
+        track,
+      }
+    })
+}
+
+export interface RecentAirport {
+  code: string
+  lastAt: string
+}
+
+/** The airports that last received a flight file or a member's procedure, newest first. Empty when the database lacks the function. */
+export async function loadRecentAirports(supabase: SupabaseClient, limit = 14): Promise<RecentAirport[]> {
+  const { data } = await supabase.rpc("admin_recent_procedure_airports", { p_limit: limit })
+  return ((data ?? []) as { airport: string; last_at: string }[]).map((row) => ({ code: row.airport, lastAt: row.last_at }))
 }

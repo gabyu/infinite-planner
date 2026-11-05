@@ -6,6 +6,7 @@ import { distanceM, planTrim } from "@/lib/ground-trim"
 import { splitPhases } from "@/lib/route-phases"
 import { angleBetween, bearingDeg, compassPoint, extractDeparture, findRunwayEnd, runwayEnds, toRunwayFrame, type RunwayEnd } from "@/lib/runway-guide"
 import runwaysJson from "@/lib/data/runways.json"
+export { isRunwayFlag } from "@/lib/procedure-flags"
 
 const NM = 1852
 const FRAME_RADIUS_NM = 40

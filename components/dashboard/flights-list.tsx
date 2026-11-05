@@ -26,9 +26,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
-import { LocalTime } from "@/components/local-time"
+import { RelativeTime } from "@/components/relative-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
+import { PlanDetailsDialog } from "@/components/dashboard/plan-details-dialog"
+import { aircraftCode } from "@/lib/aircraft"
 import { legalCopy } from "@/lib/copy"
 import { VisibilitySwitch } from "@/components/visibility-switch"
 import { planPath } from "@/lib/plan-slug"
@@ -40,6 +42,7 @@ import {
   formatFlightTime,
   isTrackerDerived,
   sourceLabel,
+  sourceShort,
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
@@ -91,6 +94,9 @@ function pageWindow(current: number, count: number): (number | null)[] {
   return keep.flatMap((n, i) => (i > 0 && n - keep[i - 1] > 1 ? [null, n] : [n]))
 }
 
+// Every small tag of a row (Draft, source, aircraft) looks the same: outline, one size, muted.
+const TAG = "h-5 cursor-default rounded-md px-1.5 font-sans text-xs font-normal text-muted-foreground"
+
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
@@ -107,6 +113,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
   const firstRun = useRef(true)
   const [deleting, setDeleting] = useState<FlightPlanSummary | null>(null)
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
+  const [editing, setEditing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("all")
@@ -389,22 +396,49 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
               <li
                 key={plan.id}
                 className={cn(
-                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50",
+                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50 md:h-20 md:overflow-hidden md:py-0",
                   columns,
                 )}
               >
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 font-mono text-sm font-medium">
+                  <div className="flex items-center gap-x-2 font-mono text-sm font-medium">
                     <span>
                       {plan.origin_airport}
+                      {plan.departure_runway && <span className="text-muted-foreground"> @{plan.departure_runway}</span>}
                       <RouteArrow />
                       {plan.destination_airport}
+                      {plan.arrival_runway && <span className="text-muted-foreground"> @{plan.arrival_runway}</span>}
                     </span>
-                    {isDraft && (
-                      <Badge variant="secondary" className="font-sans text-[11px] font-normal">
-                        Draft
-                      </Badge>
-                    )}
+                    {/* Draft, where the plan comes from, and the aircraft: three tags of the same size, each with a bubble. */}
+                    <TooltipProvider delayDuration={100}>
+                      {isDraft && (
+                        <Badge variant="outline" className={TAG}>
+                          Draft
+                        </Badge>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <Badge variant="outline" className={TAG}>
+                              {sourceShort(plan.source)}
+                            </Badge>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{sourceLabel(plan.source)}</TooltipContent>
+                      </Tooltip>
+                      {plan.aircraft && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                              <Badge variant="outline" className={TAG}>
+                                {aircraftCode(plan.aircraft)}
+                              </Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{plan.aircraft}</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TooltipProvider>
                   </div>
                   {(names[0] || names[1]) && (
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -440,22 +474,19 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground md:hidden">
-                    <LocalTime iso={plan.created_at} />
+                    <RelativeTime iso={plan.created_at} />
                     {flightTime && <> · {flightTime}</>}
                   </p>
                 </div>
 
                 <div className="order-last col-span-2 flex flex-wrap items-center gap-1.5 md:order-none md:col-span-1 md:flex-col md:items-start">
                   <span className="font-mono text-sm">{plan.flight_number ?? "—"}</span>
-                  <Badge variant="outline" className="px-1.5 text-[10px] font-normal text-muted-foreground">
-                    {sourceLabel(plan.source)}
-                  </Badge>
                 </div>
 
                 <span className="hidden text-sm md:block">{flightTime ?? <span className="text-muted-foreground">—</span>}</span>
 
                 <span className="hidden text-sm text-muted-foreground md:block">
-                  <LocalTime iso={plan.created_at} />
+                  <RelativeTime iso={plan.created_at} />
                 </span>
 
                 {library && (
@@ -538,6 +569,9 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onSelect={() => setEditing(plan)}>
+                        <Pencil /> Edit details
+                      </DropdownMenuItem>
                       {!isDraft && (
                         <>
                           <DropdownMenuItem onSelect={() => duplicate(plan)}>
@@ -612,6 +646,14 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
       )}
 
       {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
+      <PlanDetailsDialog
+        plan={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(id, details) => {
+          patchPlan(id, details)
+          toast({ title: "Details saved" })
+        }}
+      />
 
 
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>

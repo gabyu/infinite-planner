@@ -1,17 +1,17 @@
-// What an airport still lacks. The grid is: each runway (L/R/C of one number count as one: parallel runways share their
-// paths) x arrival or departure x eight directions (where the flight came in from at 40 NM, or where it was heading at
+// What an airport still lacks. The grid is: each runway end (08L and 08R are two rows) x arrival or departure x eight directions (where the flight came in from at 40 NM, or where it was heading at
 // the top of climb). A cell is covered by one flight or more; a direction nobody flies is marked "not needed" and leaves
 // the count. Progress is covered cells over the cells that are needed. Pure functions, no files.
 import type { TrimAirport } from "@/lib/ground-trim"
 import { runwayEnds } from "@/lib/runway-guide"
 import type { FlightAnalysis } from "@/lib/procedure-analysis"
+import { isRunwayFlag } from "@/lib/procedure-flags"
 
 export const OCTANTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const
 export type Octant = (typeof OCTANTS)[number]
 export type CoverageKind = "arrival" | "departure"
 
 export const octantOf = (bearing: number): Octant => OCTANTS[Math.round((((bearing % 360) + 360) % 360) / 45) % 8]
-/** "08L" -> "08": parallel runways are one family. */
+/** "08L" -> "08". Rows are per runway end now; the family is only read for the "not needed" marks saved when parallel runways were one row. */
 export const runwayFamily = (name: string) => name.replace(/[LRC]$/, "")
 /** The "done" mark of a kind rides in the same list as the "not needed" cells: "done|arrival". */
 export const doneKey = (kind: CoverageKind) => `done|${kind}`
@@ -52,15 +52,17 @@ export interface Coverage {
 }
 
 export function buildCoverage(airport: TrimAirport, flights: FlightAnalysis[], notNeeded: Set<string>): Coverage {
-  const families = Array.from(new Set(runwayEnds(airport).map((e) => runwayFamily(e.name)))).sort()
+  // One row per runway end, in runway order (04, 04L, 04R, 22...).
+  const families = Array.from(new Set(runwayEnds(airport).map((e) => e.name))).sort()
   const filled = new Map<string, string[]>()
   const unplaced: string[] = []
   for (const f of flights) {
     if ((f.kind !== "arrival" && f.kind !== "departure") || !f.runway || f.bearing === null) {
-      unplaced.push(`${f.route ?? f.file.replace(/\.kml$/i, "")}${f.flags.length ? `: ${f.flags.find((x) => !/marked XX/.test(x)) ?? f.flags[0]}` : ""}`)
+      const note = f.flags.find((x) => !isRunwayFlag(x))
+      unplaced.push(`${f.route ?? f.file.replace(/\.kml$/i, "")}${note ? `: ${note}` : ""}`)
       continue
     }
-    const key = cellKey(f.kind, runwayFamily(f.runway), octantOf(f.bearing))
+    const key = cellKey(f.kind, f.runway, octantOf(f.bearing))
     filled.set(key, [...(filled.get(key) ?? []), f.file])
   }
   const rows: CoverageRow[] = []
@@ -74,7 +76,8 @@ export function buildCoverage(airport: TrimAirport, flights: FlightAnalysis[], n
       const cells = OCTANTS.map((octant): CoverageCell => {
         const key = cellKey(kind, family, octant)
         const files = filled.get(key) ?? []
-        const na = (notNeeded.has(key) || done) && files.length === 0
+        // Marks saved while parallel runways were one row ("arrival|08|N") still apply to each of the two.
+        const na = (notNeeded.has(key) || notNeeded.has(cellKey(kind, runwayFamily(family), octant)) || done) && files.length === 0
         if (!na) {
           tally[kind].needed++
           if (files.length > 0) tally[kind].covered++

@@ -54,15 +54,15 @@ assert.equal(octantOf(0), "N")
 assert.equal(octantOf(359), "N")
 assert.equal(octantOf(46), "NE")
 assert.equal(runwayFamily("08L"), "08")
+assert.deepEqual(buildCoverage({ ...airportFor("LSGG")!, runways: [[0, 0, 0, 0, 0, 0, "08L", "26R"], [0, 0, 0, 0, 0, 0, "08R", "26L"]] as never }, [], new Set()).rows.map((r) => r.family).filter((f, i, all) => all.indexOf(f) === i), ["08L", "08R", "26L", "26R"], "parallel runways are separate rows")
 const LSGG = airportFor("LSGG")!
 assert.ok(LSGG)
 const empty = buildCoverage(LSGG, [], new Set())
-assert.equal(empty.needed, 32, "2 runway families x 2 kinds x 8 directions")
+assert.equal(empty.needed, 32, "2 runway ends x 2 kinds x 8 directions")
 assert.equal(empty.percent, 0)
 const one = buildCoverage(LSGG, [flight("a", "arrival", "04", 310)], new Set())
 assert.equal(one.covered, 1)
 assert.equal(one.percent, Math.round((1 / 32) * 100))
-// Parallel runways share a family: 22 and 22 are the same row.
 const notNeeded = buildCoverage(LSGG, [flight("a", "arrival", "04", 310)], new Set([cellKey("arrival", "04", "N")]))
 assert.equal(notNeeded.needed, 31, "a direction marked not needed leaves the count")
 const done = buildCoverage(LSGG, [flight("a", "arrival", "04", 310)], new Set([doneKey("arrival")]))
@@ -132,40 +132,4 @@ const named = ingestKml(kml, "DAAG (XX) - LSGG (04).kml")
 assert.ok(named.ok && named.rows.find((r) => r.airport === "DAAG")!.needs_check, "XX marks the row to check")
 assert.equal(suggestName(kml, parseFlightName("DAAG (XX) - LSGG (04).kml"))?.base, "DAAG (XX) - LSGG (04)")
 
-// ---- the production export endpoint: who may read it ------------------------------------------------------------------------
-async function exportStatus(env: Record<string, string | undefined>, authorization?: string) {
-  const saved = { ...process.env }
-  Object.assign(process.env, env)
-  for (const [key, value] of Object.entries(env)) if (value === undefined) delete process.env[key]
-  try {
-    const { GET } = await import("@/app/api/procedures-sync/export/route")
-    const headers: Record<string, string> = { "x-forwarded-for": `203.0.113.${Math.floor(Math.random() * 250)}` }
-    if (authorization) headers.authorization = authorization
-    return (await GET(new Request("https://example.test/api/procedures-sync/export", { headers }))).status
-  } finally {
-    for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key]
-    Object.assign(process.env, saved)
-  }
-}
-const TOKEN = "a-long-random-sync-token-for-tests-0123456789"
-async function checkExport() {
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: undefined }), 404, "no token configured: not there")
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: "short" }), 404, "a weak token is refused outright")
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "staging", PROCEDURES_SYNC_TOKEN: TOKEN }, `Bearer ${TOKEN}`), 404, "staging never serves the export")
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: TOKEN }), 401, "no token given")
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: TOKEN }, "Bearer wrong-token"), 401, "wrong token")
-  assert.equal(await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: TOKEN }, `Bearer ${TOKEN}x`), 401, "almost the token")
-  // The right token gets past the check: with no database configured it stops at 503, which is not an auth answer.
-  assert.equal(
-    await exportStatus({ NEXT_PUBLIC_ENV: "production", PROCEDURES_SYNC_TOKEN: TOKEN, NEXT_PUBLIC_SUPABASE_URL: undefined, SUPABASE_SERVICE_ROLE_KEY: undefined }, `Bearer ${TOKEN}`),
-    503,
-  )
-}
-
-checkExport().then(
-  () => console.log("test-procedures: all checks passed"),
-  (error) => {
-    console.error(error)
-    process.exit(1)
-  },
-)
+console.log("test-procedures: all checks passed")

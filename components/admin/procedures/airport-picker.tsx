@@ -9,13 +9,14 @@ export function AirportPicker({ current }: { current: string | null }) {
   const router = useRouter()
   const [value, setValue] = useState(current ?? "")
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full sm:w-64">
       <AirportInput
         id="procedures-airport"
-        label="Airport"
+        label="Open an airport"
+        bare
         value={value}
         valid={/^[A-Z]{4}$/.test(value)}
-        placeholder="Code, name or city"
+        placeholder="Open an airport"
         compact
         onChange={(icao) => {
           setValue(icao)
