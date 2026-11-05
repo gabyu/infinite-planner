@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { formatAgo, formatUtc } from "@/lib/format-ago"
 import type { GlobeFlight } from "@/lib/recent-flights"
+import { FooterSimulationNotice } from "@/components/footer-simulation-notice"
 import { AirportLabel } from "@/components/home/airport-label"
 import { useGlobeTour } from "@/components/home/use-globe-tour"
 
@@ -138,6 +139,7 @@ export function Visualizer({ flights }: { flights: GlobeFlight[] }) {
       <footer className="flex flex-col items-center gap-1 px-4 pb-5 pt-2 text-center sm:pb-6">
         <BrandLogo />
         <p className="text-xs font-light text-muted-foreground sm:text-sm">The flight plan hub for Infinite Flight</p>
+        <FooterSimulationNotice />
       </footer>
     </div>
   )

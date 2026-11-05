@@ -2,8 +2,9 @@
 //
 // A guide is a stretch of a flight plan stored relative to the runway it starts from (metres along and across the runway
 // axis, plus altitude), so it does not depend on absolute coordinates and can be laid onto another runway. Departure is the
-// first kind: from the line-up point to the top of climb. The frame, the ranking and the re-anchoring are kind-neutral; only
-// the extraction differs (arrival and approach guides would add their own, anchored at the threshold they end on).
+// first kind: from the line-up point to the top of climb. The arrival is the second: from the start of the arrival to the
+// touchdown point, framed on the runway it lands on. The frame and the ranking are kind-neutral; the extraction and the way a
+// guide is laid onto another runway differ (applyGuide / applyArrivalGuide).
 //
 // Naming and provenance rules live elsewhere (lib/flight-plans.ts, the database): this file only does the geometry.
 import { distanceM, isOnRunway, planTrim, type TrimAirport, type TrimPoint } from "@/lib/ground-trim"
@@ -236,6 +237,81 @@ export function extractDeparture(points: TrimPoint[], airport: TrimAirport, spli
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Detecting an arrival in a plan
+
+export interface ArrivalExtraction extends DepartureExtraction {
+  /** Index in the plan of the first waypoint the guide covers (the arrival, from where it comes within MAX_GUIDE_RADIUS_NM). */
+  fromIndex: number
+}
+
+/**
+ * The arrival of a plan: from the start of the arrival (route-phases) to the touchdown point (found like the ground trim does),
+ * framed on the runway end it lands on. `tocBearing` and `tocDistanceNm` describe the start of the arrival (where the plan comes
+ * from), seen from the threshold. `assignedEnd` is a runway end the pilot named: the path is then framed on that end.
+ */
+export function extractArrival(points: TrimPoint[], airport: TrimAirport, split: PhaseSplit, assignedEnd?: string): ArrivalExtraction | null {
+  if (points.length < 4) return null
+  const trim = planTrim(points, airport, "arrival")
+  const touchdown = points.length - 1 - trim.remove.length
+  const startOfArrival = Math.max(0, split.arrivalStart)
+  if (touchdown - startOfArrival < 2) return null
+  const reasons: string[] = []
+  if (trim.approximate) reasons.push("no runway data matched the end of the plan")
+
+  const landing = points[touchdown]
+  const approach = points[Math.max(startOfArrival, touchdown - 3)]
+  const trackBearing = bearingDeg(approach, landing)
+  let end: RunwayEnd | null = null
+  if (assignedEnd) {
+    end = findRunwayEnd(airport, assignedEnd)
+    if (!end) reasons.push("that runway is not in the airport data")
+  } else {
+    let best: { end: RunwayEnd; off: number } | null = null
+    for (const row of airport.runways) {
+      if (!row[6] || !row[7] || !isOnRunway(landing, [row])) continue
+      for (const candidate of runwayEnds({ ...airport, runways: [row] })) {
+        const off = angleBetween(candidate.headingTrue, trackBearing)
+        if (!best || off < best.off) best = { end: candidate, off }
+      }
+    }
+    end = best && best.off <= HEADING_MATCH_DEG ? best.end : null
+    if (!end) reasons.push(best ? "the path does not arrive along a runway heading" : "the touchdown point is not on a named runway")
+  }
+
+  const anchor: RunwayEnd = end ?? { name: "", lat: landing.lat, lng: landing.lng, headingTrue: trackBearing }
+  // Where the guide starts: the first point of the arrival that is within the guide radius of the runway.
+  let fromIndex = startOfArrival
+  while (fromIndex < touchdown - 1 && distanceM(anchor, points[fromIndex]) / NM_M > MAX_GUIDE_RADIUS_NM) fromIndex++
+  const framed: FramePoint[] = []
+  for (let i = fromIndex; i <= touchdown; i++) framed.push(toRunwayFrame(points[i], anchor))
+  let stored = limit(framed)
+  // A straight final simplifies to two points: keep the middle one too (a guide has at least three, and it carries an altitude).
+  if (stored.length < 3 && framed.length >= 3) {
+    const middle = framed[Math.floor(framed.length / 2)]
+    stored = [stored[0], middle, stored[stored.length - 1]]
+  }
+  if (stored.length < 3) reasons.push("the arrival is too short to keep")
+
+  const start = points[startOfArrival]
+  const startBearing = bearingDeg(anchor, start)
+  const startDistanceNm = distanceM(anchor, start) / NM_M
+  if (startDistanceNm < MIN_TOC_NM) reasons.push("the start of the arrival is very close to the airport")
+
+  return {
+    runwayEnd: end?.name ?? null,
+    runwayHeadingTrue: end ? Math.round(end.headingTrue) : null,
+    points: stored,
+    tocBearing: Math.round(startBearing),
+    tocDistanceNm: Math.round(startDistanceNm),
+    direction: compassPoint(startBearing),
+    assigned: Boolean(assignedEnd && end),
+    confidence: reasons.length === 0 ? "high" : "low",
+    reasons,
+    fromIndex,
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Laying a guide onto a runway
 
 export const SAME_HEADING_DEG = 15 // within this a guide is re-anchored (the same runway, a parallel one, a near neighbour)
@@ -301,6 +377,51 @@ export function applyGuide(guide: GuideGeometry, source: RunwayEnd | null, targe
   const start = fromRunwayFrame({ along: 0, across: 0, altitude: guide.points[0].altitude }, target)
   const rest = guide.points.slice(firstFar).map((point) => fromRunwayFrame(point, source))
   return { points: [start, stub, ...rest], mode: "joined", warnings }
+}
+
+const ARRIVAL_JOIN_MIN_M = 12_000 // a re-routed arrival keeps the original path as far as the last point at least this far from the threshold...
+const ARRIVAL_STUB_M = 8_000 // ...then lines up on the target runway this far out (a straight-in final)
+
+/**
+ * The arrival's path laid onto `target`: the mirror of applyGuide. On the same end: the original path. On a runway with a similar
+ * heading: the path re-anchored on the target, blended back onto the original track further out (10 to 3 km from the threshold),
+ * so the far part of the arrival is untouched. On a different heading: the original path as far as its last point 12 km or more from
+ * the threshold, then a straight-in final along the target runway, with a warning to check terrain and obstacles.
+ */
+export function applyArrivalGuide(guide: GuideGeometry, source: RunwayEnd | null, target: RunwayEnd): AppliedGuide {
+  const anchored = guide.points.map((point) => fromRunwayFrame(point, target))
+  if (source && source.name === target.name) {
+    return { points: guide.points.map((point) => fromRunwayFrame(point, source)), mode: "reanchored", warnings: [] }
+  }
+  const similar = guide.runwayHeadingTrue !== null && angleBetween(guide.runwayHeadingTrue, target.headingTrue) <= SAME_HEADING_DEG
+  if (similar) {
+    if (!source) return { points: anchored, mode: "reanchored", warnings: [] }
+    const points = guide.points.map((point, index) => {
+      const original = fromRunwayFrame(point, source)
+      // Far from the threshold the original track, near it the target runway.
+      const weight = smoothstep((Math.hypot(point.along, point.across) - MERGE_FROM_M) / (MERGE_TO_M - MERGE_FROM_M))
+      return {
+        lat: anchored[index].lat * (1 - weight) + original.lat * weight,
+        lng: anchored[index].lng * (1 - weight) + original.lng * weight,
+        altitude: point.altitude,
+      }
+    })
+    return { points, mode: "merged", warnings: [] }
+  }
+  const warnings = ["Different runway heading: check the terrain and obstacles on the final leg."]
+  if (!source) return { points: anchored, mode: "joined", warnings: [...warnings, "The original runway is unknown, so the path is only rotated onto this runway."] }
+  let lastFar = -1
+  guide.points.forEach((point, index) => {
+    if (Math.hypot(point.along, point.across) >= ARRIVAL_JOIN_MIN_M) lastFar = index
+  })
+  if (lastFar < 0) return { points: anchored, mode: "joined", warnings }
+  const kept = guide.points.slice(0, lastFar + 1).map((point) => fromRunwayFrame(point, source))
+  // Altitude of the stub: what the original path had at about that distance from the threshold.
+  const stubSource = guide.points.find((point, index) => index > lastFar && Math.hypot(point.along, point.across) <= ARRIVAL_STUB_M) ?? guide.points[lastFar]
+  const stub = fromRunwayFrame({ along: -ARRIVAL_STUB_M, across: 0, altitude: stubSource.altitude }, target)
+  const last = guide.points[guide.points.length - 1]
+  const touchdown = fromRunwayFrame({ along: Math.max(0, last.along), across: 0, altitude: last.altitude }, target)
+  return { points: [...kept, stub, touchdown], mode: "joined", warnings }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

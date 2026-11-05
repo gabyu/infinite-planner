@@ -1,6 +1,6 @@
 // The editor's side of runway guides: what goes to the database and what comes back. The functions take the signed-in
 // Supabase client; the shapes and the error mapping are pure (and tested). The table and its rules:
-// supabase/migrations/20261020000000_runway_guides.sql (a guide is private to its owner; the database copies the origin
+// supabase/migrations/20261020000000_runway_guides.sql and 20261106000000_runway_guides_arrival.sql (a guide is private to its owner; the database copies the origin
 // from the plan and refuses anything malformed).
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { DepartureExtraction, FramePoint } from "@/lib/runway-guide"
@@ -73,11 +73,13 @@ export class GuideError extends Error {
   }
 }
 
-export async function fetchGuides(supabase: SupabaseClient, airport: string): Promise<StoredGuide[]> {
+export type GuideKind = "departure" | "arrival"
+
+export async function fetchGuides(supabase: SupabaseClient, airport: string, kind: GuideKind = "departure"): Promise<StoredGuide[]> {
   const { data, error } = await supabase
     .from("runway_guides")
     .select(COLUMNS)
-    .eq("kind", "departure")
+    .eq("kind", kind)
     .eq("airport", airport)
     .order("created_at", { ascending: false })
     .limit(100)
@@ -85,7 +87,15 @@ export async function fetchGuides(supabase: SupabaseClient, airport: string): Pr
   return (data ?? []).map(rowToGuide).filter((guide): guide is StoredGuide => guide !== null)
 }
 
-export async function saveGuide(supabase: SupabaseClient, planId: string, airport: string, found: DepartureExtraction, label?: string): Promise<string> {
+// A departure and an arrival have the same shape: for an arrival the "top of climb" fields hold the start of the arrival.
+export async function saveGuide(
+  supabase: SupabaseClient,
+  planId: string,
+  airport: string,
+  found: DepartureExtraction,
+  label?: string,
+  kind: GuideKind = "departure",
+): Promise<string> {
   const { data, error } = await supabase.rpc("save_runway_guide", {
     p_plan_id: planId,
     p_airport: airport,
@@ -95,6 +105,7 @@ export async function saveGuide(supabase: SupabaseClient, planId: string, airpor
     p_toc_distance: found.tocDistanceNm,
     p_points: pointsToPayload(found.points),
     p_label: label ?? null,
+    p_kind: kind,
   })
   if (error || typeof data !== "string") throw new GuideError(error?.message)
   return data
