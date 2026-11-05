@@ -44,9 +44,13 @@ const shell = (row: OverviewRow, index: number): FlightAnalysis => ({
 })
 
 /** Every airport that has flights, with its progress, from the light overview (no tracks). */
-export async function loadSummaries(supabase: SupabaseClient): Promise<AirportSummary[]> {
+export async function loadSummaries(supabase: SupabaseClient, memberGuides: MemberGuide[] = []): Promise<AirportSummary[]> {
   const [overview, marks] = await Promise.all([supabase.rpc("admin_procedure_overview"), supabase.rpc("admin_list_procedure_marks", { p_airport: null })])
-  const rows = (overview.data ?? []) as OverviewRow[]
+  // The procedures members saved count like flight files: they fill the same cells and put an airport on the list.
+  const rows = [
+    ...((overview.data ?? []) as OverviewRow[]),
+    ...memberGuides.map((g): OverviewRow => ({ airport: g.airport, kind: g.kind, runway: g.runway, bearing: g.bearingDeg, route: "member" })),
+  ]
   const markRows = (marks.data ?? []) as { airport: string; key: string }[]
   const byAirport = new Map<string, OverviewRow[]>()
   for (const row of rows) byAirport.set(row.airport, [...(byAirport.get(row.airport) ?? []), row])
@@ -142,4 +146,22 @@ export async function loadMemberGuides(supabase: SupabaseClient): Promise<Member
       },
     ]
   })
+}
+
+/** Member procedures of one airport as flights for the coverage grid (no track: they are not drawn on the map). */
+export function guidesAsFlights(guides: MemberGuide[], icao: string): FlightAnalysis[] {
+  return guides
+    .filter((g) => g.airport === icao)
+    .map((g) => ({
+      file: `guide:${g.id}`,
+      kind: g.kind,
+      runway: g.runway,
+      bearing: g.bearingDeg,
+      turnNm: g.distanceNm,
+      altAt: {},
+      establishedNm: null,
+      flags: g.runway ? [] : ["member procedure without a runway"],
+      route: `saved by ${g.ownerName ?? "a member"}`,
+      track: [],
+    }))
 }

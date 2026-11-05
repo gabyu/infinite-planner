@@ -82,7 +82,7 @@ export function MemberGuides({ guides, airport }: { guides: MemberGuide[]; airpo
         </div>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
-        Procedures members saved from their own flight plans. Each is private to its author; only admins see this list. Deleting one does not change the plans that used it.
+        Procedures members saved from their own flight plans. They count in the airport list and the coverage grid above. Each is private to its author; only admins see this list. Deleting one does not change the plans that used it.
       </p>
       {error && <p className="mb-2 text-sm text-destructive">{error}</p>}
       {shown.length === 0 ? (
