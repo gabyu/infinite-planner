@@ -7,6 +7,7 @@ import { useTheme } from "next-themes"
 import { resolveBasemap, setBasemap } from "@/lib/map-tiles"
 import { altitudeBucket } from "@/lib/route-render"
 import type { FlightAnalysis, FlightGroup } from "@/lib/procedure-analysis"
+import { isRunwayFlag } from "@/lib/procedure-flags"
 
 // Every analysed flight of an airport drawn on a map, coloured by its group, with the runway, direction and profile of each.
 // Read-only apart from removing a flight; merging groups and consensus paths come later.
@@ -199,8 +200,8 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
                   </li>
                 ))}
               </ul>
-              {members.some((m) => m.flags.length) && (
-                <div className="mt-1 text-xs text-amber-600">{members.flatMap((m) => m.flags).join("; ")}</div>
+              {members.some((m) => m.flags.some((f) => !isRunwayFlag(f))) && (
+                <div className="mt-1 text-xs text-amber-600">{members.flatMap((m) => m.flags).filter((f) => !isRunwayFlag(f)).join("; ")}</div>
               )}
             </div>
           )

@@ -4,6 +4,7 @@
 import type { TrimAirport } from "@/lib/ground-trim"
 import { runwayEnds } from "@/lib/runway-guide"
 import type { FlightAnalysis } from "@/lib/procedure-analysis"
+import { isRunwayFlag } from "@/lib/procedure-flags"
 
 export const OCTANTS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const
 export type Octant = (typeof OCTANTS)[number]
@@ -57,7 +58,8 @@ export function buildCoverage(airport: TrimAirport, flights: FlightAnalysis[], n
   const unplaced: string[] = []
   for (const f of flights) {
     if ((f.kind !== "arrival" && f.kind !== "departure") || !f.runway || f.bearing === null) {
-      unplaced.push(`${f.route ?? f.file.replace(/\.kml$/i, "")}${f.flags.length ? `: ${f.flags.find((x) => !/marked XX/.test(x)) ?? f.flags[0]}` : ""}`)
+      const note = f.flags.find((x) => !isRunwayFlag(x))
+      unplaced.push(`${f.route ?? f.file.replace(/\.kml$/i, "")}${note ? `: ${note}` : ""}`)
       continue
     }
     const key = cellKey(f.kind, f.runway, octantOf(f.bearing))

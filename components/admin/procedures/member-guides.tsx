@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, Loader2, Trash2 } from "lucide-react"
+import { Eye, Loader2, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GuideEdit } from "@/components/admin/procedures/guide-edit"
 import { LocalTime } from "@/components/local-time"
 import { guideLegText } from "@/lib/copy"
 import type { MemberGuide } from "@/lib/procedures-db"
@@ -44,6 +45,7 @@ export function MemberGuides({ guides, airport, previewId }: { guides: MemberGui
   const [confirm, setConfirm] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editing, setEditing] = useState<MemberGuide | null>(null)
 
   const shown = guides.filter((g) => (!onlyAirport || !airport || g.airport === airport) && (kind === "all" || g.kind === kind))
 
@@ -128,6 +130,10 @@ export function MemberGuides({ guides, airport, previewId }: { guides: MemberGui
                   <Eye className="h-3.5 w-3.5" aria-hidden />
                   Preview
                 </button>
+                <button type="button" onClick={() => setEditing(g)} className={action}>
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Edit
+                </button>
                 <button
                   type="button"
                   disabled={busy === g.id}
@@ -142,6 +148,7 @@ export function MemberGuides({ guides, airport, previewId }: { guides: MemberGui
           ))}
         </ul>
       )}
+      {editing && <GuideEdit guide={editing} onClose={() => setEditing(null)} onSaved={() => router.refresh()} />}
     </section>
   )
 }

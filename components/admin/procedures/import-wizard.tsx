@@ -1,16 +1,15 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react"
-import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { TrimAirport } from "@/lib/ground-trim"
-import { resolveBasemap, setBasemap } from "@/lib/map-tiles"
+import { isRunwayFlag } from "@/lib/procedure-flags"
 import { OCTANTS, octantOf } from "@/lib/procedure-coverage"
 import type { ProcedureRow } from "@/lib/procedure-ingest"
-import { altitudeBucket } from "@/lib/route-render"
-import { runwayEnds, type RunwayEnd } from "@/lib/runway-guide"
+import { runwayEnds } from "@/lib/runway-guide"
+import { loadAirport, RunwayMap } from "@/components/admin/procedures/runway-map"
 import { cn } from "@/lib/utils"
 
 // The import of flight files, one procedure per screen. A flight gives two (the departure at its origin, the arrival at its
@@ -25,90 +24,6 @@ export interface PendingRow extends ProcedureRow {
 }
 
 const select = "h-8 rounded-md border border-input bg-background px-2 text-sm"
-
-const airportCache = new Map<string, TrimAirport | null>()
-async function loadAirport(icao: string): Promise<TrimAirport | null> {
-  if (airportCache.has(icao)) return airportCache.get(icao) ?? null
-  try {
-    const response = await fetch(`/api/airports/${icao}/runways`)
-    const data = response.ok ? ((await response.json()) as TrimAirport) : null
-    airportCache.set(icao, data)
-    return data
-  } catch {
-    return null
-  }
-}
-
-// The airport zoomed in, its runway ends as small labelled buttons, and the flight's track as a fine line coloured by altitude.
-function StepMap({ row, airport, onPick }: { row: PendingRow; airport: TrimAirport | null; onPick: (runway: string) => void }) {
-  const el = useRef<HTMLDivElement>(null)
-  const { resolvedTheme } = useTheme()
-  const dark = resolvedTheme === "dark"
-  const pick = useRef(onPick)
-  pick.current = onPick
-  const ends = useMemo<RunwayEnd[]>(() => (airport ? runwayEnds(airport) : []), [airport])
-  // The runway-end buttons, kept so choosing a runway restyles them without rebuilding the map (and losing the zoom).
-  const markers = useRef<Map<string, any>>(new Map())
-  const selected = useRef(row.runway)
-  selected.current = row.runway
-  const iconFor = (L: any, name: string, on: boolean, ink: string) =>
-    L.divIcon({
-      className: "",
-      html: `<button type="button" style="transform:translate(-50%,-50%);font:600 11px ui-monospace,monospace;padding:1px 5px;border-radius:9999px;border:1px solid ${on ? "#4f46e5" : ink};background:${on ? "#4f46e5" : dark ? "#0f172a" : "#fff"};color:${on ? "#fff" : ink};cursor:pointer">${name}</button>`,
-      iconSize: [0, 0],
-    })
-  const leaflet = useRef<any>(null)
-
-  useEffect(() => {
-    if (!airport || !el.current) return
-    let map: any
-    let cancelled = false
-    ;(async () => {
-      // @ts-ignore leaflet ships no types in this project
-      const L = (await import("leaflet")).default
-      // @ts-ignore
-      await import("leaflet/dist/leaflet.css")
-      if (cancelled || !el.current) return
-      map = L.map(el.current, { zoomControl: true, attributionControl: false })
-      setBasemap(L as any, map, resolveBasemap("auto", dark) === "dark")
-      const ink = dark ? "#e2e8f0" : "#0f172a"
-      // Runways: a plain line per runway.
-      for (const r of airport.runways) L.polyline([[r[0], r[1]], [r[2], r[3]]], { color: ink, weight: 2, opacity: 0.8, interactive: false }).addTo(map)
-      // The flight, by altitude, as in the plan editor.
-      const t = row.track
-      for (let i = 1; i < t.length; i++) {
-        L.polyline([[t[i - 1][0], t[i - 1][1]], [t[i][0], t[i][1]]], { className: `alt-${altitudeBucket((t[i - 1][2] + t[i][2]) / 2)}`, weight: 2, interactive: false }).addTo(map)
-      }
-      // Runway ends: click one to choose it.
-      leaflet.current = L
-      markers.current.clear()
-      for (const end of ends) {
-        const marker = L.marker([end.lat, end.lng], { icon: iconFor(L, end.name, end.name === selected.current, ink), keyboard: false })
-          .on("click", () => pick.current(end.name))
-          .addTo(map)
-        markers.current.set(end.name, marker)
-      }
-      const around = L.latLngBounds([[airport.lat, airport.lng]]).extend(ends.map((e) => [e.lat, e.lng]))
-      map.fitBounds(around, { padding: [60, 60], maxZoom: 13 })
-      window.setTimeout(() => map?.invalidateSize(), 120)
-    })()
-    return () => {
-      cancelled = true
-      map?.remove()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [airport, ends, row.id, row.track, dark])
-
-  useEffect(() => {
-    const L = leaflet.current
-    if (!L) return
-    const ink = dark ? "#e2e8f0" : "#0f172a"
-    markers.current.forEach((marker, name) => marker.setIcon(iconFor(L, name, name === row.runway, ink)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row.runway, dark])
-
-  return <div ref={el} className="h-[340px] w-full overflow-hidden rounded-lg border bg-muted/30" role="img" aria-label={`${row.airport} and the ${row.kind} track`} />
-}
 
 interface WizardProps {
   rows: PendingRow[]
@@ -150,7 +65,7 @@ export function ImportWizard({ rows: initial, onClose, onSaved }: WizardProps) {
     setSaving(true)
     setError(null)
     try {
-      const payload = chosen.map(({ id: _id, file: _file, include: _include, status: _status, ...row }) => ({ ...row, needs_check: row.runway === null }))
+      const payload = chosen.map(({ id: _id, file: _file, include: _include, status: _status, ...row }) => ({ ...row, needs_check: row.runway === null, flags: row.runway ? row.flags.filter((f) => !isRunwayFlag(f)) : row.flags }))
       const response = await fetch("/api/admin/procedures/commit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows: payload }) })
       const body = (await response.json().catch(() => null)) as { results?: { content_hash: string; airport: string; added: boolean; error?: string }[]; error?: string } | null
       if (!response.ok || !body?.results) return setError(body?.error ?? "Couldn't save the procedures.")
@@ -186,7 +101,7 @@ export function ImportWizard({ rows: initial, onClose, onSaved }: WizardProps) {
                 <span className="font-mono font-medium text-foreground">{label(current)}</span> · <span className="font-mono">{current.route}</span> · {current.file}
               </DialogDescription>
             </DialogHeader>
-            <StepMap row={current} airport={airports[current.airport] ?? null} onPick={(runway) => patch(current.id, { runway })} />
+            <RunwayMap mapKey={current.id} label={`${current.airport} and the ${current.kind} track`} track={current.track} runway={current.runway} airport={airports[current.airport] ?? null} onPick={(runway) => patch(current.id, { runway })} />
             <p className="-mt-1 text-xs text-muted-foreground">Click a runway end on the map, or pick it below. The line is the flight, coloured by altitude.</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <label className="flex items-center gap-2 text-sm">
