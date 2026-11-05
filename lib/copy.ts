@@ -136,8 +136,8 @@ export const copy = {
     tapRunway: "Confirm your runway",
     noGuides: "No suggested procedures for this runway yet.",
     departing: "Departing",
-    arriving: "Arriving from", // PROVISIONAL
-    lowConfidenceArrival: "Couldn't tell which runway this arrival used. Pick the runway above, then save.", // PROVISIONAL
+    arriving: "Arriving from",
+    lowConfidenceArrival: "Couldn't tell which runway this arrival used. Pick the runway above, then save.",
     north: "North",
     east: "East",
     south: "South",
