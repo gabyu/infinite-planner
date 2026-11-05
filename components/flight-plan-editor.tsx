@@ -69,6 +69,7 @@ import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
 import { AircraftField } from "@/components/editor/aircraft-field"
+import { aircraftCode } from "@/lib/aircraft"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
 import { AirportCard } from "@/components/editor/live-airports"
 import { RunwayGuides } from "@/components/editor/runway-guides"
@@ -1395,11 +1396,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   // The database is told first (the plan takes the guide's origin, so a plan built on a tracker-derived guide cannot be
   // published), then the departure part of the plan is replaced in one undo step. Throws when the database refuses.
   const originalDeparture = useRef<{ airport: string; waypoints: Waypoint[] } | null>(null)
-  const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide) => {
+  // The arrival the plan had before the first arrival procedure was applied, and the ids of the waypoints that replaced it.
+  const originalArrival = useRef<{ airport: string; waypoints: Waypoint[]; appliedIds: string[] } | null>(null)
+  const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide, _mode?: unknown, arrivalFrom?: number) => {
     if (!guideSupabase || !savedPlanId) throw new GuideError("plan_not_found")
     setOriginSources(await attachGuideToPlan(guideSupabase, savedPlanId, guide.id))
-    // The plan's own departure is kept the first time a procedure is applied, so it can be put back.
-    if (originalDeparture.current?.airport !== originAirport) {
+    const arriving = arrivalFrom !== undefined
+    // The plan's own departure (or arrival) is kept the first time a procedure is applied, so it can be put back.
+    if (!arriving && originalDeparture.current?.airport !== originAirport) {
       originalDeparture.current = { airport: originAirport, waypoints: waypoints.slice(0, phaseSplit.departureEnd + 1) }
     }
     const stamp = Date.now()
@@ -1410,11 +1414,23 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       lng: point.lng,
       altitude: Math.round(point.altitude),
     }))
-    const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
-    // One setWaypoints call = one undo step. The naming rules renumber the new waypoints with the rest.
-    setWaypoints(applyWaypointNamingRules([...replacement, ...kept], originAirport, destinationAirport, includeBranding))
-    delete trimRemoved.current.departure
-    setTrimmed((current) => ({ ...current, departure: false }))
+    if (arriving) {
+      // The arrival part (from where the guide starts to the end of the plan) is replaced; what comes before stays.
+      if (originalArrival.current?.airport !== destinationAirport) {
+        originalArrival.current = { airport: destinationAirport, waypoints: waypoints.slice(arrivalFrom), appliedIds: [] }
+      }
+      originalArrival.current.appliedIds = replacement.map((wp) => wp.id)
+      const head = waypoints.slice(0, arrivalFrom).map((wp) => ({ ...wp, selected: false }))
+      setWaypoints(applyWaypointNamingRules([...head, ...replacement], originAirport, destinationAirport, includeBranding))
+      delete trimRemoved.current.arrival
+      setTrimmed((current) => ({ ...current, arrival: false }))
+    } else {
+      const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
+      // One setWaypoints call = one undo step. The naming rules renumber the new waypoints with the rest.
+      setWaypoints(applyWaypointNamingRules([...replacement, ...kept], originAirport, destinationAirport, includeBranding))
+      delete trimRemoved.current.departure
+      setTrimmed((current) => ({ ...current, departure: false }))
+    }
     setTrimPreview(null)
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: replacement.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
@@ -1435,6 +1451,28 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
     setWaypoints(applyWaypointNamingRules([...saved.waypoints, ...kept], originAirport, destinationAirport, includeBranding))
     originalDeparture.current = null
+    setGuidePreview(null)
+    setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    toast({
+      title: copy.guides.restoredToast,
+      action: (
+        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
+    return true
+  }
+
+  // Puts the arrival the plan had before the first arrival procedure was applied back (one undo step).
+  const restoreOriginalArrival = () => {
+    const saved = originalArrival.current
+    if (!saved || saved.airport !== destinationAirport) return false
+    const firstApplied = waypoints.findIndex((wp) => wp.id === saved.appliedIds[0])
+    if (firstApplied < 0) return false
+    const head = waypoints.slice(0, firstApplied).map((wp) => ({ ...wp, selected: false }))
+    setWaypoints(applyWaypointNamingRules([...head, ...saved.waypoints], originAirport, destinationAirport, includeBranding))
+    originalArrival.current = null
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
     toast({
@@ -1641,7 +1679,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         {canSave &&
           (aircraft.trim() ? (
             <span className="max-w-[10rem] truncate rounded border bg-muted/50 px-1.5 py-0.5 text-foreground" title={aircraft.trim()}>
-              {aircraft.trim()}
+              {aircraftCode(aircraft)}
             </span>
           ) : (
             <button
@@ -1710,7 +1748,11 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           Export FPL
         </Button>
       </div>
-      {libraryOpen && (
+      {libraryOpen && trackerDerived && planShare.visibility !== "public" && (
+        // A plan converted from a FlightRadar24 or FlightAware file can't be published: say so, no switch to offer.
+        <p className="text-xs text-muted-foreground">{legalCopy.publishOnlyOwnDesigns}</p>
+      )}
+      {libraryOpen && !(trackerDerived && planShare.visibility !== "public") && (
         <div>
           <VisibilitySwitch
             planId={savedPlanId ?? ""}
@@ -1722,11 +1764,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
             requiresDeclaration={[...originSources, ...(planSource ? [planSource] : [])].includes("Imported")}
             disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty || trackerDerived}
             disabledReason={
-              trackerDerived
-                ? legalCopy.publishOnlyOwnDesigns
-                : !canSave
-                  ? "Sign in with Discord to publish a flight plan"
-                  : "Export the flight plan first to make it public"
+              !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
             }
           />
         </div>
@@ -2069,26 +2107,26 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         defaultOpen={!isMobile}
                         className="mx-4 mb-3"
                       >
-                        {(embedded, runway) =>
-                          activeTab === "departure" ? (
-                            <RunwayGuides
-                              supabase={guideSupabase}
-                              icao={originAirport}
-                              valid={icaoValidation.origin}
-                              waypoints={waypoints}
-                              split={phaseSplit}
-                              loadAirport={loadAirport}
-                              planId={savedPlanId}
-                              planIsDraft={savedStatus === "draft"}
-                              targetRunway={runway}
-                              onPreview={setGuidePreview}
-                              onApply={applyGuideToPlan}
-                              onNotify={(title, description) => toast({ title, description })}
-                              destination={destinationAirport}
-                              onRestore={restoreOriginalDeparture}
-                              embedded={embedded}
-                            />
-                          ) : null
+                        {(embedded, runway) => (
+                          <RunwayGuides
+                            kind={activeTab === "arrival" ? "arrival" : "departure"}
+                            supabase={guideSupabase}
+                            icao={activeTab === "arrival" ? destinationAirport : originAirport}
+                            valid={activeTab === "arrival" ? icaoValidation.destination : icaoValidation.origin}
+                            waypoints={waypoints}
+                            split={phaseSplit}
+                            loadAirport={loadAirport}
+                            planId={savedPlanId}
+                            planIsDraft={savedStatus === "draft"}
+                            targetRunway={runway}
+                            onPreview={setGuidePreview}
+                            onApply={applyGuideToPlan}
+                            onNotify={(title, description) => toast({ title, description })}
+                            destination={activeTab === "arrival" ? originAirport : destinationAirport}
+                            onRestore={activeTab === "arrival" ? restoreOriginalArrival : restoreOriginalDeparture}
+                            embedded={embedded}
+                          />
+                        )
                         }
                       </AirportCard>
                       <GroundMovements

@@ -7,15 +7,18 @@ import { copy, guideDateText, guideLegText, replaceText } from "@/lib/copy"
 import type { TrimAirport, TrimPoint } from "@/lib/ground-trim"
 import type { PhaseSplit } from "@/lib/route-phases"
 import {
+  applyArrivalGuide,
   applyGuide,
+  extractArrival,
   extractDeparture,
   findRunwayEnd,
   rankGuides,
   type ApplyMode,
+  type ArrivalExtraction,
   type DepartureExtraction,
   type GuidePoint,
 } from "@/lib/runway-guide"
-import { deleteGuide, fetchGuides, GuideError, saveGuide, type GuideErrorKey, type StoredGuide } from "@/lib/runway-guide-client"
+import { deleteGuide, fetchGuides, GuideError, saveGuide, type GuideErrorKey, type GuideKind, type StoredGuide } from "@/lib/runway-guide-client"
 import { cn } from "@/lib/utils"
 
 const ERROR_TEXT: Record<GuideErrorKey, string> = {
@@ -36,10 +39,12 @@ const SIDES = [
 const sideOf = (bearing: number) => Math.floor((((bearing % 360) + 360 + 45) % 360) / 90)
 
 interface RunwayGuidesProps {
+  /** Which part of the flight: the procedures of the departure airport, or of the arrival airport. */
+  kind?: GuideKind
   /** Signed in, and the database is reachable. Guides are private to their owner, so nothing is shown otherwise. */
   supabase: SupabaseClient | null
   icao: string
-  /** The departure airport code is valid and complete. */
+  /** The airport code (departure or arrival, by `kind`) is valid and complete. */
   valid: boolean
   /** The plan as it stands in the editor. */
   waypoints: TrimPoint[]
@@ -54,10 +59,10 @@ interface RunwayGuidesProps {
   targetRunway: string | null
   /** Shows a path over the route on the map, or clears it. */
   onPreview: (path: { lat: number; lng: number }[] | null) => void
-  /** Puts a guide's path into the plan in place of its departure. Throws when it could not be done. */
-  onApply: (points: GuidePoint[], guide: StoredGuide, mode: ApplyMode) => Promise<void>
+  /** Puts a guide's path into the plan in place of its departure (or arrival: `fromIndex` is where the arrival part starts). Throws when it could not be done. */
+  onApply: (points: GuidePoint[], guide: StoredGuide, mode: ApplyMode, fromIndex?: number) => Promise<void>
   onNotify: (title: string, description?: string) => void
-  /** The plan's destination airport: names the original departure in the list ("Original, to KSFO"). */
+  /** The plan's other airport: names the original in the list ("Original, to KSFO" for a departure, "Original, from LFPG" for an arrival). */
   destination: string
   /** Puts the plan's own departure back, as it was before the first procedure was applied. False when it could not. */
   onRestore: () => boolean
@@ -70,6 +75,7 @@ interface RunwayGuidesProps {
 // keep it as a guide, and, when the pilot taps another runway, their saved guides for that runway to preview and use.
 // Nothing changes in the plan until Use is pressed, and Use is one undo step.
 export function RunwayGuides({
+  kind = "departure",
   supabase,
   icao,
   valid,
@@ -111,11 +117,11 @@ export function RunwayGuides({
   const refresh = useCallback(async () => {
     if (!supabase || !enabled) return
     try {
-      setGuides(await fetchGuides(supabase, icao))
+      setGuides(await fetchGuides(supabase, icao, kind))
     } catch {
       setGuides([])
     }
-  }, [supabase, enabled, icao])
+  }, [supabase, enabled, icao, kind])
   useEffect(() => {
     setOriginal((current) => (current && current.icao === icao ? current : null))
   }, [icao])
@@ -127,13 +133,20 @@ export function RunwayGuides({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh])
 
-  // The departure this plan has, detected; or, when the detection cannot tell, the runway the pilot assigned by tapping.
-  const detected = useMemo<DepartureExtraction | null>(() => (airport ? extractDeparture(waypoints, airport, split) : null), [airport, waypoints, split])
-  const shown = useMemo<DepartureExtraction | null>(() => {
+  // The departure (or arrival) this plan has, detected; or, when the detection cannot tell, the runway the pilot assigned by tapping.
+  const extract = useCallback(
+    (assigned?: string): DepartureExtraction | ArrivalExtraction | null =>
+      !airport ? null : kind === "arrival" ? extractArrival(waypoints, airport, split, assigned) : extractDeparture(waypoints, airport, split, assigned),
+    [airport, kind, waypoints, split],
+  )
+  const detected = useMemo(() => extract(), [extract])
+  const shown = useMemo(() => {
     if (!airport || !detected) return detected
     if (detected.confidence === "high" || !targetRunway) return detected
-    return extractDeparture(waypoints, airport, split, targetRunway) ?? detected
-  }, [airport, detected, waypoints, split, targetRunway])
+    return extract(targetRunway) ?? detected
+  }, [airport, detected, extract, targetRunway])
+  const arriving = kind === "arrival"
+  const sideLabel = arriving ? copy.guides.arriving : copy.guides.departing
 
   const target = airport && targetRunway ? findRunwayEnd(airport, targetRunway) : null
   const ranked = useMemo(() => {
@@ -153,7 +166,8 @@ export function RunwayGuides({
   const layOnto = (guide: StoredGuide) => {
     if (!airport || !target) return null
     const source = guide.runwayName ? findRunwayEnd(airport, guide.runwayName) : null
-    return applyGuide({ runwayEnd: guide.runwayName, runwayHeadingTrue: guide.runwayHeadingDeg, points: guide.points }, source, target)
+    const geometry = { runwayEnd: guide.runwayName, runwayHeadingTrue: guide.runwayHeadingDeg, points: guide.points }
+    return arriving ? applyArrivalGuide(geometry, source, target) : applyGuide(geometry, source, target)
   }
 
   const togglePreview = (guide: StoredGuide) => {
@@ -164,17 +178,23 @@ export function RunwayGuides({
     }
     const applied = layOnto(guide)
     if (!applied) return
-    // The new path, then on to the plan's next waypoint after its own departure (where the plan carries on).
-    const next = waypoints[split.departureEnd + 1]
+    // A departure: the new path, then on to the plan's next waypoint. An arrival: from the plan's waypoint before it, then the new path.
     setPreviewId(guide.id)
-    onPreview([...applied.points, ...(next ? [next] : [])])
+    if (arriving) {
+      const from = (shown as ArrivalExtraction | null)?.fromIndex ?? split.arrivalStart
+      const before = waypoints[from - 1]
+      onPreview([...(before ? [before] : []), ...applied.points])
+    } else {
+      const next = waypoints[split.departureEnd + 1]
+      onPreview([...applied.points, ...(next ? [next] : [])])
+    }
   }
 
   const save = async () => {
     if (!supabase || !planId || !shown || !shown.runwayEnd) return
     setSaving(true)
     try {
-      await saveGuide(supabase, planId, icao, shown)
+      await saveGuide(supabase, planId, icao, shown, undefined, kind)
       setSavedFor(`${planId}:${shown.runwayEnd}:${shown.points.length}`)
       onNotify(copy.guides.savedToast)
       await refresh()
@@ -191,7 +211,7 @@ export function RunwayGuides({
     setBusyId(guide.id)
     const before = original ?? (shown ? { icao, runway: shown.runwayEnd, nm: shown.tocDistanceNm, bearing: shown.tocBearing, destination } : null)
     try {
-      await onApply(applied.points, guide, applied.mode)
+      await onApply(applied.points, guide, applied.mode, arriving ? (shown as ArrivalExtraction | null)?.fromIndex : undefined)
       if (before && !original) setOriginal(before)
       setConfirmApply(null)
       setPreviewId(null)
@@ -258,11 +278,11 @@ export function RunwayGuides({
               <>
                 {pill(shown.runwayEnd)}
                 <p className="min-w-0 flex-1 font-medium text-foreground">
-                  {copy.guides.departing} {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
+                  {sideLabel} {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
                 </p>
               </>
             ) : (
-              <p className="min-w-0 flex-1 text-muted-foreground">{copy.guides.lowConfidence}</p>
+              <p className="min-w-0 flex-1 text-muted-foreground">{arriving ? copy.guides.lowConfidenceArrival : copy.guides.lowConfidence}</p>
             )}
             <button
               type="button"
@@ -288,7 +308,7 @@ export function RunwayGuides({
               {pill(target.name)}
               <span className="min-w-0 flex-1 truncate">
                 <span className="font-medium text-foreground">{guideLegText(original.nm, original.bearing)}</span>
-                <span className="text-muted-foreground">{` · ${copy.guides.original}${original.destination ? `, to ${original.destination}` : ""}`}</span>
+                <span className="text-muted-foreground">{` · ${copy.guides.original}${original.destination ? `, ${arriving ? copy.guides.from : "to"} ${original.destination}` : ""}`}</span>
               </span>
               <button type="button" onClick={restore} className="h-7 shrink-0 rounded-md border px-2 font-medium hover:bg-accent">
                 {copy.guides.restore}
@@ -297,7 +317,7 @@ export function RunwayGuides({
           )}
           {sides.map((side) => (
             <div key={side.key} className="space-y-1.5">
-              <p className="pt-1.5 text-muted-foreground">{`${copy.guides.departing} ${side.text}`}</p>
+              <p className="pt-1.5 text-muted-foreground">{`${sideLabel} ${side.text}`}</p>
               {side.items.map(({ guide }) => {
                 const applied = layOnto(guide.guide)
                 const previewing = previewId === guide.id

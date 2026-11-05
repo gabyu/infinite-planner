@@ -5,8 +5,9 @@ All notable changes to Infinite Planner are documented here.
 ## Unreleased
 
 ### Added
+- **Arrival procedures.** The Arrival tab now has the same procedures as Departure: your plan's arrival ("Arriving from North · 85 NM · 012°") can be saved, dated, applied to the runway you pick, and restored to the original. Needs the `20261106000000_runway_guides_arrival.sql` migration.
 - **Procedures in the departure card.** Under the runway tiles, your plan's departure ("Departing East · 227 NM · 106°") can be saved as a procedure. Pick a runway and the list shows the procedures you saved for it, dated, with a check on the one your plan flies. **Apply** puts one into the plan in one undo step; **Restore** brings the original departure back.
-- **Aircraft.** A new **Aircraft** field in the editor's Options (signed in), with the aircraft Infinite Flight offers as suggestions (or type your own). It is kept with your plan, never written into the FPL. A small **⚠ AC** shows beside the route until it is filled in.
+- **Aircraft.** A new **Aircraft** field in the editor's Options (signed in), with the aircraft Infinite Flight offers as suggestions, found from any part of the name or its short code ("359" finds the A350-900), or type your own. The chip beside the route shows the short code (A359). It is kept with your plan, never written into the FPL. A small **⚠ AC** shows beside the route until it is filled in.
 - **A flight number button.** A small **⚠ #** appears beside the route when the plan has no flight number; it opens the field.
 - **Explore: a library of community flight plans** (not announced yet: it opens to everyone only when the launch switch is flipped; until then admins use it alone). Every exported flight plan is **Private** until you switch its **visibility** to **Public** (listed in the library and indexed by search engines; there is no in-between). The link to a public plan and its library entry are the same address, `/explore/plans/lfpg-klax-af65-k3x9p2qa`. Plan pages show the route on a map of dots like the homepage globe, an altitude graph, the distance and the figures that matter, with airport codes, IATA codes and city names so they can be found by search.
 - **Browse, search and sort.** `/explore` lists the library by Popular, Latest, Most imported, Most downloaded or Most liked, with search by airport (ICAO, IATA or city), flight number or "CDG to LAX", filters, and pages for every route (`/explore/routes/lfpg-klax`), airport (`/explore/location/KPHX`) and flight number (`/explore/flight_number/AF69`). Routes are drawn over the land as dots and coloured by altitude, like the homepage globe.
@@ -20,7 +21,8 @@ All notable changes to Infinite Planner are documented here.
 
 ### Changed
 - **Runway tiles are small.** Six runways to a row, all the same size, coloured by how the wind favours them; the headwind and crosswind of the chosen runway are written under the tiles instead of on each one.
-- **The simulation-only notice lives in the footer** (Convert, Sketch and the library pages), and no longer repeats beside the export buttons.
+- **The simulation-only notice is in every footer** of the site (including the admin area and the homepage globe), and no longer repeats beside the export buttons.
+- **Publishing a converted plan.** A plan converted from a FlightRadar24 or FlightAware file shows only the note that it can't be published (no switch); every other plan shows only the switch.
 - **Switching between Departure and Arrival is instant**: the live airport data is kept while the page is open and refreshed in the background.
 - **Notices fade out** by themselves (the import message and the waypoint simplification block).
 - **Share links are gone.** The Share button is replaced by a **Visibility** switch (Private / Public) on every exported flight plan, in the dashboard and in the editor. All the links created by the old sharing feature stop working. Downloading will require a Discord sign-in once the library is launched.

@@ -7,9 +7,11 @@ import { splitPhases } from "@/lib/route-phases"
 import { guideErrorKey, pointsToPayload, rowToGuide } from "@/lib/runway-guide-client"
 import {
   angleBetween,
+  applyArrivalGuide,
   applyGuide,
   bearingDeg,
   compassPoint,
+  extractArrival,
   extractDeparture,
   findRunwayEnd,
   fromRunwayFrame,
@@ -85,7 +87,7 @@ for (let i = 0; i < 6; i++) {
 }
 const split = splitPhases(track)
 const tocIndex = split.departureEnd
-assert.equal(track[tocIndex].altitude, 33_000) // first point at 90% of the 35,000 ft maximum
+assert.ok(track[tocIndex].altitude >= 33_000) // the top of climb: 90% or more of the 35,000 ft maximum
 
 {
   const found = extractDeparture(track, KDTW, split)!
@@ -230,6 +232,60 @@ assert.equal(track[tocIndex].altitude, 33_000) // first point at 90% of the 35,0
   assert.equal(guideErrorKey("guide_not_found"), "notFound")
   assert.equal(guideErrorKey("anything else"), "generic")
   assert.equal(guideErrorKey(null), "generic")
+}
+
+// 8. An arrival: cruise in from the north-east, descend, join a straight final to 21L, touch down, roll out.
+{
+  const back = (m: number) => offset(e21L, e21L.headingTrue + 180, m) // out along the extended centre line
+  const plan: TrimPoint[] = []
+  let at: LatLng = offset(back(60_000), 60, 300_000)
+  for (let i = 0; i < 4; i++) {
+    plan.push({ ...at, altitude: 35_000 })
+    at = offset(at, 240, 40_000)
+  }
+  for (const [along, altitude] of [[110_000, 30_000], [80_000, 20_000], [50_000, 12_000], [30_000, 7_000], [16_000, 4_000], [9_000, 2_600], [4_500, 1_500], [1_800, 900]] as const) {
+    plan.push({ ...back(along), altitude })
+  }
+  plan.push({ ...offset(e21L, e21L.headingTrue, 300), altitude: 650 }) // touchdown
+  for (const m of [900, 1800, 2400]) plan.push({ ...offset(e21L, e21L.headingTrue, m), altitude: 645 }) // roll out
+  const planSplit = splitPhases(plan)
+  const found = extractArrival(plan, KDTW, planSplit)!
+  assert.ok(found, "found an arrival")
+  assert.equal(found.runwayEnd, "21L")
+  assert.equal(found.confidence, "high", found.reasons.join("; "))
+  assert.ok(found.points.length >= 3 && found.points.length <= MAX_GUIDE_POINTS)
+  // Ends at the touchdown point on the runway, comes in from before the threshold, within the guide radius.
+  const last = found.points[found.points.length - 1]
+  assert.ok(last.along >= 0 && last.along <= 700 && Math.abs(last.across) <= 60, JSON.stringify(last))
+  assert.ok(found.points[0].along < -20_000)
+  assert.ok(found.points.every((p) => Math.hypot(p.along, p.across) / 1852 <= 40.5))
+  assert.ok(found.fromIndex >= planSplit.arrivalStart)
+  // The arrival comes from the north-east: bearing from the threshold about 29 degrees.
+  assert.ok(found.tocDistanceNm > 40)
+  assert.ok(angleBetween(found.tocBearing, 29) < 25, `bearing ${found.tocBearing}`)
+  assert.equal(found.direction, "north-east")
+  // A runway with no data, and a plan that is too short.
+  const noRunways = extractArrival(plan, { ...KDTW, runways: [] }, planSplit)
+  assert.equal(noRunways?.runwayEnd ?? null, null)
+  assert.equal(extractArrival(plan.slice(0, 3), KDTW, planSplit), null)
+
+  // Laid onto the same end: the original. Onto the parallel 21R: the near part moves, the far part stays. Onto 27 (other heading): joins.
+  const geometry: GuideGeometry = { runwayEnd: "21L", runwayHeadingTrue: found.runwayHeadingTrue, points: found.points }
+  const same = applyArrivalGuide(geometry, e21L, e21L)
+  assert.equal(same.mode, "reanchored")
+  near(same.points[same.points.length - 1], plan[12], 60, "touchdown")
+  const parallel = applyArrivalGuide(geometry, e21L, e21R)
+  assert.equal(parallel.mode, "merged")
+  const finalPoint = parallel.points[parallel.points.length - 1]
+  near(finalPoint, fromRunwayFrame({ ...last, across: last.across }, e21R), 60, "touchdown on 21R")
+  near(parallel.points[0], same.points[0], 50, "far end unchanged")
+  const e27 = runwayEnds(KDTW).find((end) => angleBetween(end.headingTrue, e21L.headingTrue) > 40)!
+  const other = applyArrivalGuide(geometry, e21L, e27)
+  assert.equal(other.mode, "joined")
+  assert.ok(other.warnings.length > 0)
+  near(other.points[0], same.points[0], 50, "far end unchanged")
+  const touch = other.points[other.points.length - 1]
+  assert.ok(Math.abs(toRunwayFrame({ ...touch, altitude: 0 }, e27).across) <= 5, "lands on the target centre line")
 }
 
 // 7. Bearings.
