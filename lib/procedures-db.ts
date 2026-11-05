@@ -1,7 +1,9 @@
 // Reads of the airport procedures database, for the admin page. Every call goes through an admin_* function that checks
 // is_admin() itself, with the signed-in admin's own client (never the service role).
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { TrimAirport } from "@/lib/ground-trim"
 import { airportFor, groupFlights, type FlightAnalysis } from "@/lib/procedure-analysis"
+import { findRunwayEnd, fromRunwayFrame } from "@/lib/runway-guide"
 import { buildCoverage } from "@/lib/procedure-coverage"
 
 interface OverviewRow {
@@ -148,20 +150,32 @@ export async function loadMemberGuides(supabase: SupabaseClient): Promise<Member
   })
 }
 
-/** Member procedures of one airport as flights for the coverage grid (no track: they are not drawn on the map). */
-export function guidesAsFlights(guides: MemberGuide[], icao: string): FlightAnalysis[] {
+/**
+ * Member procedures of one airport as flights, so they count in the coverage grid and are drawn on the map with the flight files
+ * (`file` = "guide:<id>"). The path is laid back onto the runway it was saved from; without a runway there is nothing to draw.
+ */
+export function guidesAsFlights(guides: MemberGuide[], icao: string, airport: TrimAirport | null = null): FlightAnalysis[] {
   return guides
     .filter((g) => g.airport === icao)
-    .map((g) => ({
-      file: `guide:${g.id}`,
-      kind: g.kind,
-      runway: g.runway,
-      bearing: g.bearingDeg,
-      turnNm: g.distanceNm,
-      altAt: {},
-      establishedNm: null,
-      flags: g.runway ? [] : ["member procedure without a runway"],
-      route: `saved by ${g.ownerName ?? "a member"}`,
-      track: [],
-    }))
+    .map((g) => {
+      const end = airport && g.runway ? findRunwayEnd(airport, g.runway) : null
+      const track: [number, number, number][] = end
+        ? g.points.map(([along, across, altitude]) => {
+            const point = fromRunwayFrame({ along, across, altitude }, end)
+            return [point.lat, point.lng, altitude]
+          })
+        : []
+      return {
+        file: `guide:${g.id}`,
+        kind: g.kind,
+        runway: g.runway,
+        bearing: g.bearingDeg,
+        turnNm: g.distanceNm,
+        altAt: {},
+        establishedNm: null,
+        flags: g.runway ? [] : ["member procedure without a runway"],
+        route: `saved by ${g.ownerName ?? "a member"}`,
+        track,
+      }
+    })
 }

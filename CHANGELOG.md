@@ -22,6 +22,7 @@ All notable changes to Infinite Planner are documented here.
 - **A Routes section in the admin dashboard**: the library with its coverage, the open reports (resolve, or hide the plan), a Hide / Unhide on every plan, and a switch to stop a user from publishing.
 
 ### Changed
+- **Admin Procedures: import in two steps.** **Import Flight Plans** reads the files and shows every procedure they hold (departures and arrivals) in teal on the map, before anything is saved. For each one you can correct the runway and the direction (from / to), leave some out, then import. Members' procedures are now drawn on the map with the flight files and count in the totals; **Preview** shows one of them alone (**Show all** brings the rest back).
 - **Admin coverage grid: parallel runways are separate rows** (08L and 08R each have their own arrivals and departures). Directions marked "not needed" before keep applying to both.
 - **Runway tiles are small.** Six runways to a row, all the same size, coloured by how the wind favours them; the headwind and crosswind of the chosen runway are written under the tiles instead of on each one.
 - **The simulation-only notice is in every footer** of the site (including the admin area and the homepage globe), and no longer repeats beside the export buttons.

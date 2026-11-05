@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { resolveBasemap, setBasemap } from "@/lib/map-tiles"
 import type { FlightAnalysis, FlightGroup } from "@/lib/procedure-analysis"
+import { useImportDraft } from "@/components/admin/procedures/import-draft"
 
 // Every analysed flight of an airport drawn on a map, coloured by its group, with the runway, direction and profile of each.
 // Read-only apart from removing a flight; merging groups and consensus paths come later.
@@ -54,6 +55,12 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
   const previewLayer = useRef<any>(null)
   const previewRef = useRef(preview)
   previewRef.current = preview
+  const isolated = preview !== null
+  const { pending, hoverId } = useImportDraft()
+  const pendingLayers = useRef<Map<string, any>>(new Map())
+  const pendingCount = useRef(0)
+  // Bumped when the map has been built, so what is drawn over it (a review in progress) is drawn again after an airport switch.
+  const [mapReady, setMapReady] = useState(0)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [runwayFilter, setRunwayFilter] = useState<string>("all")
   const [hover, setHover] = useState<string | null>(null)
@@ -98,14 +105,50 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
       if (all.length) map.fitBounds(all, { padding: [30, 30] })
       ;(window as any).__procMap = map
       drawPreview(L, map, previewRef.current, dark, previewLayer)
+      setMapReady((n) => n + 1)
     })()
     return () => {
       cancelled = true
       layers.current.clear()
+      pendingLayers.current.clear()
       previewLayer.current = null
       map?.remove()
     }
   }, [center, dark, flights, groupOf, icao, runways])
+
+  // The procedures of an import being reviewed, in teal over everything else; the one under the pointer in the list is thicker.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      // @ts-ignore leaflet ships no types in this project
+      const L = (await import("leaflet")).default
+      const map = (window as any).__procMap
+      if (cancelled || !map) return
+      pendingLayers.current.forEach((layer) => layer.remove())
+      pendingLayers.current.clear()
+      if (isolated) return
+      const color = dark ? "#2dd4bf" : "#0d9488"
+      const shown = pending.filter((row) => row.airport === icao && row.kind !== "unknown" && row.include && row.track.length >= 2)
+      shown.forEach((row) => {
+        const line = L.polyline(row.track.map((p) => [p[0], p[1]]), {
+          color,
+          weight: hoverId === row.id ? 6 : 3.5,
+          opacity: hoverId && hoverId !== row.id ? 0.45 : 0.95,
+          dashArray: row.kind === "departure" ? "6 5" : undefined,
+        }).addTo(map)
+        line.bindTooltip(`New · ${row.route} · ${row.kind} ${row.runway ?? "?"}`)
+        pendingLayers.current.set(row.id, line)
+      })
+      // New procedures arrived (or left): frame them all.
+      if (shown.length !== pendingCount.current) {
+        pendingCount.current = shown.length
+        if (shown.length > 0) map.fitBounds(L.featureGroup(Array.from(pendingLayers.current.values())).getBounds(), { padding: [40, 40], maxZoom: 11 })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pending, hoverId, icao, dark, isolated, flights, mapReady])
 
   // The previewed procedure changes without rebuilding the map.
   const previewId = preview?.id ?? null
@@ -129,18 +172,25 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
       if (!layer) return
       const group = groupOf.get(f.file)?.group.id
       const kindShown = f.kind === "arrival" ? shownKinds.arrival : f.kind === "departure" ? shownKinds.departure : true
-      const show = kindShown && !(group && hidden.has(group)) && (runwayFilter === "all" || f.runway === runwayFilter)
+      const show = !isolated && kindShown && !(group && hidden.has(group)) && (runwayFilter === "all" || f.runway === runwayFilter)
       const map = layer._map ?? (window as any).__procMap
       if (show && !layer._map && map) layer.addTo(map)
       if (!show && layer._map) layer.remove()
       layer.setStyle?.({ weight: hover === f.file ? 5 : 2.5, opacity: hover && hover !== f.file ? 0.35 : 0.85 })
     })
-  }, [hidden, runwayFilter, hover, flights, groupOf, shownKinds, dark])
+  }, [hidden, runwayFilter, hover, flights, groupOf, shownKinds, dark, isolated])
 
   async function removeFlight(id: string, label: string) {
     if (!window.confirm(`Remove ${label} from ${icao}?`)) return
-    await fetch("/api/admin/procedures", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete", id }) })
+    // A member's procedure ("guide:<id>") is deleted through its own action; a flight file through the other.
+    const body = id.startsWith("guide:") ? { action: "deleteGuide", id: id.slice(6) } : { action: "delete", id }
+    await fetch("/api/admin/procedures", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     router.refresh()
+  }
+
+  // One member's procedure shown alone (the Preview button): every other line is hidden until "Show all".
+  function showAll() {
+    router.replace(`/admin-dashboard/procedures?airport=${icao}`, { scroll: false })
   }
 
   const runwayNames = Array.from(new Set(flights.map((f) => f.runway).filter(Boolean))) as string[]
@@ -222,7 +272,15 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
               </div>
             </div>
           </div>
-          {arrivalGroups.length + departureGroups.length === 0 && <p className="text-sm text-muted-foreground">No flight files for this airport yet.</p>}
+          {isolated && (
+            <div className="mb-3 flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
+              <span>Showing one procedure on the map.</span>
+              <button type="button" onClick={showAll} className="rounded-md px-2 py-1 text-xs font-medium hover:bg-accent">
+                Show all
+              </button>
+            </div>
+          )}
+          {arrivalGroups.length + departureGroups.length === 0 && <p className="text-sm text-muted-foreground">No flights or procedures for this airport yet.</p>}
           {groupBlock("Approaches", arrivalGroups)}
           {groupBlock("Departures", departureGroups)}
         </section>

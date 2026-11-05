@@ -1,3 +1,4 @@
+import { ImportDraftProvider } from "@/components/admin/procedures/import-draft"
 import { AirportList } from "@/components/admin/procedures/airport-list"
 import { AirportPicker } from "@/components/admin/procedures/airport-picker"
 import { CoveragePanel } from "@/components/admin/procedures/coverage-panel"
@@ -7,7 +8,7 @@ import { SyncCard } from "@/components/admin/procedures/sync-card"
 import { PageHeader } from "@/components/admin/page-header"
 import { getSessionContext, requireAdmin } from "@/lib/admin/auth"
 import { getAirportInfo } from "@/lib/airports"
-import { airportFor } from "@/lib/procedure-analysis"
+import { airportFor, groupFlights } from "@/lib/procedure-analysis"
 import { findRunwayEnd, fromRunwayFrame } from "@/lib/runway-guide"
 import { guideLegText } from "@/lib/copy"
 import { buildCoverage } from "@/lib/procedure-coverage"
@@ -70,14 +71,16 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
       </div>
     </section>
   )
+  // Flight files and members' procedures together: both fill the grid and both are on the map.
+  const allFlights = icao && airport && detail ? [...detail.flights, ...guidesAsFlights(memberGuides, icao, airport)] : []
   const coverage =
     icao && airport && detail ? (
-      <CoveragePanel icao={icao} airportName={info ? `${info.name}, ${info.city}` : ""} coverage={buildCoverage(airport, [...detail.flights, ...guidesAsFlights(memberGuides, icao)], detail.notNeeded)} />
+      <CoveragePanel icao={icao} airportName={info ? `${info.name}, ${info.city}` : ""} coverage={buildCoverage(airport, allFlights, detail.notNeeded)} />
     ) : null
   const members = <MemberGuides guides={memberGuides} airport={icao} previewId={preview?.id ?? null} />
 
   return (
-    <>
+    <ImportDraftProvider>
       <PageHeader
         title="Procedures"
         description="How real flights arrive at and leave each airport, what is still missing, and the progress. Visible to admins only."
@@ -91,9 +94,9 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
           icao={icao}
           center={[airport.lat, airport.lng]}
           runways={airport.runways.map((r) => ({ name: `${r[6] ?? ""}/${r[7] ?? ""}`, from: [r[0], r[1]] as [number, number], to: [r[2], r[3]] as [number, number] }))}
-          flights={detail.flights}
-          arrivalGroups={detail.arrivalGroups}
-          departureGroups={detail.departureGroups}
+          flights={allFlights}
+          arrivalGroups={groupFlights(allFlights, "arrival")}
+          departureGroups={groupFlights(allFlights, "departure")}
           preview={preview}
           before={
             <>
@@ -114,6 +117,6 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
           {members}
         </div>
       )}
-    </>
+    </ImportDraftProvider>
   )
 }
