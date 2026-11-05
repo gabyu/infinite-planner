@@ -98,3 +98,48 @@ export async function loadSyncState(supabase: SupabaseClient) {
   const row = ((data ?? []) as { copy_allowed: boolean; last_synced_at: string | null; flights_count: number | null }[])[0]
   return { copyAllowed: row?.copy_allowed === true, lastSyncedAt: row?.last_synced_at ?? null, flightsCount: row?.flights_count ?? null }
 }
+
+export interface MemberGuide {
+  id: string
+  ownerId: string
+  ownerName: string | null
+  kind: "departure" | "arrival"
+  airport: string
+  runway: string | null
+  headingDeg: number | null
+  bearingDeg: number
+  distanceNm: number
+  label: string | null
+  /** [along, across, altitude] triples in the runway's frame. */
+  points: [number, number, number][]
+  useCount: number
+  originSources: string[]
+  createdAt: string
+}
+
+/** The procedures members saved from their own plans (private to them), for the admin review. Newest first, 500 at most. */
+export async function loadMemberGuides(supabase: SupabaseClient): Promise<MemberGuide[]> {
+  const { data } = await supabase.rpc("admin_list_runway_guides")
+  return ((data ?? []) as Record<string, unknown>[]).flatMap((row) => {
+    const points = Array.isArray(row.points) ? (row.points as unknown[]).filter((p): p is [number, number, number] => Array.isArray(p) && p.length === 3) : []
+    if (typeof row.id !== "string" || typeof row.airport !== "string" || points.length === 0) return []
+    return [
+      {
+        id: row.id,
+        ownerId: String(row.owner_id),
+        ownerName: typeof row.owner_name === "string" ? row.owner_name : null,
+        kind: row.kind === "arrival" ? ("arrival" as const) : ("departure" as const),
+        airport: row.airport,
+        runway: typeof row.runway_name === "string" ? row.runway_name : null,
+        headingDeg: typeof row.runway_heading_deg === "number" ? row.runway_heading_deg : null,
+        bearingDeg: Number(row.toc_bearing_deg) || 0,
+        distanceNm: Number(row.toc_distance_nm) || 0,
+        label: typeof row.label === "string" ? row.label : null,
+        points,
+        useCount: Number(row.use_count) || 0,
+        originSources: Array.isArray(row.origin_sources) ? (row.origin_sources as string[]) : [],
+        createdAt: String(row.created_at),
+      },
+    ]
+  })
+}

@@ -217,7 +217,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
         </table>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Arrival: where the flight came in from at 40 NM. Departure: where it was heading at the top of climb. Parallel runways (08L, 08R) count as one.
+        Arrival: where the flight came in from at 40 NM. Departure: where it was heading at the top of climb.
       </p>
 
       <div

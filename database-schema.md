@@ -178,3 +178,9 @@ changing them. Without them the app still runs but the statistics feature is dis
 - Filenames of imported KML files are parsed for flight number, airports, date and source
   (FlightRadar24 / FlightAware); drawn plans are recorded with source `DrawingBoard`.
 - The homepage shows total flights, unique airports, popular airports and popular flights.
+
+
+## Flight plan details and the member procedures review (`20261107000000_plan_details_and_admin_guides.sql`)
+- `flight_plans.departure_runway` / `arrival_runway` (nullable, `08L` style): the runways the plan departs from and lands on, detected or picked in the editor, editable from the dashboard. Never in the FPL.
+- `update_flight_plan_details(plan, flight_number, aircraft, dep_runway, arr_runway)` (SECURITY DEFINER, owner only) edits those details and the primary flight number on a draft **or an exported** plan. The lock trigger `flight_plans_stamp_save` lets the flight number change only inside this function (transaction-local flag `app.plan_details_edit`); every other column of an exported plan stays locked.
+- `admin_list_runway_guides()` / `admin_delete_runway_guide(id)` (admins only): the procedures members saved (who, when, path) and a delete, for Admin → Procedures → Saved by members.

@@ -1,6 +1,7 @@
 import { AirportList } from "@/components/admin/procedures/airport-list"
 import { AirportPicker } from "@/components/admin/procedures/airport-picker"
 import { CoveragePanel } from "@/components/admin/procedures/coverage-panel"
+import { MemberGuides } from "@/components/admin/procedures/member-guides"
 import { ProceduresMap } from "@/components/admin/procedures/procedures-map"
 import { SyncCard } from "@/components/admin/procedures/sync-card"
 import { PageHeader } from "@/components/admin/page-header"
@@ -8,7 +9,7 @@ import { getSessionContext, requireAdmin } from "@/lib/admin/auth"
 import { getAirportInfo } from "@/lib/airports"
 import { airportFor } from "@/lib/procedure-analysis"
 import { buildCoverage } from "@/lib/procedure-coverage"
-import { loadAirport, loadSummaries, loadSyncState } from "@/lib/procedures-db"
+import { loadAirport, loadMemberGuides, loadSummaries, loadSyncState } from "@/lib/procedures-db"
 
 export const dynamic = "force-dynamic"
 
@@ -20,7 +21,11 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
   if (!ctx) return null
 
   const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
-  const [summaries, sync] = await Promise.all([loadSummaries(ctx.supabase), isStaging ? loadSyncState(ctx.supabase) : null])
+  const [summaries, sync, memberGuides] = await Promise.all([
+    loadSummaries(ctx.supabase),
+    isStaging ? loadSyncState(ctx.supabase) : null,
+    loadMemberGuides(ctx.supabase),
+  ])
 
   const wanted = (searchParams.airport ?? "").toUpperCase()
   const icao = /^[A-Z]{4}$/.test(wanted) ? wanted : (summaries[0]?.code ?? null)
@@ -79,6 +84,8 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
           />
         </>
       )}
+
+      <MemberGuides guides={memberGuides} airport={icao} />
     </>
   )
 }

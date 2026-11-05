@@ -26,6 +26,9 @@ const waypointSchema = z.object({
   altitude: z.number().finite().min(-2000).max(100000).transform(Math.round),
 })
 
+export const RUNWAY_PATTERN = /^(0[1-9]|[12][0-9]|3[0-6])[LRC]?$/
+const runwaySchema = z.string().trim().toUpperCase().regex(RUNWAY_PATTERN, "Invalid runway.").nullable().default(null)
+
 export const flightPlanBodySchema = z.object({
   source: z.enum(FLIGHT_PLAN_SOURCES),
   // 'draft' for an autosave, 'exported' when the FPL is downloaded (locks the plan).
@@ -56,6 +59,9 @@ export const flightPlanBodySchema = z.object({
     .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), "Invalid aircraft.")
     .nullable()
     .default(null),
+  // The runways the plan departs from and lands on ("08L"): detected or picked in the editor, kept with the plan.
+  departureRunway: runwaySchema,
+  arrivalRunway: runwaySchema,
 })
 
 export type FlightPlanBody = z.infer<typeof flightPlanBodySchema>
@@ -75,6 +81,8 @@ export function flightPlanColumns(body: FlightPlanBody) {
     includes_branding: body.includesBranding,
     flight_time_minutes: body.flightTimeMinutes,
     aircraft: body.aircraft,
+    departure_runway: body.departureRunway,
+    arrival_runway: body.arrivalRunway,
   }
 }
 
@@ -135,20 +143,25 @@ export async function requireLibraryUser(request: Request) {
   return auth
 }
 
-// A database that hasn't had the extra_flight_numbers (or aircraft) migration yet answers "undefined column": saving and
+// A database that hasn't had the extra_flight_numbers (aircraft, runways) migration yet answers "undefined column": saving and
 // reading then carry on without them (a plan with one flight number and no aircraft loses nothing).
 export function isMissingExtraColumn(error: { code?: string; message?: string } | null | undefined) {
-  return !!error && (error.code === "42703" || /extra_flight_numbers|aircraft/.test(error.message ?? ""))
+  return !!error && (error.code === "42703" || /extra_flight_numbers|aircraft|departure_runway|arrival_runway/.test(error.message ?? ""))
 }
 
-export function withoutExtraNumbers<T extends { extra_flight_numbers?: unknown; aircraft?: unknown }>(
+export function withoutExtraNumbers<T extends { extra_flight_numbers?: unknown; aircraft?: unknown; departure_runway?: unknown; arrival_runway?: unknown }>(
   columns: T,
-): Omit<T, "extra_flight_numbers" | "aircraft"> {
-  const { extra_flight_numbers: _omit, aircraft: _aircraft, ...rest } = columns
+): Omit<T, "extra_flight_numbers" | "aircraft" | "departure_runway" | "arrival_runway"> {
+  const { extra_flight_numbers: _omit, aircraft: _aircraft, departure_runway: _dep, arrival_runway: _arr, ...rest } = columns
   return rest
 }
 
 /** True when leaving the optional columns out loses nothing: no codeshare numbers and no aircraft were sent. */
-export function nothingLostWithoutOptional(columns: { extra_flight_numbers: unknown[]; aircraft: string | null }) {
-  return columns.extra_flight_numbers.length === 0 && !columns.aircraft
+export function nothingLostWithoutOptional(columns: {
+  extra_flight_numbers: unknown[]
+  aircraft: string | null
+  departure_runway: string | null
+  arrival_runway: string | null
+}) {
+  return columns.extra_flight_numbers.length === 0 && !columns.aircraft && !columns.departure_runway && !columns.arrival_runway
 }

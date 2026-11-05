@@ -5,6 +5,8 @@ All notable changes to Infinite Planner are documented here.
 ## Unreleased
 
 ### Added
+- **Edit a flight's details from the dashboard.** The row menu has **Edit details**: flight number, aircraft, departure runway and arrival runway, on drafts and exported plans alike (they live in our system, the route and the FPL never change). The runways are filled in by the editor when it detects them or when you pick a procedure or a runway, and show under the flight number in the list. Needs the `20261107000000_plan_details_and_admin_guides.sql` migration.
+- **Admin: procedures saved by members.** Admin → Procedures has a new **Saved by members** list: who saved each procedure and when, a small drawing of the path, and a Delete (plans that used it are untouched).
 - **Arrival procedures.** The Arrival tab now has the same procedures as Departure: your plan's arrival ("Arriving from North · 85 NM · 012°") can be saved, dated, applied to the runway you pick, and restored to the original. Needs the `20261106000000_runway_guides_arrival.sql` migration.
 - **Procedures in the departure card.** Under the runway tiles, your plan's departure ("Departing East · 227 NM · 106°") can be saved as a procedure. Pick a runway and the list shows the procedures you saved for it, dated, with a check on the one your plan flies. **Apply** puts one into the plan in one undo step; **Restore** brings the original departure back.
 - **Aircraft.** A new **Aircraft** field in the editor's Options (signed in), with the aircraft Infinite Flight offers as suggestions, found from any part of the name or its short code ("359" finds the A350-900), or type your own. The chip beside the route shows the short code (A359). It is kept with your plan, never written into the FPL. A small **⚠ AC** shows beside the route until it is filled in.
@@ -20,6 +22,7 @@ All notable changes to Infinite Planner are documented here.
 - **A Routes section in the admin dashboard**: the library with its coverage, the open reports (resolve, or hide the plan), a Hide / Unhide on every plan, and a switch to stop a user from publishing.
 
 ### Changed
+- **Admin coverage grid: parallel runways are separate rows** (08L and 08R each have their own arrivals and departures). Directions marked "not needed" before keep applying to both.
 - **Runway tiles are small.** Six runways to a row, all the same size, coloured by how the wind favours them; the headwind and crosswind of the chosen runway are written under the tiles instead of on each one.
 - **The simulation-only notice is in every footer** of the site (including the admin area and the homepage globe), and no longer repeats beside the export buttons.
 - **Publishing a converted plan.** A plan converted from a FlightRadar24 or FlightAware file shows only the note that it can't be published (no switch); every other plan shows only the switch.

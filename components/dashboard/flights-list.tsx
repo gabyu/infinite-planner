@@ -29,6 +29,8 @@ import { toast } from "@/hooks/use-toast"
 import { LocalTime } from "@/components/local-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
+import { PlanDetailsDialog } from "@/components/dashboard/plan-details-dialog"
+import { aircraftCode } from "@/lib/aircraft"
 import { legalCopy } from "@/lib/copy"
 import { VisibilitySwitch } from "@/components/visibility-switch"
 import { planPath } from "@/lib/plan-slug"
@@ -107,6 +109,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
   const firstRun = useRef(true)
   const [deleting, setDeleting] = useState<FlightPlanSummary | null>(null)
   const [viewing, setViewing] = useState<FlightPlanSummary | null>(null)
+  const [editing, setEditing] = useState<FlightPlanSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
   const [tab, setTab] = useState<Tab>("all")
@@ -447,6 +450,16 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
 
                 <div className="order-last col-span-2 flex flex-wrap items-center gap-1.5 md:order-none md:col-span-1 md:flex-col md:items-start">
                   <span className="font-mono text-sm">{plan.flight_number ?? "—"}</span>
+                  {(plan.aircraft || plan.departure_runway || plan.arrival_runway) && (
+                    <span className="flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-muted-foreground">
+                      {plan.aircraft && <span title={plan.aircraft}>{aircraftCode(plan.aircraft)}</span>}
+                      {(plan.departure_runway || plan.arrival_runway) && (
+                        <span title="Departure runway → arrival runway">
+                          {plan.departure_runway ?? "?"} → {plan.arrival_runway ?? "?"}
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <Badge variant="outline" className="px-1.5 text-[10px] font-normal text-muted-foreground">
                     {sourceLabel(plan.source)}
                   </Badge>
@@ -538,6 +551,9 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuItem onSelect={() => setEditing(plan)}>
+                        <Pencil /> Edit details
+                      </DropdownMenuItem>
                       {!isDraft && (
                         <>
                           <DropdownMenuItem onSelect={() => duplicate(plan)}>
@@ -612,6 +628,14 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
       )}
 
       {viewing && <PlanViewDialog planId={viewing.id} onClose={() => setViewing(null)} />}
+      <PlanDetailsDialog
+        plan={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(id, details) => {
+          patchPlan(id, details)
+          toast({ title: "Details saved" })
+        }}
+      />
 
 
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
