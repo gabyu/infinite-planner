@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronDown,
   HelpCircle,
+  AlertTriangle,
   LassoSelect,
   AlertCircle,
   Info,
@@ -67,6 +68,7 @@ import { WaypointList } from "@/components/editor/waypoint-list"
 import { AltitudeStrip } from "@/components/editor/altitude-strip"
 import { SourceMark } from "@/components/editor/source-mark"
 import { FlightNumbersField } from "@/components/editor/flight-numbers-field"
+import { AircraftField } from "@/components/editor/aircraft-field"
 import { GroundMovements, GroundTrimBar } from "@/components/editor/ground-movements"
 import { AirportCard } from "@/components/editor/live-airports"
 import { RunwayGuides } from "@/components/editor/runway-guides"
@@ -199,6 +201,18 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   }, [curveSegments])
   const isTouchPrimary = useIsTouchPrimary()
   const [simplificationInfo, setSimplificationInfo] = useState<SimplificationInfo | null>(null)
+  // The notices are passing messages: they fade out, then go, together with the "imported" line beside them.
+  const [fadingOut, setFadingOut] = useState(false)
+  useEffect(() => {
+    if (!simplificationInfo) return
+    setFadingOut(false)
+    const fade = window.setTimeout(() => setFadingOut(true), 6500)
+    const gone = window.setTimeout(() => setSimplificationInfo(null), 7000)
+    return () => {
+      window.clearTimeout(fade)
+      window.clearTimeout(gone)
+    }
+  }, [simplificationInfo])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -250,6 +264,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const [flightNumberEdit, setFlightNumberEdit] = useState<string | undefined>(undefined)
   // The other numbers of the flight (codeshares), next to the main one above. Saved with the plan.
   const [extraFlightNumbers, setExtraFlightNumbers] = useState<string[]>([])
+  // The aircraft of the plan: stored with it, never written into the FPL.
+  const [aircraft, setAircraft] = useState("")
   const { user: authUser, ready: authReady, available: authAvailable } = useAuthUser()
   const [isEditingMap, setIsEditingMap] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
@@ -332,13 +348,19 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     return () => clearTimeout(timeout)
   }, [mode, waypoints, originAirport, destinationAirport])
 
-  // Clear success message after 5 seconds
+  // Clear success message after 5 seconds, fading out first
+  const [successFading, setSuccessFading] = useState(false)
   useEffect(() => {
     if (successMessage) {
+      setSuccessFading(false)
+      const fade = setTimeout(() => setSuccessFading(true), 4500)
       const timer = setTimeout(() => {
         setSuccessMessage(null)
       }, 5000)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(fade)
+        clearTimeout(timer)
+      }
     }
   }, [successMessage])
 
@@ -457,6 +479,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setFlightNumberOverride(null)
         setFlightNumberEdit(undefined)
         setExtraFlightNumbers([])
+        setAircraft("")
         setImportSource(
           result.source === "FlightAware" || result.source === "FlightRadar24" || result.source === "Imported" ? result.source : null,
         )
@@ -594,8 +617,9 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         ]),
         effectiveBranding,
         flightTimeMinutes,
+        aircraft.trim(),
       ]),
-    [planSource, detectedFlightNumber, extraFlightNumbers, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
+    [planSource, detectedFlightNumber, extraFlightNumbers, aircraft, originAirport, destinationAirport, waypoints, includeBranding, effectiveBranding, flightTimeMinutes],
   )
   const isDirty = savedFingerprint !== currentFingerprint
 
@@ -683,6 +707,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
       waypoints: finalWaypoints.map(({ name, lat, lng, altitude }) => ({ name, lat, lng, altitude })),
       includesBranding: effectiveBranding,
       flightTimeMinutes,
+      aircraft: aircraft.trim() || null,
     })
 
     const send = (url: string, method: "POST" | "PUT") =>
@@ -817,6 +842,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         setIcaoValidation({ origin: true, destination: true })
         setIncludeBranding(branded)
         setFlightTimeMinutes(body.flight_time_minutes ?? null)
+        setAircraft(typeof body.aircraft === "string" ? body.aircraft : "")
         setWaypoints(restored)
         setOriginSources(Array.isArray(body.origin_sources) ? body.origin_sources : [])
         if (mode === "import") {
@@ -1368,9 +1394,14 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
   const guideSupabase = useMemo(() => (authUser && liveAllowed ? getBrowserSupabase() : null), [authUser, liveAllowed])
   // The database is told first (the plan takes the guide's origin, so a plan built on a tracker-derived guide cannot be
   // published), then the departure part of the plan is replaced in one undo step. Throws when the database refuses.
+  const originalDeparture = useRef<{ airport: string; waypoints: Waypoint[] } | null>(null)
   const applyGuideToPlan = async (points: GuidePoint[], guide: StoredGuide) => {
     if (!guideSupabase || !savedPlanId) throw new GuideError("plan_not_found")
     setOriginSources(await attachGuideToPlan(guideSupabase, savedPlanId, guide.id))
+    // The plan's own departure is kept the first time a procedure is applied, so it can be put back.
+    if (originalDeparture.current?.airport !== originAirport) {
+      originalDeparture.current = { airport: originAirport, waypoints: waypoints.slice(0, phaseSplit.departureEnd + 1) }
+    }
     const stamp = Date.now()
     const replacement: Waypoint[] = points.map((point, index) => ({
       id: `${stamp}-guide-${index}`,
@@ -1395,6 +1426,26 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         </ToastAction>
       ),
     })
+  }
+
+  // Puts the departure the plan had before the first procedure was applied back (one undo step).
+  const restoreOriginalDeparture = () => {
+    const saved = originalDeparture.current
+    if (!saved || saved.airport !== originAirport) return false
+    const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
+    setWaypoints(applyWaypointNamingRules([...saved.waypoints, ...kept], originAirport, destinationAirport, includeBranding))
+    originalDeparture.current = null
+    setGuidePreview(null)
+    setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    toast({
+      title: copy.guides.restoredToast,
+      action: (
+        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+          {copy.editor.trimUndo}
+        </ToastAction>
+      ),
+    })
+    return true
   }
 
   // The toggles are "on" while the ground movements are in the plan. Turning one off previews what goes (Apply
@@ -1528,6 +1579,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
         </PanelSection>
     )
 
+  const aircraftSection = (inGrid: boolean, always = false) =>
+    (canSave || always) && (
+      <PanelSection label={copy.editor.aircraftLabel} className={inGrid ? exportSectionClass : undefined} help={copy.editor.aircraftHelp}>
+        <AircraftField id="aircraft" value={aircraft} onChange={setAircraft} />
+      </PanelSection>
+    )
+
   const flightTimeSection = (inGrid: boolean, always = false) =>
     (canSave || always) && (
         <PanelSection
@@ -1543,6 +1601,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
     <>
       {brandingSection(inGrid)}
       {flightNumberSection(inGrid)}
+      {aircraftSection(inGrid)}
       {flightTimeSection(inGrid)}
     </>
   )
@@ -1568,14 +1627,41 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                   field?.focus({ preventScroll: true })
                 }, 80)
               }}
-              className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              title="Add the flight number"
+              aria-label="Add the flight number"
+              className="inline-flex h-5 items-center gap-0.5 rounded border border-amber-500/50 bg-amber-500/10 px-1.5 font-mono text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200"
             >
+              <AlertTriangle className="h-3 w-3" aria-hidden />
               {copy.editor.addFlightNumber}
             </button>
           ) : (
             <span>{copy.editor.noFlightNumber}</span>
           )
         )}
+        {canSave &&
+          (aircraft.trim() ? (
+            <span className="max-w-[10rem] truncate rounded border bg-muted/50 px-1.5 py-0.5 text-foreground" title={aircraft.trim()}>
+              {aircraft.trim()}
+            </span>
+          ) : (
+            <button
+              type="button"
+              title={copy.editor.aircraftAdd}
+              aria-label={copy.editor.aircraftAdd}
+              onClick={() => {
+                setPanelTab("options")
+                window.setTimeout(() => {
+                  const field = document.getElementById("aircraft")
+                  field?.scrollIntoView({ block: "center", behavior: "smooth" })
+                  field?.focus({ preventScroll: true })
+                }, 80)
+              }}
+              className="inline-flex h-5 items-center gap-0.5 rounded border border-amber-500/50 bg-amber-500/10 px-1.5 font-mono text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200"
+            >
+              <AlertTriangle className="h-3 w-3" aria-hidden />
+              {copy.editor.aircraftChip}
+            </button>
+          ))}
         <SourceMark source={importSource} />
       </div>
     ) : null
@@ -1624,7 +1710,6 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
           Export FPL
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">{legalCopy.simulationOnly}</p>
       {libraryOpen && (
         <div>
           <VisibilitySwitch
@@ -1924,13 +2009,13 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         </p>
                       )}
                       {successMessage && (
-                        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <p className={cn("flex items-start gap-1.5 text-xs text-muted-foreground transition-opacity duration-500", successFading && "opacity-0")}>
                           <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                           {successMessage}
                         </p>
                       )}
                       {simplificationInfo && (
-                        <details className="rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+                        <details className={cn("rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition-opacity duration-500", fadingOut && "opacity-0")}>
                           <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
                             <Info className="h-3.5 w-3.5 text-primary" />
                             Waypoint simplification applied
@@ -1984,7 +2069,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                         defaultOpen={!isMobile}
                         className="mx-4 mb-3"
                       >
-                        {(embedded, runway, toneOf) =>
+                        {(embedded, runway) =>
                           activeTab === "departure" ? (
                             <RunwayGuides
                               supabase={guideSupabase}
@@ -1999,7 +2084,8 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                               onPreview={setGuidePreview}
                               onApply={applyGuideToPlan}
                               onNotify={(title, description) => toast({ title, description })}
-                              toneOf={toneOf}
+                              destination={destinationAirport}
+                              onRestore={restoreOriginalDeparture}
                               embedded={embedded}
                             />
                           ) : null
@@ -2042,6 +2128,7 @@ export function FlightPlanEditor({ initialMode }: FlightPlanEditorProps) {
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t">
                   {/* Flight numbers and time are saved with a plan: only offered when signed in */}
                   {flightNumberSection(false)}
+                  {aircraftSection(false)}
                   {flightTimeSection(false)}
                   {optionsContent}
                   {brandingSection(false)}

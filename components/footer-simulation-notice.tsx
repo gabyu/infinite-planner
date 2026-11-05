@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation"
 import { SIMULATION_DISCLAIMER } from "@/lib/brand"
 
-// The simulation-only notice that closes the footer of the library's pages (plans, Explore, profiles).
-const LIBRARY_PATHS = ["/explore", "/pilots", "/preview/"]
+// The simulation-only notice that closes the footer of the library's pages (plans, Explore, profiles) and of the planner pages
+// (Convert, Sketch), so the editor itself does not carry it.
+const LIBRARY_PATHS = ["/explore", "/pilots", "/preview/", "/convert", "/sketch", "/planner"]
 
 export function FooterSimulationNotice() {
   const pathname = usePathname()

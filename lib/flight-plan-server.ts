@@ -46,6 +46,16 @@ export const flightPlanBodySchema = z.object({
   waypoints: z.array(waypointSchema).min(2, "A flight plan needs at least 2 waypoints.").max(1000),
   includesBranding: z.boolean(),
   flightTimeMinutes: z.number().int().min(1).max(5999).nullable(),
+  // The aircraft ("Boeing 777-300ER"): kept in our system, never written into the .fpl. Optional.
+  aircraft: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    // eslint-disable-next-line no-control-regex
+    .refine((value) => !/[\u0000-\u001f\u007f]/.test(value), "Invalid aircraft.")
+    .nullable()
+    .default(null),
 })
 
 export type FlightPlanBody = z.infer<typeof flightPlanBodySchema>
@@ -64,6 +74,7 @@ export function flightPlanColumns(body: FlightPlanBody) {
     waypoints: body.waypoints,
     includes_branding: body.includesBranding,
     flight_time_minutes: body.flightTimeMinutes,
+    aircraft: body.aircraft,
   }
 }
 
@@ -124,13 +135,20 @@ export async function requireLibraryUser(request: Request) {
   return auth
 }
 
-// A database that hasn't had the extra_flight_numbers migration yet answers "undefined column": saving and reading
-// then carry on without it (plans with only one flight number lose nothing).
+// A database that hasn't had the extra_flight_numbers (or aircraft) migration yet answers "undefined column": saving and
+// reading then carry on without them (a plan with one flight number and no aircraft loses nothing).
 export function isMissingExtraColumn(error: { code?: string; message?: string } | null | undefined) {
-  return !!error && (error.code === "42703" || /extra_flight_numbers/.test(error.message ?? ""))
+  return !!error && (error.code === "42703" || /extra_flight_numbers|aircraft/.test(error.message ?? ""))
 }
 
-export function withoutExtraNumbers<T extends { extra_flight_numbers?: unknown }>(columns: T): Omit<T, "extra_flight_numbers"> {
-  const { extra_flight_numbers: _omit, ...rest } = columns
+export function withoutExtraNumbers<T extends { extra_flight_numbers?: unknown; aircraft?: unknown }>(
+  columns: T,
+): Omit<T, "extra_flight_numbers" | "aircraft"> {
+  const { extra_flight_numbers: _omit, aircraft: _aircraft, ...rest } = columns
   return rest
+}
+
+/** True when leaving the optional columns out loses nothing: no codeshare numbers and no aircraft were sent. */
+export function nothingLostWithoutOptional(columns: { extra_flight_numbers: unknown[]; aircraft: string | null }) {
+  return columns.extra_flight_numbers.length === 0 && !columns.aircraft
 }

@@ -2,12 +2,12 @@
 
 import { Fragment, useEffect, useState, type ReactNode } from "react"
 import { ChevronDown, Loader2 } from "lucide-react"
-import { atisWindText, copy, runwayComponentsText, tileWindText, weatherSourceText } from "@/lib/copy"
+import { atisWindText, copy, runwayComponentsText, weatherSourceText } from "@/lib/copy"
 import type { TrimAirport } from "@/lib/ground-trim"
 import type { WeatherState } from "@/lib/live-api/airport"
 import { chipRunways, effectiveChoice, type EndChoice, type HandChoice } from "@/lib/runway-choice"
 import { runwayEnds } from "@/lib/runway-guide"
-import { adviseRunways, endTone, type EndTone, type RankedEnd } from "@/lib/runway-wind"
+import { adviseRunways, endTone, type EndTone } from "@/lib/runway-wind"
 import { cn } from "@/lib/utils"
 
 // What /api/live/airports/{icao} answers (see lib/live-api/airport.ts); "unknown" is a 404 for a code that isn't an airport.
@@ -25,20 +25,26 @@ type Live = { state: "loading" } | AtisState | NoAtisState | { state: "unavailab
 
 const REFRESH_MS = 60_000
 
+// The last answer for each airport, kept in this page's memory: switching between the Departure and Arrival tabs (or back to
+// an airport) shows it at once and refreshes it in the background, instead of starting from "loading" every time.
+// Nothing is stored on disk and nothing outlives the page.
+const lastAnswer = new Map<string, Live>()
+
 // Follows one airport while its code is valid: asks the server now and then every minute (only while the tab is visible).
 // The server answers from a shared cache, so this never costs Infinite Flight a call of its own.
 function useAirportLive(icao: string, active: boolean): Live | null {
-  const [live, setLive] = useState<Live>({ state: "loading" })
+  const [live, setLive] = useState<Live>(() => lastAnswer.get(icao) ?? { state: "loading" })
 
   useEffect(() => {
     if (!active) return
     let cancelled = false
-    setLive({ state: "loading" })
+    setLive(lastAnswer.get(icao) ?? { state: "loading" })
     const load = async () => {
       if (document.hidden) return
       try {
         const response = await fetch(`/api/live/airports/${icao}`, { cache: "no-store" })
         const data = (await response.json()) as Live
+        if (data.state !== "unavailable") lastAnswer.set(icao, data)
         if (!cancelled) setLive(data)
       } catch {
         if (!cancelled) setLive({ state: "unavailable" })
@@ -71,34 +77,32 @@ export const TONE_CLASSES: Record<EndTone, string> = {
   avoid: "border-red-500/50 bg-red-500/15 text-red-800 hover:bg-red-500/25 dark:text-red-200",
 }
 
-// One tile per runway end: its name and what the wind does on it, coloured by how the wind favours it.
+// One small tile per runway end, coloured by how the wind favours it. What the wind does on the chosen end is written under
+// the tiles (see `detail`), not on every tile.
 function RunwayTiles({
   runways,
   choice,
   onTap,
-  ranks,
   titles,
   tones,
-  tag,
+  detail,
 }: {
   runways: string[]
   choice: EndChoice | null
   onTap: (runway: string) => void
-  /** Headwind and crosswind of each end, where the wind is known. */
-  ranks: Record<string, RankedEnd>
   /** What the wind does on each runway, shown as a tooltip. */
   titles?: Record<string, string>
   /** Green / yellow / red by how the wind favours each end. The chosen tile is outlined whatever its tone. */
   tones?: Record<string, EndTone>
-  /** A small label under every tile ("ATIS"). */
-  tag?: string
+  /** What the wind does on the chosen end, written under the tiles. */
+  detail?: string | null
 }) {
   if (runways.length === 0) return null
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="space-y-1.5">
+    <div className="grid grid-cols-6 gap-1.5">
       {runways.map((runway) => {
         const chosen = choice?.runway === runway
-        const rank = ranks[runway]
         return (
           <button
             key={runway}
@@ -107,23 +111,18 @@ function RunwayTiles({
             title={titles?.[runway]}
             onClick={() => onTap(runway)}
             className={cn(
-              "flex min-w-[3.25rem] max-w-[5rem] flex-1 basis-[3.5rem] flex-col items-center gap-0.5 rounded-md border px-1 py-2 text-center transition-colors",
+              "flex h-8 w-full flex-col items-center justify-center rounded-md border px-1 text-center transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               tones?.[runway] ? TONE_CLASSES[tones[runway]] : "bg-muted hover:bg-accent",
               chosen && "border-primary ring-1 ring-primary",
             )}
           >
             <span className="font-mono text-sm font-medium tabular-nums">{runway}</span>
-            {rank &&
-              tileWindText(rank.headwindKt, rank.crosswindKt).map((line) => (
-                <span key={line} className="text-[11px] leading-tight text-muted-foreground">
-                  {line}
-                </span>
-              ))}
-            {tag && <span className="text-[11px] leading-tight text-muted-foreground">{tag}</span>}
           </button>
         )
       })}
+    </div>
+    {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
     </div>
   )
 }
@@ -192,10 +191,10 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
       : choice.by === "atis"
         ? copy.live.runwayFromAtis
         : choice.inAtis
-          ? copy.live.runwayYours
+          ? null
           : copy.live.runwayYoursNotInAtis
     : choice?.by === "hand"
-      ? copy.live.runwayYours
+      ? null
       : choice?.by === "wind"
         ? copy.live.runwayIntoWind
         : weather && weather.ranked.length > 0
@@ -221,8 +220,6 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
           windNow,
         )
       : null)
-  const ranks: Record<string, RankedEnd> = {}
-  for (const rank of advice?.ranked ?? []) ranks[rank.name] = rank
   // What the wind does on each end, as a tooltip.
   const tones: Record<string, EndTone> = {}
   for (const rank of advice?.ranked ?? []) {
@@ -283,7 +280,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
 
       {atis && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
-          <RunwayTiles runways={chips} choice={choice} onTap={onTap} ranks={ranks} titles={titles} tones={tones} tag="ATIS" />
+          <RunwayTiles runways={chips} choice={choice} onTap={onTap} titles={titles} tones={tones} detail={choice ? titles[choice.runway] : null} />
           {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
           {notRead && <p className="text-xs text-muted-foreground">{copy.live.runwaysNotRead}</p>}
           {(showText || notRead) && (
@@ -307,7 +304,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
 
       {noAtis && expandable && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
-          <RunwayTiles runways={chips} choice={choice} onTap={onTap} ranks={ranks} titles={titles} tones={tones} />
+          <RunwayTiles runways={chips} choice={choice} onTap={onTap} titles={titles} tones={tones} detail={choice ? titles[choice.runway] : null} />
           {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
           {weatherNote && <p className="text-xs text-muted-foreground">{weatherNote}</p>}
           <p className="truncate text-xs text-muted-foreground" title={weather ? copy.live.weatherCreditFull : undefined}>

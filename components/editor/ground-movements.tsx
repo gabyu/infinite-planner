@@ -1,6 +1,7 @@
 "use client"
 
-import { Loader2 } from "lucide-react"
+import { HelpCircle, Loader2 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { copy } from "@/lib/copy"
 import type { TrimEnd } from "@/lib/ground-trim"
@@ -16,7 +17,7 @@ interface GroundMovementsProps {
   trimmed: Record<TrimEnd, boolean>
   disabled?: boolean
   onToggle: (end: TrimEnd) => void
-  /** No hint line, for the phone sheet where height is scarce (the hint stays as the label's tooltip). */
+  /** Tighter spacing, for the phone sheet where height is scarce. */
   compact?: boolean
 }
 
@@ -27,11 +28,23 @@ export function GroundMovements({ end, previewing, busy, trimmed, disabled, onTo
   const id = `ground-movements-${end}`
   const on = !trimmed[end]
   return (
-    <div className={cn("border-b", compact ? "px-4 py-2" : "space-y-1.5 p-4")}>
+    <div className={cn("border-b", compact ? "px-4 py-2" : "p-4")}>
       <div className="flex items-center justify-between gap-3">
-        <label htmlFor={id} className="text-sm font-medium" title={copy.editor.groundHint}>
-          {copy.editor.groundWaypoints}
-        </label>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={id} className="text-sm font-medium">
+            {copy.editor.groundWaypoints}
+          </label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button type="button" aria-label={copy.editor.groundHint} className="text-muted-foreground hover:text-foreground">
+                <HelpCircle className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right">
+              <p>{copy.editor.groundHint}</p>
+            </PopoverContent>
+          </Popover>
+        </div>
         <div className="flex items-center gap-2">
           {busy === end && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden />}
           <Switch
@@ -39,16 +52,10 @@ export function GroundMovements({ end, previewing, busy, trimmed, disabled, onTo
             checked={on}
             disabled={disabled || busy !== null}
             onCheckedChange={() => onToggle(end)}
-            aria-describedby={compact ? undefined : `${id}-hint`}
             className={cn(previewing === end && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background")}
           />
         </div>
       </div>
-      {!compact && (
-        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
-          {copy.editor.groundHint}
-        </p>
-      )}
     </div>
   )
 }

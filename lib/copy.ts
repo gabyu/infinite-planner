@@ -32,11 +32,16 @@ export const copy = {
     tabArrival: "Arrival",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
-    addFlightNumber: "Add a flight number",
+    addFlightNumber: "#",
     noFlightNumber: "No flight number",
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
     flightNumberAddPlaceholder: "Add another",
+    aircraftLabel: "Aircraft",
+    aircraftPlaceholder: "e.g. Boeing 777-300ER",
+    aircraftChip: "AC",
+    aircraftAdd: "Add the aircraft",
+    aircraftHelp: "Optional. The aircraft you fly this plan with. Kept with your plan, not written into the FPL.",
     flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.",
     sheetHandle: "Drag to resize the panel",
 
@@ -98,10 +103,10 @@ export const copy = {
     runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.",
     showText: "Show the ATIS text",
     hideText: "Hide the ATIS text",
-    runwayTap: "Tap the runway you'll use.",
+    runwayTap: "Tap a runway.",
     runwayFromAtis: "From the ATIS.",
     runwayYours: "Your choice.",
-    runwayYoursNotInAtis: "Your choice. Not in the ATIS now.",
+    runwayYoursNotInAtis: "Not in the ATIS now.",
     noAtisShort: "No ATIS",
     runwayIntoWind: "Into the wind.",
     bestHeadwind: "Best headwind:",
@@ -120,12 +125,17 @@ export const copy = {
     save: "Save procedure",
     saving: "Saving...",
     saved: "Saved",
+    inPlan: "In your plan", // aria-label of the check mark only
+    original: "Original",
+    restore: "Restore",
+    restoredToast: "Original procedure restored",
     yourProcedure: "Your procedure",
     suggested: "Suggested procedures for",
     needsPlan: "Available once your plan is saved.",
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
-    tapRunway: "Pick a runway above to see suggested procedures for it.",
+    tapRunway: "Confirm your runway",
     noGuides: "No suggested procedures for this runway yet.",
+    departing: "Departing",
     north: "North",
     east: "East",
     south: "South",
@@ -151,6 +161,14 @@ export const copy = {
 export function replaceText(current: { runway: string | null; nm: number } | null, next: { runway: string | null; nm: number }) {
   const label = (p: { runway: string | null; nm: number }) => `${p.runway ?? "?"}, ${p.nm}\u00A0NM`
   return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.`
+}
+
+/** "2 Nov" for the day a saved procedure was created (the year only when it is not this year's). */
+export function guideDateText(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+  const sameYear = date.getFullYear() === new Date().getFullYear()
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })
 }
 
 /** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
@@ -219,8 +237,6 @@ export const legalCopy = {
   publishOnlyOwnDesigns: "Flight plans converted from FlightRadar24 or FlightAware files can't be published.",
   // A plan an admin took off Explore: the owner sees this, never a reason.
   planNotAvailable: "This flight plan isn't available on Explore right now.",
-  // Short tag beside a view or a download of a plan.
-  simulationOnly: "Simulation only: not the published procedure",
   // The publish dialog, the same from every place a plan can be published. Imported plans add the checkbox.
   // Bump the version in DECLARATION_WORDING_KEY below whenever the title, body or checkbox wording changes.
   declarationTitle: "Do you have the right to share this flight plan?",

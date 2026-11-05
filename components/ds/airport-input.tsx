@@ -23,6 +23,8 @@ interface AirportInputProps {
   onChange: (icao: string) => void
   placeholder?: string
   className?: string
+  /** A shorter, bordered field for dense tool pages (the admin dashboard). The default is the large field of the import form. */
+  compact?: boolean
 }
 
 const CODE = /^[A-Za-z]{4}$/
@@ -43,7 +45,7 @@ async function search(query: string): Promise<Match[]> {
 // "CDG") and suggests matching airports. The form still only ever receives an ICAO code: typing a
 // complete 4-letter code is accepted as is (even one we don't know, scenery can be custom), picking a
 // suggestion fills the code in. Suggestions come from /api/airports, so the dataset stays on the server.
-export function AirportInput({ id, label, value, valid, onChange, placeholder, className }: AirportInputProps) {
+export function AirportInput({ id, label, value, valid, onChange, placeholder, className, compact }: AirportInputProps) {
   const listId = useId()
   const [text, setText] = useState(value)
   const [results, setResults] = useState<Match[]>([])
@@ -145,8 +147,10 @@ export function AirportInput({ id, label, value, valid, onChange, placeholder, c
           autoComplete="off"
           spellCheck={false}
           className={cn(
-            "h-14 border-transparent bg-background px-4 pr-9 text-lg md:text-lg shadow-sm placeholder:text-muted-foreground/40 focus-visible:ring-offset-0",
-            isCode && "font-mono text-2xl md:text-2xl uppercase tracking-[0.18em]",
+            compact
+              ? "h-[var(--control-h,2.25rem)] border-input bg-background px-3 pr-9 text-sm md:text-sm placeholder:text-muted-foreground/60 focus-visible:ring-offset-0"
+              : "h-14 border-transparent bg-background px-4 pr-9 text-lg md:text-lg shadow-sm placeholder:text-muted-foreground/40 focus-visible:ring-offset-0",
+            isCode && (compact ? "font-mono uppercase tracking-[0.12em]" : "font-mono text-2xl md:text-2xl uppercase tracking-[0.18em]"),
           )}
         />
         {valid && (
