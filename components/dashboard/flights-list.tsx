@@ -94,6 +94,9 @@ function pageWindow(current: number, count: number): (number | null)[] {
   return keep.flatMap((n, i) => (i > 0 && n - keep[i - 1] > 1 ? [null, n] : [n]))
 }
 
+// Every small tag of a row (Draft, source, aircraft) looks the same: outline, one size, muted.
+const TAG = "h-5 cursor-default rounded-md px-1.5 font-sans text-xs font-normal text-muted-foreground"
+
 const routeOf = (plan: FlightPlanSummary) => `${plan.origin_airport} → ${plan.destination_airport}`
 
 // The signed-in user's flight plans, drafts and exported ones in one list, newest first (no tabs,
@@ -393,12 +396,12 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
               <li
                 key={plan.id}
                 className={cn(
-                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50",
+                  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-accent/50 md:h-20 md:overflow-hidden md:py-0",
                   columns,
                 )}
               >
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 font-mono text-sm font-medium">
+                  <div className="flex items-center gap-x-2 font-mono text-sm font-medium">
                     <span>
                       {plan.origin_airport}
                       <RouteArrow />
@@ -407,14 +410,14 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     {/* Draft, where the plan comes from, and the aircraft: three tags of the same size, each with a bubble. */}
                     <TooltipProvider delayDuration={100}>
                       {isDraft && (
-                        <Badge variant="secondary" className="font-sans text-[11px] font-normal">
+                        <Badge variant="outline" className={TAG}>
                           Draft
                         </Badge>
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="inline-flex">
-                            <Badge variant="outline" className="cursor-default font-sans text-[11px] font-normal text-muted-foreground">
+                            <Badge variant="outline" className={TAG}>
                               {sourceShort(plan.source)}
                             </Badge>
                           </span>
@@ -425,7 +428,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="inline-flex">
-                              <Badge variant="outline" className="cursor-default font-sans text-[11px] font-normal text-muted-foreground">
+                              <Badge variant="outline" className={TAG}>
                                 {aircraftCode(plan.aircraft)}
                               </Badge>
                             </span>
@@ -477,7 +480,7 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                 <div className="order-last col-span-2 flex flex-wrap items-center gap-1.5 md:order-none md:col-span-1 md:flex-col md:items-start">
                   <span className="font-mono text-sm">{plan.flight_number ?? "—"}</span>
                   {(plan.departure_runway || plan.arrival_runway) && (
-                    <span className="font-mono text-[11px] text-muted-foreground" title="Departure runway → arrival runway">
+                    <span className="font-mono text-xs text-muted-foreground" title="Departure runway → arrival runway">
                       {plan.departure_runway ?? "?"} → {plan.arrival_runway ?? "?"}
                     </span>
                   )}
