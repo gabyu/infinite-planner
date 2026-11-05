@@ -53,7 +53,6 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
-  const [marking, setMarking] = useState(false)
   // The procedures read from the files, being reviewed one screen at a time (nothing is saved before the last screen).
   const [draft, setDraft] = useState<PendingRow[] | null>(null)
   // Files that could not be read.
@@ -194,25 +193,28 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
                       </td>
                     )
                   if (cell.notNeeded)
+                    // Empty directions of a kind marked "done" are n/a and only follow that mark. A single direction marked n/a
+                    // before this was removed can still be clicked to count again.
                     return (
                       <td key={cell.key}>
-                        <button
-                          type="button"
-                          onClick={() => marking && mark(cell.key, false)}
-                          className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")}
-                          title={marking ? "Needed again" : "Not needed"}
-                        >
-                          n/a
-                        </button>
+                        {coverage[row.kind].done ? (
+                          <div className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")} title="Not needed">
+                            n/a
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => mark(cell.key, false)} className={cn(base, "border-transparent bg-muted/50 text-muted-foreground")} title="Not needed. Click to count it again">
+                            n/a
+                          </button>
+                        )}
                       </td>
                     )
                   return (
                     <td key={cell.key}>
                       <button
                         type="button"
-                        onClick={() => (marking ? mark(cell.key, true) : input.current?.click())}
-                        className={cn(base, "border-dashed text-muted-foreground transition-colors hover:bg-accent", marking && "border-amber-500")}
-                        title={marking ? "Mark not needed" : `Missing: ${row.kind} ${row.family} from ${cell.octant}. Add a file.`}
+                        onClick={() => input.current?.click()}
+                        className={cn(base, "border-dashed text-muted-foreground transition-colors hover:bg-accent")}
+                        title={`Missing: ${row.kind} ${row.family} from ${cell.octant}. Add a file.`}
                       >
                         <Plus className="h-3 w-3" aria-hidden />
                         <span className="sr-only">Missing: {row.kind} {row.family} from {cell.octant}</span>
@@ -247,9 +249,6 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
           {progress ? `Reading ${progress.done} of ${progress.total}…` : "Import Flight Plans"}
         </Button>
-        <label className="ml-auto flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" className="accent-primary" checked={marking} onChange={(e) => setMarking(e.target.checked)} /> Mark directions not needed
-        </label>
       </div>
 
       {draft && <ImportWizard rows={draft} onClose={() => setDraft(null)} onSaved={() => router.refresh()} />}
