@@ -46,23 +46,16 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
         }
       : null
 
-  return (
-    <>
-      <PageHeader
-        title="Procedures"
-        description="How real flights arrive at and leave each airport, what is still missing, and the progress. Visible to admins only."
-      />
-
-      {sync && <SyncCard copyAllowed={sync.copyAllowed} lastSyncedAt={sync.lastSyncedAt} flightsCount={sync.flightsCount} timezone={ctx.profile?.timezone ?? null} />}
-
-      <div className="mb-4">
-        <AirportPicker current={icao} />
-      </div>
-
-      <section aria-labelledby="airports" className="mb-8">
-        <h2 id="airports" className="mb-2 text-sm font-semibold">
+  // The left column (everything to read and act on) and the map beside it, which stays in view while the column scrolls.
+  const airports = (
+    <section aria-labelledby="airports" className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="airports" className="text-sm font-semibold">
           Airports with flights
         </h2>
+        <AirportPicker current={icao} />
+      </div>
+      <div className="max-h-72 overflow-y-auto rounded-lg">
         <AirportList
           current={icao}
           rows={summaries.map((s) => ({
@@ -74,31 +67,53 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
             percent: s.percent,
           }))}
         />
-      </section>
+      </div>
+    </section>
+  )
+  const coverage =
+    icao && airport && detail ? (
+      <CoveragePanel icao={icao} airportName={info ? `${info.name}, ${info.city}` : ""} coverage={buildCoverage(airport, [...detail.flights, ...guidesAsFlights(memberGuides, icao)], detail.notNeeded)} />
+    ) : null
+  const members = <MemberGuides guides={memberGuides} airport={icao} previewId={preview?.id ?? null} />
 
-      {icao && !detail && (
-        <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-          {info ? `${icao} ${info.name}` : icao}: the airport data has no named runways for it, so its arrivals and departures cannot be placed yet.
-        </p>
+  return (
+    <>
+      <PageHeader
+        title="Procedures"
+        description="How real flights arrive at and leave each airport, what is still missing, and the progress. Visible to admins only."
+      />
+
+      {sync && <SyncCard copyAllowed={sync.copyAllowed} lastSyncedAt={sync.lastSyncedAt} flightsCount={sync.flightsCount} timezone={ctx.profile?.timezone ?? null} />}
+
+      {icao && airport && detail ? (
+        <ProceduresMap
+          key={icao}
+          icao={icao}
+          center={[airport.lat, airport.lng]}
+          runways={airport.runways.map((r) => ({ name: `${r[6] ?? ""}/${r[7] ?? ""}`, from: [r[0], r[1]] as [number, number], to: [r[2], r[3]] as [number, number] }))}
+          flights={detail.flights}
+          arrivalGroups={detail.arrivalGroups}
+          departureGroups={detail.departureGroups}
+          preview={preview}
+          before={
+            <>
+              {airports}
+              {coverage}
+            </>
+          }
+          after={members}
+        />
+      ) : (
+        <div className="mx-auto max-w-3xl space-y-6">
+          {airports}
+          {icao && !detail && (
+            <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+              {info ? `${icao} ${info.name}` : icao}: the airport data has no named runways for it, so its arrivals and departures cannot be placed yet.
+            </p>
+          )}
+          {members}
+        </div>
       )}
-
-      {icao && airport && detail && (
-        <>
-          <CoveragePanel icao={icao} airportName={info ? `${info.name}, ${info.city}` : ""} coverage={buildCoverage(airport, [...detail.flights, ...guidesAsFlights(memberGuides, icao)], detail.notNeeded)} />
-          <ProceduresMap
-            key={icao}
-            icao={icao}
-            center={[airport.lat, airport.lng]}
-            runways={airport.runways.map((r) => ({ name: `${r[6] ?? ""}/${r[7] ?? ""}`, from: [r[0], r[1]] as [number, number], to: [r[2], r[3]] as [number, number] }))}
-            flights={detail.flights}
-            arrivalGroups={detail.arrivalGroups}
-            departureGroups={detail.departureGroups}
-            preview={preview}
-          />
-        </>
-      )}
-
-      <MemberGuides guides={memberGuides} airport={icao} previewId={preview?.id ?? null} />
     </>
   )
 }

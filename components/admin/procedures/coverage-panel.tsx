@@ -116,7 +116,7 @@ export function CoveragePanel({ icao, airportName, coverage }: Props) {
   const refused = results.length - added
 
   return (
-    <section aria-label={`${icao} coverage`} className="mb-6 rounded-lg border bg-card p-4">
+    <section aria-label={`${icao} coverage`} className="rounded-lg border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold">

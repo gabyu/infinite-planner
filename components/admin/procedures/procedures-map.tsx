@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { Trash2 } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -24,6 +24,9 @@ interface Props {
   departureGroups: FlightGroup[]
   /** A procedure a member saved, shown on its own over the flights (the admin's Preview button). Points in feet. */
   preview?: { id: string; label: string; points: { lat: number; lng: number; altitude: number }[] } | null
+  /** Page content above and below the flight groups, in the left column beside the map. */
+  before?: ReactNode
+  after?: ReactNode
 }
 
 // One procedure drawn over the flights: a thick line through its points, each point with its altitude. Replaces the previous one.
@@ -45,7 +48,7 @@ function drawPreview(L: any, map: any, preview: Props["preview"], dark: boolean,
   map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 11 })
 }
 
-export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, departureGroups, preview = null }: Props) {
+export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, departureGroups, preview = null, before, after }: Props) {
   const mapEl = useRef<HTMLDivElement>(null)
   const layers = useRef<Map<string, any>>(new Map())
   const previewLayer = useRef<any>(null)
@@ -194,33 +197,40 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
     )
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
-      <aside>
-        <div className="mb-3 space-y-2 text-sm">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1" role="group" aria-label="Show on the map">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={shownKinds.arrival} onChange={(e) => setShownKinds((k) => ({ ...k, arrival: e.target.checked }))} />
-              <svg width="24" height="6" aria-hidden><line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="2.5" /></svg>
-              Arrivals <span className="text-muted-foreground">{flights.filter((f) => f.kind === "arrival").length}</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2">
-              <input type="checkbox" checked={shownKinds.departure} onChange={(e) => setShownKinds((k) => ({ ...k, departure: e.target.checked }))} />
-              <svg width="24" height="6" aria-hidden><line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="2.5" strokeDasharray="6 5" /></svg>
-              Departures <span className="text-muted-foreground">{flights.filter((f) => f.kind === "departure").length}</span>
-            </label>
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
+      <div className="min-w-0 space-y-6 xl:order-1">
+        {before}
+        <section aria-label="Flights on the map" className="rounded-lg border bg-card p-4">
+          <div className="mb-3 space-y-2 text-sm">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1" role="group" aria-label="Show on the map">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={shownKinds.arrival} onChange={(e) => setShownKinds((k) => ({ ...k, arrival: e.target.checked }))} />
+                <svg width="24" height="6" aria-hidden><line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="2.5" /></svg>
+                Arrivals <span className="text-muted-foreground">{flights.filter((f) => f.kind === "arrival").length}</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={shownKinds.departure} onChange={(e) => setShownKinds((k) => ({ ...k, departure: e.target.checked }))} />
+                <svg width="24" height="6" aria-hidden><line x1="0" y1="3" x2="24" y2="3" stroke="currentColor" strokeWidth="2.5" strokeDasharray="6 5" /></svg>
+                Departures <span className="text-muted-foreground">{flights.filter((f) => f.kind === "departure").length}</span>
+              </label>
+              <div className="ml-auto flex items-center gap-2">
+                <span>Runway</span>
+                <select className="h-8 rounded-md border border-input bg-background px-2 text-sm" value={runwayFilter} onChange={(e) => setRunwayFilter(e.target.value)}>
+                  <option value="all">All</option>
+                  {runwayNames.sort().map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span>Runway</span>
-            <select className="h-8 rounded-md border border-input bg-background px-2 text-sm" value={runwayFilter} onChange={(e) => setRunwayFilter(e.target.value)}>
-              <option value="all">All</option>
-              {runwayNames.sort().map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-        </div>
-        {groupBlock("Approaches", arrivalGroups)}
-        {groupBlock("Departures", departureGroups)}
-      </aside>
-      <div id="procedures-map" ref={mapEl} className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-lg border" />
+          {arrivalGroups.length + departureGroups.length === 0 && <p className="text-sm text-muted-foreground">No flight files for this airport yet.</p>}
+          {groupBlock("Approaches", arrivalGroups)}
+          {groupBlock("Departures", departureGroups)}
+        </section>
+        {after}
+      </div>
+      <div className="order-first xl:order-2 xl:sticky xl:top-4">
+        <div id="procedures-map" ref={mapEl} className="h-[45vh] min-h-[320px] w-full overflow-hidden rounded-lg border xl:h-[calc(100vh-2rem)]" />
+      </div>
     </div>
   )
 }
