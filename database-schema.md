@@ -98,7 +98,7 @@ Signed-in users' exported flight plans are stored in `flight_plans`
 CREATE TABLE flight_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES profiles (id) ON DELETE CASCADE,
-  source TEXT NOT NULL,                    -- 'FlightRadar24' | 'FlightAware' | 'Sketch'
+  source TEXT NOT NULL,                    -- 'FlightRadar24' | 'FlightAware' | 'AeroHub' | 'Sketch' | 'Imported'
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),   -- last save of the content (UTC)
   flight_number TEXT,                      -- NULL unless the KML filename carries one reliably
   origin_airport TEXT NOT NULL,            -- ICAO
