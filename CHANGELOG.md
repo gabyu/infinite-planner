@@ -5,6 +5,8 @@ All notable changes to Infinite Planner are documented here.
 ## Unreleased
 
 ### Added
+- **Procedures in the departure card.** Under the runway tiles, your plan's departure ("Departing East · 227 NM · 106°") can be saved as a procedure. Pick a runway and the list shows the procedures you saved for it, dated, with a check on the one your plan flies. **Apply** puts one into the plan in one undo step; **Restore** brings the original departure back.
+- **A flight number button.** A small **⚠ #** appears beside the route when the plan has no flight number; it opens the field.
 - **Explore: a library of community flight plans** (not announced yet: it opens to everyone only when the launch switch is flipped; until then admins use it alone). Every exported flight plan is **Private** until you switch its **visibility** to **Public** (listed in the library and indexed by search engines; there is no in-between). The link to a public plan and its library entry are the same address, `/explore/plans/lfpg-klax-af65-k3x9p2qa`. Plan pages show the route on a map of dots like the homepage globe, an altitude graph, the distance and the figures that matter, with airport codes, IATA codes and city names so they can be found by search.
 - **Browse, search and sort.** `/explore` lists the library by Popular, Latest, Most imported, Most downloaded or Most liked, with search by airport (ICAO, IATA or city), flight number or "CDG to LAX", filters, and pages for every route (`/explore/routes/lfpg-klax`), airport (`/explore/location/KPHX`) and flight number (`/explore/flight_number/AF69`). Routes are drawn over the land as dots and coloured by altitude, like the homepage globe.
 - **Download, like, import.** Signed in with Discord, you can download a plan, like it (Favorites in your dashboard) and **import** it: a copy lands in your dashboard and opens in the map, ready to adjust and export as your own. Signed out, you see everything and are invited to sign in; whatever you clicked is done when you come back. A copy shows "Based on…" in your dashboard, or "Original no longer available" if the author unpublished it.
@@ -16,6 +18,9 @@ All notable changes to Infinite Planner are documented here.
 - **A Routes section in the admin dashboard**: the library with its coverage, the open reports (resolve, or hide the plan), a Hide / Unhide on every plan, and a switch to stop a user from publishing.
 
 ### Changed
+- **Runway tiles are small.** Six runways to a row, all the same size, coloured by how the wind favours them; the headwind and crosswind of the chosen runway are written under the tiles instead of on each one.
+- **The simulation-only notice lives in the footer** (Convert, Sketch and the library pages), and no longer repeats beside the export buttons.
+- **Notices fade out** by themselves (the import message and the waypoint simplification block).
 - **Share links are gone.** The Share button is replaced by a **Visibility** switch (Private / Public) on every exported flight plan, in the dashboard and in the editor. All the links created by the old sharing feature stop working. Downloading will require a Discord sign-in once the library is launched.
 - **Flight number you can edit.** In the flight plan editor (signed in) a new **Flight number** field lets you change or clear the number read from the file name, for a codeshare or a number of your own, until you export. It is saved with the plan.
 - **Breadcrumb on plan pages**: Explore / route / flight number, each step a link back up. The **Explore** item of the menu stays clickable on the pages under it.
