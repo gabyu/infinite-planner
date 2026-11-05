@@ -107,6 +107,11 @@ export function sourceLabel(source: FlightPlanSource): string {
   return source === "Sketch" ? "Route Sketch" : source === "Imported" ? "Imported file" : source
 }
 
+/** The short tag for the dashboard row: "FR24", "FA", "Sketch", "File". `sourceLabel` is the full name (its tooltip). */
+export function sourceShort(source: FlightPlanSource): string {
+  return source === "FlightRadar24" ? "FR24" : source === "FlightAware" ? "FA" : source === "Imported" ? "File" : "Sketch"
+}
+
 // Where a draft is reopened for editing: Sketch drafts in Sketch, imported ones in Convert.
 export function flightPlanEditPath(plan: { id: string; source: FlightPlanSource; is_fork?: boolean }) {
   if (plan.is_fork) return `/convert?draft=${plan.id}&fork=1`

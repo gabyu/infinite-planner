@@ -42,6 +42,7 @@ import {
   formatFlightTime,
   isTrackerDerived,
   sourceLabel,
+  sourceShort,
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
@@ -403,11 +404,36 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                       <RouteArrow />
                       {plan.destination_airport}
                     </span>
-                    {isDraft && (
-                      <Badge variant="secondary" className="font-sans text-[11px] font-normal">
-                        Draft
-                      </Badge>
-                    )}
+                    {/* Draft, where the plan comes from, and the aircraft: three tags of the same size, each with a bubble. */}
+                    <TooltipProvider delayDuration={100}>
+                      {isDraft && (
+                        <Badge variant="secondary" className="font-sans text-[11px] font-normal">
+                          Draft
+                        </Badge>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex">
+                            <Badge variant="outline" className="cursor-default font-sans text-[11px] font-normal text-muted-foreground">
+                              {sourceShort(plan.source)}
+                            </Badge>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{sourceLabel(plan.source)}</TooltipContent>
+                      </Tooltip>
+                      {plan.aircraft && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex">
+                              <Badge variant="outline" className="cursor-default font-sans text-[11px] font-normal text-muted-foreground">
+                                {aircraftCode(plan.aircraft)}
+                              </Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{plan.aircraft}</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TooltipProvider>
                   </div>
                   {(names[0] || names[1]) && (
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -450,19 +476,11 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
 
                 <div className="order-last col-span-2 flex flex-wrap items-center gap-1.5 md:order-none md:col-span-1 md:flex-col md:items-start">
                   <span className="font-mono text-sm">{plan.flight_number ?? "—"}</span>
-                  {(plan.aircraft || plan.departure_runway || plan.arrival_runway) && (
-                    <span className="flex flex-wrap items-center gap-x-2 font-mono text-[11px] text-muted-foreground">
-                      {plan.aircraft && <span title={plan.aircraft}>{aircraftCode(plan.aircraft)}</span>}
-                      {(plan.departure_runway || plan.arrival_runway) && (
-                        <span title="Departure runway → arrival runway">
-                          {plan.departure_runway ?? "?"} → {plan.arrival_runway ?? "?"}
-                        </span>
-                      )}
+                  {(plan.departure_runway || plan.arrival_runway) && (
+                    <span className="font-mono text-[11px] text-muted-foreground" title="Departure runway → arrival runway">
+                      {plan.departure_runway ?? "?"} → {plan.arrival_runway ?? "?"}
                     </span>
                   )}
-                  <Badge variant="outline" className="px-1.5 text-[10px] font-normal text-muted-foreground">
-                    {sourceLabel(plan.source)}
-                  </Badge>
                 </div>
 
                 <span className="hidden text-sm md:block">{flightTime ?? <span className="text-muted-foreground">—</span>}</span>
