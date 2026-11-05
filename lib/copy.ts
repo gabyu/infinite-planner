@@ -32,16 +32,16 @@ export const copy = {
     tabArrival: "Arrival",
     flightNumbersLabel: "Flight numbers",
     flightNumberPrimary: "Main flight number",
-    addFlightNumber: "#", // PROVISIONAL
+    addFlightNumber: "#",
     noFlightNumber: "No flight number",
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
     flightNumberAddPlaceholder: "Add another",
-    aircraftLabel: "Aircraft", // PROVISIONAL
-    aircraftPlaceholder: "e.g. Boeing 777-300ER", // PROVISIONAL
-    aircraftChip: "AC", // PROVISIONAL
-    aircraftAdd: "Add the aircraft", // PROVISIONAL
-    aircraftHelp: "Optional. The aircraft you fly this plan with. Kept with your plan, not written into the FPL.", // PROVISIONAL
+    aircraftLabel: "Aircraft",
+    aircraftPlaceholder: "e.g. Boeing 777-300ER",
+    aircraftChip: "AC",
+    aircraftAdd: "Add the aircraft",
+    aircraftHelp: "Optional. The aircraft you fly this plan with. Kept with your plan, not written into the FPL.",
     flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.",
     sheetHandle: "Drag to resize the panel",
 
@@ -103,7 +103,7 @@ export const copy = {
     runwaysNotRead: "The runways couldn't be read from this ATIS. Read the text.",
     showText: "Show the ATIS text",
     hideText: "Hide the ATIS text",
-    runwayTap: "Tap a runway.", // PROVISIONAL
+    runwayTap: "Tap a runway.",
     runwayFromAtis: "From the ATIS.",
     runwayYours: "Your choice.",
     runwayYoursNotInAtis: "Not in the ATIS now.",
@@ -126,16 +126,16 @@ export const copy = {
     saving: "Saving...",
     saved: "Saved",
     inPlan: "In your plan", // aria-label of the check mark only
-    original: "Original", // PROVISIONAL
-    restore: "Restore", // PROVISIONAL
-    restoredToast: "Original procedure restored", // PROVISIONAL
+    original: "Original",
+    restore: "Restore",
+    restoredToast: "Original procedure restored",
     yourProcedure: "Your procedure",
     suggested: "Suggested procedures for",
     needsPlan: "Available once your plan is saved.",
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
-    tapRunway: "Confirm your runway", // PROVISIONAL
+    tapRunway: "Confirm your runway",
     noGuides: "No suggested procedures for this runway yet.",
-    departing: "Departing", // PROVISIONAL
+    departing: "Departing",
     north: "North",
     east: "East",
     south: "South",
