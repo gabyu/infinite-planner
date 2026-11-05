@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
-import { LocalTime } from "@/components/local-time"
+import { RelativeTime } from "@/components/relative-time"
 import { RouteArrow } from "@/components/route-arrow"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
 import { PlanDetailsDialog } from "@/components/dashboard/plan-details-dialog"
@@ -404,8 +404,10 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                   <div className="flex items-center gap-x-2 font-mono text-sm font-medium">
                     <span>
                       {plan.origin_airport}
+                      {plan.departure_runway && <span className="text-muted-foreground"> @{plan.departure_runway}</span>}
                       <RouteArrow />
                       {plan.destination_airport}
+                      {plan.arrival_runway && <span className="text-muted-foreground"> @{plan.arrival_runway}</span>}
                     </span>
                     {/* Draft, where the plan comes from, and the aircraft: three tags of the same size, each with a bubble. */}
                     <TooltipProvider delayDuration={100}>
@@ -472,24 +474,19 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     </p>
                   )}
                   <p className="mt-1 text-xs text-muted-foreground md:hidden">
-                    <LocalTime iso={plan.created_at} />
+                    <RelativeTime iso={plan.created_at} />
                     {flightTime && <> · {flightTime}</>}
                   </p>
                 </div>
 
                 <div className="order-last col-span-2 flex flex-wrap items-center gap-1.5 md:order-none md:col-span-1 md:flex-col md:items-start">
                   <span className="font-mono text-sm">{plan.flight_number ?? "—"}</span>
-                  {(plan.departure_runway || plan.arrival_runway) && (
-                    <span className="font-mono text-xs text-muted-foreground" title="Departure runway → arrival runway">
-                      {plan.departure_runway ?? "?"} → {plan.arrival_runway ?? "?"}
-                    </span>
-                  )}
                 </div>
 
                 <span className="hidden text-sm md:block">{flightTime ?? <span className="text-muted-foreground">—</span>}</span>
 
                 <span className="hidden text-sm text-muted-foreground md:block">
-                  <LocalTime iso={plan.created_at} />
+                  <RelativeTime iso={plan.created_at} />
                 </span>
 
                 {library && (
