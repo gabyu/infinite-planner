@@ -25,6 +25,8 @@ interface AirportInputProps {
   className?: string
   /** A shorter, bordered field for dense tool pages (the admin dashboard). The default is the large field of the import form. */
   compact?: boolean
+  /** Just the field: the label is kept for screen readers only and the airport's name is not written under it. */
+  bare?: boolean
 }
 
 const CODE = /^[A-Za-z]{4}$/
@@ -45,7 +47,7 @@ async function search(query: string): Promise<Match[]> {
 // "CDG") and suggests matching airports. The form still only ever receives an ICAO code: typing a
 // complete 4-letter code is accepted as is (even one we don't know, scenery can be custom), picking a
 // suggestion fills the code in. Suggestions come from /api/airports, so the dataset stays on the server.
-export function AirportInput({ id, label, value, valid, onChange, placeholder, className, compact }: AirportInputProps) {
+export function AirportInput({ id, label, value, valid, onChange, placeholder, className, compact, bare }: AirportInputProps) {
   const listId = useId()
   const [text, setText] = useState(value)
   const [results, setResults] = useState<Match[]>([])
@@ -126,8 +128,8 @@ export function AirportInput({ id, label, value, valid, onChange, placeholder, c
   const unknownCode = valid && !chosen && known.has(value)
 
   return (
-    <div className={cn("relative space-y-2 text-left", className)}>
-      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+    <div className={cn("relative text-left", !bare && "space-y-2", className)}>
+      <Label htmlFor={id} className={cn("text-xs font-medium text-muted-foreground", bare && "sr-only")}>
         {label}
       </Label>
       <div className="relative">
@@ -199,7 +201,7 @@ export function AirportInput({ id, label, value, valid, onChange, placeholder, c
         )}
       </div>
 
-      <p className="min-h-4 truncate text-xs text-muted-foreground">
+      <p className={cn("min-h-4 truncate text-xs text-muted-foreground", bare && "hidden")}>
         {chosen ? chosen.name : unknownCode ? "Not in our airport list, used as typed" : ""}
       </p>
     </div>

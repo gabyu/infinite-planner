@@ -99,12 +99,6 @@ export async function loadAirport(supabase: SupabaseClient, icao: string) {
   }
 }
 
-export async function loadSyncState(supabase: SupabaseClient) {
-  const { data } = await supabase.rpc("admin_procedure_sync_state")
-  const row = ((data ?? []) as { copy_allowed: boolean; last_synced_at: string | null; flights_count: number | null }[])[0]
-  return { copyAllowed: row?.copy_allowed === true, lastSyncedAt: row?.last_synced_at ?? null, flightsCount: row?.flights_count ?? null }
-}
-
 export interface MemberGuide {
   id: string
   ownerId: string
@@ -178,4 +172,15 @@ export function guidesAsFlights(guides: MemberGuide[], icao: string, airport: Tr
         track,
       }
     })
+}
+
+export interface RecentAirport {
+  code: string
+  lastAt: string
+}
+
+/** The airports that last received a flight file or a member's procedure, newest first. Empty when the database lacks the function. */
+export async function loadRecentAirports(supabase: SupabaseClient, limit = 14): Promise<RecentAirport[]> {
+  const { data } = await supabase.rpc("admin_recent_procedure_airports", { p_limit: limit })
+  return ((data ?? []) as { airport: string; last_at: string }[]).map((row) => ({ code: row.airport, lastAt: row.last_at }))
 }

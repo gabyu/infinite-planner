@@ -3,7 +3,7 @@ import { AirportPicker } from "@/components/admin/procedures/airport-picker"
 import { CoveragePanel } from "@/components/admin/procedures/coverage-panel"
 import { MemberGuides } from "@/components/admin/procedures/member-guides"
 import { ProceduresMap } from "@/components/admin/procedures/procedures-map"
-import { SyncCard } from "@/components/admin/procedures/sync-card"
+import { RecentAirports } from "@/components/admin/procedures/recent-airports"
 import { PageHeader } from "@/components/admin/page-header"
 import { getSessionContext, requireAdmin } from "@/lib/admin/auth"
 import { getAirportInfo } from "@/lib/airports"
@@ -11,20 +11,19 @@ import { airportFor, groupFlights } from "@/lib/procedure-analysis"
 import { findRunwayEnd, fromRunwayFrame } from "@/lib/runway-guide"
 import { guideLegText } from "@/lib/copy"
 import { buildCoverage } from "@/lib/procedure-coverage"
-import { guidesAsFlights, loadAirport, loadMemberGuides, loadSummaries, loadSyncState } from "@/lib/procedures-db"
+import { guidesAsFlights, loadAirport, loadMemberGuides, loadRecentAirports, loadSummaries } from "@/lib/procedures-db"
 
 export const dynamic = "force-dynamic"
 
 // The airport procedures database: for each airport, how real flights arrive and leave, what is still missing, and the
-// progress. Admins only. Flights are added here by dropping flight files; production is the source, staging copies it.
+// progress. Admins only. Flights are added here by importing flight files.
 export default async function ProceduresPage({ searchParams }: { searchParams: { airport?: string; preview?: string } }) {
   await requireAdmin()
   const ctx = await getSessionContext()
   if (!ctx) return null
 
-  const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
   const memberGuides = await loadMemberGuides(ctx.supabase)
-  const [summaries, sync] = await Promise.all([loadSummaries(ctx.supabase, memberGuides), isStaging ? loadSyncState(ctx.supabase) : null])
+  const [summaries, recent] = await Promise.all([loadSummaries(ctx.supabase, memberGuides), loadRecentAirports(ctx.supabase)])
 
   // A member's procedure to look at on the map (?preview=<id>): its airport is opened with it.
   const previewGuide = searchParams.preview ? memberGuides.find((g) => g.id === searchParams.preview) ?? null : null
@@ -49,9 +48,9 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
   // The left column (everything to read and act on) and the map beside it, which stays in view while the column scrolls.
   const airports = (
     <section aria-labelledby="airports" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="airports" className="text-sm font-semibold">
-          Airports with flights
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="airports" className="shrink-0 text-sm font-semibold">
+          Airports
         </h2>
         <AirportPicker current={icao} />
       </div>
@@ -85,7 +84,7 @@ export default async function ProceduresPage({ searchParams }: { searchParams: {
         description="How real flights arrive at and leave each airport, what is still missing, and the progress. Visible to admins only."
       />
 
-      {sync && <SyncCard copyAllowed={sync.copyAllowed} lastSyncedAt={sync.lastSyncedAt} flightsCount={sync.flightsCount} timezone={ctx.profile?.timezone ?? null} />}
+      <RecentAirports airports={recent} current={icao} />
 
       {icao && airport && detail ? (
         <ProceduresMap
