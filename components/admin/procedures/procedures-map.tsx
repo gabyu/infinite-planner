@@ -22,11 +22,35 @@ interface Props {
   flights: FlightAnalysis[]
   arrivalGroups: FlightGroup[]
   departureGroups: FlightGroup[]
+  /** A procedure a member saved, shown on its own over the flights (the admin's Preview button). Points in feet. */
+  preview?: { id: string; label: string; points: { lat: number; lng: number; altitude: number }[] } | null
 }
 
-export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, departureGroups }: Props) {
+// One procedure drawn over the flights: a thick line through its points, each point with its altitude. Replaces the previous one.
+function drawPreview(L: any, map: any, preview: Props["preview"], dark: boolean, layer: { current: any }) {
+  layer.current?.remove()
+  layer.current = null
+  if (!preview || preview.points.length < 2) return
+  const color = dark ? "#fbbf24" : "#d97706"
+  const group = L.featureGroup()
+  const line = L.polyline(preview.points.map((p) => [p.lat, p.lng]), { color, weight: 5, opacity: 0.95 }).addTo(group)
+  line.bindTooltip(preview.label, { sticky: true })
+  preview.points.forEach((p, i) => {
+    L.circleMarker([p.lat, p.lng], { radius: i === 0 ? 5 : 3.5, color, fillColor: dark ? "#0f172a" : "#fff", fillOpacity: 1, weight: 2 })
+      .bindTooltip(`${i + 1} · ${Math.round(p.altitude).toLocaleString("en-US")} ft`)
+      .addTo(group)
+  })
+  group.addTo(map)
+  layer.current = group
+  map.fitBounds(group.getBounds(), { padding: [40, 40], maxZoom: 11 })
+}
+
+export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, departureGroups, preview = null }: Props) {
   const mapEl = useRef<HTMLDivElement>(null)
   const layers = useRef<Map<string, any>>(new Map())
+  const previewLayer = useRef<any>(null)
+  const previewRef = useRef(preview)
+  previewRef.current = preview
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [runwayFilter, setRunwayFilter] = useState<string>("all")
   const [hover, setHover] = useState<string | null>(null)
@@ -70,13 +94,31 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
       const all = flights.flatMap((f) => f.track.map((p) => [p[0], p[1]] as [number, number]))
       if (all.length) map.fitBounds(all, { padding: [30, 30] })
       ;(window as any).__procMap = map
+      drawPreview(L, map, previewRef.current, dark, previewLayer)
     })()
     return () => {
       cancelled = true
       layers.current.clear()
+      previewLayer.current = null
       map?.remove()
     }
   }, [center, dark, flights, groupOf, icao, runways])
+
+  // The previewed procedure changes without rebuilding the map.
+  const previewId = preview?.id ?? null
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      // @ts-ignore leaflet ships no types in this project
+      const L = (await import("leaflet")).default
+      const map = (window as any).__procMap
+      if (cancelled || !map) return
+      drawPreview(L, map, previewRef.current, dark, previewLayer)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [previewId, dark])
 
   useEffect(() => {
     flights.forEach((f) => {
@@ -178,7 +220,7 @@ export function ProceduresMap({ icao, center, runways, flights, arrivalGroups, d
         {groupBlock("Approaches", arrivalGroups)}
         {groupBlock("Departures", departureGroups)}
       </aside>
-      <div ref={mapEl} className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-lg border" />
+      <div id="procedures-map" ref={mapEl} className="h-[70vh] min-h-[420px] w-full overflow-hidden rounded-lg border" />
     </div>
   )
 }

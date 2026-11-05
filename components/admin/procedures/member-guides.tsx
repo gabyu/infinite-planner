@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Trash2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { LocalTime } from "@/components/local-time"
@@ -37,7 +37,7 @@ function PathPreview({ points }: { points: [number, number, number][] }) {
   )
 }
 
-export function MemberGuides({ guides, airport }: { guides: MemberGuide[]; airport: string | null }) {
+export function MemberGuides({ guides, airport, previewId }: { guides: MemberGuide[]; airport: string | null; previewId: string | null }) {
   const router = useRouter()
   const [onlyAirport, setOnlyAirport] = useState(Boolean(airport))
   const [kind, setKind] = useState<"all" | "departure" | "arrival">("all")
@@ -46,6 +46,13 @@ export function MemberGuides({ guides, airport }: { guides: MemberGuide[]; airpo
   const [error, setError] = useState<string | null>(null)
 
   const shown = guides.filter((g) => (!onlyAirport || !airport || g.airport === airport) && (kind === "all" || g.kind === kind))
+
+  // Shows (or hides) one procedure on the map above, in the address so it survives a refresh: ?airport=LFPG&preview=<id>.
+  function preview(g: MemberGuide) {
+    const on = previewId === g.id
+    router.replace(`/admin-dashboard/procedures?airport=${g.airport}${on ? "" : `&preview=${g.id}`}`, { scroll: false })
+    if (!on) window.setTimeout(() => document.getElementById("procedures-map")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250)
+  }
 
   async function remove(id: string) {
     if (confirm !== id) return setConfirm(id)
@@ -106,6 +113,17 @@ export function MemberGuides({ guides, airport }: { guides: MemberGuide[]; airpo
                 </p>
                 <p className="text-[11px] text-muted-foreground">Origin: {g.originSources.join(", ") || "unknown"}</p>
               </div>
+              <div className="flex flex-col items-stretch gap-1">
+              <Button
+                variant={previewId === g.id ? "secondary" : "outline"}
+                size="sm"
+                disabled={!g.runway}
+                title={g.runway ? undefined : "No runway: it can't be placed on the map"}
+                onClick={() => preview(g)}
+              >
+                {previewId === g.id ? <EyeOff /> : <Eye />}
+                {previewId === g.id ? "Hide" : "Preview"}
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -116,6 +134,7 @@ export function MemberGuides({ guides, airport }: { guides: MemberGuide[]; airpo
                 {busy === g.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
                 {confirm === g.id ? "Delete for good?" : "Delete"}
               </Button>
+              </div>
             </li>
           ))}
         </ul>
