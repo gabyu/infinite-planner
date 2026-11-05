@@ -7,6 +7,7 @@ import {
   isUuid,
   json,
   LOCKED_MESSAGE,
+  nothingLostWithoutOptional,
   requireUser,
   withoutExtraNumbers,
 } from "@/lib/flight-plan-server"
@@ -23,7 +24,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const fields =
     "id, status, source, origin_sources, created_at, flight_number, origin_airport, destination_airport, origin_airport_name, destination_airport_name, waypoints, includes_branding, flight_time_minutes, visibility, public_id, is_fork, featured"
   const read = (list: string) => auth.supabase.from("flight_plans").select(list).eq("id", params.id).maybeSingle()
-  let { data, error } = await read(`${fields}, extra_flight_numbers`)
+  let { data, error } = await read(`${fields}, extra_flight_numbers, aircraft`)
   // A database without the extra_flight_numbers column yet: read the plan without it.
   if (isMissingExtraColumn(error)) ({ data, error } = await read(fields))
   if (!data) return json({ error: "Flight plan not found." }, 404)
@@ -50,7 +51,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     supabase.from("flight_plans").update(values).eq("id", params.id).select("id, status, created_at").maybeSingle()
   let { data, error } = await save(columns)
   // A database without the extra_flight_numbers column yet: save the rest (nothing is lost with one number only).
-  if (isMissingExtraColumn(error) && columns.extra_flight_numbers.length === 0) {
+  if (isMissingExtraColumn(error) && nothingLostWithoutOptional(columns)) {
     ;({ data, error } = await save(withoutExtraNumbers(columns)))
   }
 

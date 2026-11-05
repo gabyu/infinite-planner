@@ -37,6 +37,11 @@ export const copy = {
     flightNumberRemove: "Remove",
     flightNumberPlaceholder: "e.g. AF69",
     flightNumberAddPlaceholder: "Add another",
+    aircraftLabel: "Aircraft", // PROVISIONAL
+    aircraftPlaceholder: "e.g. Boeing 777-300ER", // PROVISIONAL
+    aircraftChip: "AC", // PROVISIONAL
+    aircraftAdd: "Add the aircraft", // PROVISIONAL
+    aircraftHelp: "Optional. The aircraft you fly this plan with. Kept with your plan, not written into the FPL.", // PROVISIONAL
     flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.",
     sheetHandle: "Drag to resize the panel",
 

@@ -25,20 +25,26 @@ type Live = { state: "loading" } | AtisState | NoAtisState | { state: "unavailab
 
 const REFRESH_MS = 60_000
 
+// The last answer for each airport, kept in this page's memory: switching between the Departure and Arrival tabs (or back to
+// an airport) shows it at once and refreshes it in the background, instead of starting from "loading" every time.
+// Nothing is stored on disk and nothing outlives the page.
+const lastAnswer = new Map<string, Live>()
+
 // Follows one airport while its code is valid: asks the server now and then every minute (only while the tab is visible).
 // The server answers from a shared cache, so this never costs Infinite Flight a call of its own.
 function useAirportLive(icao: string, active: boolean): Live | null {
-  const [live, setLive] = useState<Live>({ state: "loading" })
+  const [live, setLive] = useState<Live>(() => lastAnswer.get(icao) ?? { state: "loading" })
 
   useEffect(() => {
     if (!active) return
     let cancelled = false
-    setLive({ state: "loading" })
+    setLive(lastAnswer.get(icao) ?? { state: "loading" })
     const load = async () => {
       if (document.hidden) return
       try {
         const response = await fetch(`/api/live/airports/${icao}`, { cache: "no-store" })
         const data = (await response.json()) as Live
+        if (data.state !== "unavailable") lastAnswer.set(icao, data)
         if (!cancelled) setLive(data)
       } catch {
         if (!cancelled) setLive({ state: "unavailable" })

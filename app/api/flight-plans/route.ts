@@ -3,6 +3,7 @@ import {
   flightPlanColumns,
   isMissingExtraColumn,
   json,
+  nothingLostWithoutOptional,
   requireUser,
   withoutExtraNumbers,
 } from "@/lib/flight-plan-server"
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     supabase.from("flight_plans").insert({ user_id: user.id, source: parsed.data.source, ...values }).select("id, status, created_at").single()
   let { data, error } = await create(columns)
   // A database without the extra_flight_numbers column yet: save the rest (nothing is lost with one number only).
-  if (isMissingExtraColumn(error) && columns.extra_flight_numbers.length === 0) {
+  if (isMissingExtraColumn(error) && nothingLostWithoutOptional(columns)) {
     ;({ data, error } = await create(withoutExtraNumbers(columns)))
   }
 
