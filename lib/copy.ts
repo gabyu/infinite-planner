@@ -266,5 +266,30 @@ export const legalCopy = {
   reportOwnPlan: "This is your own flight plan.",
 } as const
 
+/** Partner imports (/import): the banner in the editor and the error pages. Not public copy about partnerships. */
+export const partnerImportCopy = {
+  idLabel: "AeroHub ID",
+  viewOnPartner: "View on AeroHub Radar",
+  backToPartner: "Back to AeroHub Radar",
+  errorPageTitle: "Import",
+  unknownPartnerTitle: "This import link isn't available",
+  unknownPartnerBody: "The source in this link is unknown or turned off.",
+  invalidUrlTitle: "This import link isn't valid",
+  invalidUrlBody: "The file address in the link isn't one we can open. Try again from AeroHub Radar.",
+  expiredTitle: "This link has expired",
+  expiredBody: "Click 'Open in Infinite Planner' again on AeroHub Radar.",
+  unreachableTitle: "AeroHub Radar didn't answer",
+  unreachableBody: "The file couldn't be fetched in time. Try again in a moment.",
+  badFileTitle: "This file can't be imported",
+  badFileBody: "It is too large or isn't a KML file. Try again from AeroHub Radar.",
+  invalidKmlTitle: "This KML file isn't valid",
+  invalidKmlBody: "The route in the file couldn't be read. Try again from AeroHub Radar.",
+  invalidAirportsTitle: "Departure or arrival is missing",
+  invalidAirportsBody: "The file needs a known departure and arrival airport to be imported. Nothing was imported.",
+  tooManyTitle: "Too many requests",
+  tooManyBody: "Wait a minute, then try again.",
+  goHome: "Go to Infinite Planner",
+} as const
+
 /** What is stored with each declaration instead of its text: the checkbox key and the version of its wording. */
 export const DECLARATION_WORDING_KEY = "declarationCheckbox@1"
