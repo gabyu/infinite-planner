@@ -13,7 +13,7 @@ export default function PlannerLayout({ children }: { children: React.ReactNode 
       <StudioThemeScope />
       <SiteHeader />
       <main className="flex-grow">{children}</main>
-      <SiteFooter />
+      <SiteFooter variant="compact" />
     </div>
   )
 }

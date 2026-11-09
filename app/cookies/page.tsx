@@ -46,7 +46,7 @@ export default function CookiesPage() {
           Analytics is not loaded and no analytics cookies are set.
         </p>
         <p>
-          You may change your choice at any time using the "Cookie preferences" link in the footer of every page. See{" "}
+          You may change your choice at any time using the button in Section 6 below, or the "Cookie preferences" link in the footer of the main pages. See{" "}
           <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
             Google's Privacy Policy
           </a>{" "}
@@ -61,6 +61,11 @@ export default function CookiesPage() {
           <li>
             <strong>Vercel Speed Insights</strong> provides anonymous performance measurements of the Service. It does
             not process personal data.
+          </li>
+          <li>
+            <strong>Ko-fi</strong>, the page opened by the optional "Support the project" link, is a separate website
+            with its own cookies and policies. We set no cookie and load nothing from Ko-fi on our pages: it only
+            matters if you follow the link.
           </li>
           <li>
             <strong>Supabase</strong> stores the limited flight statistics described in our{" "}

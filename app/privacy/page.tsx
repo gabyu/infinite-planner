@@ -21,6 +21,11 @@ export default function PrivacyPage() {
           community ("we", "us"). Questions about this Privacy Policy may be sent to the contact address in Section
           12.
         </p>
+        <p>
+          The Service is free. A link in the footer lets you, if you wish, support the project on Ko-fi. This is
+          optional, is not a donation to an organisation, and gives nothing in return (see our{" "}
+          <Link href="/terms">Terms of Service</Link>). Payments are handled by Ko-fi, not by us.
+        </p>
       </section>
 
       <section>
@@ -141,6 +146,17 @@ export default function PrivacyPage() {
               Google's Privacy Policy
             </a>
             .
+          </li>
+          <li>
+            <strong>Ko-fi</strong>, only if you choose to support the project. The link in the footer opens Ko-fi's
+            own website, a separate service. We send Ko-fi no information about you, and we do not load anything from
+            Ko-fi on our pages. What you give Ko-fi (card details, name, email, a message) is handled by Ko-fi and its
+            payment providers under{" "}
+            <a href="https://more.ko-fi.com/privacy" target="_blank" rel="noopener noreferrer">
+              Ko-fi's Privacy Policy
+            </a>
+            . We never receive your card or payment details. Ko-fi may show us what you choose to share there, such as
+            your name and message; we do not link it to your Infinite Planner account.
           </li>
           <li>
             <strong>Vercel</strong>, which hosts the Service and provides anonymous performance measurements that do not

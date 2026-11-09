@@ -17,7 +17,7 @@ export interface TermsSection {
 }
 
 export const TERMS_INTRO =
-  "Short version: this is a free tool for the Infinite Flight community. Use it reasonably, don't abuse it, and don't treat generated flight plans as real-world navigation data."
+  "Short version: this is a free tool for the Infinite Flight community. Use it reasonably, don't abuse it, and don't treat generated flight plans as real-world navigation data. You can optionally support the project, and you get nothing in return for it."
 
 export const TERMS_SECTIONS: TermsSection[] = [
   {
@@ -64,6 +64,15 @@ export const TERMS_SECTIONS: TermsSection[] = [
       "When you make a flight plan public, your Discord username and avatar are displayed with it as its author, and this cannot be turned off for that plan. If you do not wish them to be displayed, keep the flight plan private. By publishing a flight plan you grant the Service a non-exclusive, worldwide, royalty-free licence to host, display, and distribute it, and to let signed-in users download it, like it, and import a copy of it, for as long as it remains published. You confirm that you designed it or are entitled to publish it, and that it does not infringe the rights of anyone else.",
       "You may change a flight plan back to private at any time, after which its page and address stop working. The links created by the earlier sharing feature of the Service were withdrawn when it was replaced by this visibility setting and no longer work. A copy that another user imported while your plan was published belongs to that user: it stays in their account and is not affected when you unpublish or delete the original. Downloading a flight plan from the library requires signing in with Discord.",
       "For legal reasons, imported KML files are not retained; only the flight plan data generated from them may be kept. Unsaved drafts are not retained indefinitely and are deleted automatically unless you take steps to keep them, as described in our [Privacy Policy](/privacy).",
+    ],
+  },
+  {
+    heading: "Supporting the project",
+    blocks: [
+      "The Service is free to use. No feature, content, or level of service depends on a payment, and nothing is ever withheld from people who do not pay.",
+      'A link in the footer ("Support the project") leads to the project\'s page on Ko-fi, where anyone who wishes to may voluntarily send a payment of their choice to help with the running costs and the development of the Service. This is entirely optional.',
+      "Infinite Planner is a personal project, operated independently. It is not an association, a foundation, a company, or any other organisation of its own. A payment made through that link is therefore not a donation to an organisation and not a purchase. It gives no right to any feature, priority, status, ownership, influence over the Service, or other benefit, and it does not give right to a tax deduction or a tax receipt. Choosing not to support the project changes nothing about your use of the Service.",
+      "Payments are handled entirely by Ko-fi and its payment providers, under their own terms and privacy policies. We do not receive or store your card or payment details. Any question about a payment, including a refund, is governed by Ko-fi's terms. The Service does not link a payment to your Infinite Planner account. We may change or remove the support link at any time.",
     ],
   },
   {
