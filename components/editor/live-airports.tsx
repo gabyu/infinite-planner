@@ -1,11 +1,11 @@
 "use client"
 
 import { Fragment, useEffect, useState, type ReactNode } from "react"
-import { ChevronDown, Loader2 } from "lucide-react"
-import { atisWindText, copy, runwayComponentsText, weatherSourceText } from "@/lib/copy"
+import { AlertTriangle, ChevronDown, Loader2 } from "lucide-react"
+import { atisWindText, copy, planRunwayMismatchText, runwayComponentsText, weatherSourceText } from "@/lib/copy"
 import type { TrimAirport } from "@/lib/ground-trim"
 import type { WeatherState } from "@/lib/live-api/airport"
-import { chipRunways, effectiveChoice, type EndChoice, type HandChoice } from "@/lib/runway-choice"
+import { chipRunways, effectiveChoice, planRunwayOutsideAtis, type EndChoice, type HandChoice } from "@/lib/runway-choice"
 import { runwayEnds } from "@/lib/runway-guide"
 import { adviseRunways, endTone, type EndTone } from "@/lib/runway-wind"
 import { cn } from "@/lib/utils"
@@ -135,6 +135,8 @@ interface AirportCardProps {
   /** The runway the pilot tapped for this end, if any. Kept by the editor so it survives switching tabs. */
   hand: HandChoice | null
   onTap: (runway: string) => void
+  /** The runway the plan itself flies at this end (detected, only when sure). A warning shows when the ATIS does not list it. */
+  planRunway?: string | null
   /** The editor's cached airport loader: gives the tiles their arrows when the live data carries no headings (the ATIS). */
   loadAirport?: (icao: string) => Promise<TrimAirport | null>
   /**
@@ -150,7 +152,7 @@ interface AirportCardProps {
 // The live ATIS of one airport, at the top of the Departure or Arrival tab. One line when collapsed (airport, ATIS letter,
 // the runways of this end, wind), the runway chips and the ATIS text when open. Nothing at all while live data is off
 // (switched off, no key) or for a code that isn't an airport.
-export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, children, defaultOpen, className }: AirportCardProps) {
+export function AirportCard({ icao, valid, end, hand, onTap, planRunway = null, loadAirport, children, defaultOpen, className }: AirportCardProps) {
   const live = useAirportLive(icao, valid && /^[A-Z]{4}$/.test(icao))
   const [airport, setAirport] = useState<TrimAirport | null>(null)
   useEffect(() => {
@@ -183,6 +185,7 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
   // kept even when the ATIS stops listing it.
   const choice = atis ? effectiveChoice(hand, icao, runways) : noAtis ? effectiveChoice(hand, icao, [], weather?.pick ?? null) : null
   const chips = chipRunways(choice, runways)
+  const mismatch = atis ? planRunwayOutsideAtis(planRunway, runways) : null
   const choiceNote = atis
     ? !choice
       ? runways.length > 1
@@ -277,6 +280,13 @@ export function AirportCard({ icao, valid, end, hand, onTap, loadAirport, childr
         </span>
         {expandable && <ChevronDown className={cn("mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
       </button>
+
+      {mismatch && planRunway && (
+        <p role="status" className="flex items-start gap-2 border-t bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+          {planRunwayMismatchText(end, planRunway, mismatch)}
+        </p>
+      )}
 
       {atis && open && (
         <div className="space-y-2 border-t px-3 py-2.5">

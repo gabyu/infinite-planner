@@ -40,5 +40,6 @@ Keys are in `lib/copy.ts` (`copy.live` and `atisWindText`). Every line is marked
 | `weatherSourceText` | Source line: the airport's own METAR, or a neighbouring station with its distance | METAR KSFO, 04:53Z / From KOAK, 12 NM away, 04:53Z |
 | `runwayComponentsText` | The wind on the chosen runway (also the tooltip of each chip) | 28R: headwind 5 kt, crosswind 3 kt from the right. (tailwind / left likewise) |
 | `source` | Foot of the block | Live from the Infinite Flight Expert Server. Simulation only. |
+| `planRunwayMismatchText` | Amber line under the ATIS row when the plan's own runway (detected) is not one the ATIS lists for that end. PROVISIONAL | Your plan departs 08L, but the ATIS has 26R in use. Pick a runway in green above, then use a procedure for it. (Arrival: "lands on".) |
 
 Not shown: nothing is shown when live data is off, when the key is missing on that environment, or for a code that is not an airport.

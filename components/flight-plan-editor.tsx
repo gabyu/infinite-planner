@@ -1406,6 +1406,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   }
   // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
+  // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
+  const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
   // Stable (it only reads a ref), so effects that depend on it do not run again on every render.
@@ -1446,6 +1448,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       }
       const dep = origin ? extractDeparture(waypoints, origin, phaseSplit) : null
       const arr = destination ? extractArrival(waypoints, destination, phaseSplit) : null
+      setPlanRunways({
+        departure: dep && dep.confidence === "high" ? dep.runwayEnd : null,
+        arrival: arr && arr.confidence === "high" ? arr.runwayEnd : null,
+      })
       setDepartureRunway((current) =>
         pick(handRunways.departure, originAirport, origin, dep && dep.confidence === "high" ? dep.runwayEnd : null, current),
       )
@@ -2180,6 +2186,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                         valid={activeTab === "departure" ? icaoValidation.origin : icaoValidation.destination}
                         end={activeTab}
                         hand={handRunways[activeTab]}
+                        planRunway={planRunways[activeTab]}
                         onTap={(runway) =>
                           setHandRunways((current) => ({
                             ...current,
