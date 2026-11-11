@@ -176,7 +176,7 @@ export function guideDateText(iso: string) {
 /** Under the ATIS line when the plan's runway is not one the ATIS has in use ("Your plan departs 08L, but the ATIS has 26R, 26L in use. ..."). */
 export function planRunwayMismatchText(end: "departure" | "arrival", runway: string, atisRunways: string[]) {
   const verb = end === "departure" ? "departs" : "lands on"
-  return `Your plan ${verb} ${runway}, but the ATIS has ${atisRunways.join(", ")} in use. Pick a runway in green above, then use a procedure for it.` // PROVISIONAL
+  return `Your plan ${verb} ${runway}, but the ATIS has ${atisRunways.join(", ")} in use. Pick a runway in green above, then use a procedure for it.`
 }
 
 /** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
