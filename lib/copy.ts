@@ -237,12 +237,17 @@ export const visibilityCopy = {
   helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`,
 }
 
+// The sources whose files can't be published (the rule itself lives in lib/flight-plans.ts and the database). Add a new
+// tracker here and every sentence below follows.
+const TRACKER_SOURCE_NAMES = ["FlightRadar24", "FlightAware", "AeroHub Radar"] as const
+const listOf = (names: readonly string[]) => (names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`)
+
 /**
  * Legal and compliance correctif (copy-review-legal.md has the four options of each string). Calm option, approved 2026-10-18.
  */
 export const legalCopy = {
   // Where publishing is refused or switched off (switch helper text, API error). Same sentence everywhere.
-  publishOnlyOwnDesigns: "Flight plans converted from FlightRadar24 or FlightAware files can't be published.",
+  publishOnlyOwnDesigns: `Flight plans converted from ${listOf(TRACKER_SOURCE_NAMES)} files can't be published.`,
   // A plan an admin took off Explore: the owner sees this, never a reason.
   planNotAvailable: "This flight plan isn't available on Explore right now.",
   // The publish dialog, the same from every place a plan can be published. Imported plans add the checkbox.

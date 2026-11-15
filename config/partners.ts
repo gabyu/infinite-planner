@@ -15,6 +15,12 @@ export interface Partner {
   maxFileSizeBytes: number
   fetchTimeoutMs: number
   attribution: string
+  /**
+   * The partner's logo, as supplied (never recoloured or redrawn). Shown only in the import banner and only while the
+   * partner is `enabled`: the kill switch removes it with everything else. `minHeightPx` is the smallest height at which
+   * the tagline stays legible (a condition of the partner's authorization).
+   */
+  logo?: { lightBg: string; darkBg: string; alt: string; minHeightPx: number }
   /** Local testing only: allows http and one port on a host from allowedHosts. Never set on a real partner. */
   devOnly?: { port: number }
 }
@@ -30,6 +36,12 @@ export const partners: readonly Partner[] = [
     maxFileSizeBytes: 1_048_576,
     fetchTimeoutMs: 5000,
     attribution: "Imported from AeroHub Radar",
+    logo: {
+      lightBg: "/partners/aerohubradar/logo-light-bg.svg",
+      darkBg: "/partners/aerohubradar/logo-dark-bg.svg",
+      alt: "AeroHub Radar",
+      minHeightPx: 24,
+    },
   },
   // Serves the committed fixture from this app's own dev server (app/api/dev/aerohub-fixture). Only on `next dev`:
   // on Vercel (staging and production) NODE_ENV is "production", so this entry is off.
@@ -43,6 +55,12 @@ export const partners: readonly Partner[] = [
     maxFileSizeBytes: 1_048_576,
     fetchTimeoutMs: 5000,
     attribution: "Imported from AeroHub Radar",
+    logo: {
+      lightBg: "/partners/aerohubradar/logo-light-bg.svg",
+      darkBg: "/partners/aerohubradar/logo-dark-bg.svg",
+      alt: "AeroHub Radar",
+      minHeightPx: 24,
+    },
     devOnly: { port: 3000 },
   },
 ]
