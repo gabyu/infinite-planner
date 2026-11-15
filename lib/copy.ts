@@ -279,7 +279,7 @@ export const legalCopy = {
 
 /** Partner imports (/import): the banner in the editor and the error pages. Not public copy about partnerships. */
 export const partnerImportCopy = {
-  idLabel: "AeroHub ID",
+  idLabel: "ID",
   viewOnPartner: "View on AeroHub Radar",
   backToPartner: "Back to AeroHub Radar",
   errorPageTitle: "Import",

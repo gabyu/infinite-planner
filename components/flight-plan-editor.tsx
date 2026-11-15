@@ -2084,7 +2084,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
           strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} stats={stats} />}
           header={
             <div className="px-4 py-3">
-              <div className="flex items-start justify-between gap-2">
+              {/* With a partner logo the row is baseline-aligned: the airports and the logotype sit on the same line */}
+              <div className={cn("flex justify-between gap-2", preloaded?.banner.logo ? "items-baseline" : "items-start")}>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="font-mono text-xl font-semibold text-primary">
                     {originAirport || "ORIG"}
