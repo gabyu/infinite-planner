@@ -4,6 +4,7 @@ import { PencilRuler, Upload } from "lucide-react"
 import { PageShell } from "@/components/ds/page-shell"
 import { Button } from "@/components/ui/button"
 import { ActivityOverview } from "@/components/dashboard/activity-overview"
+import { RefreshIfStale } from "@/components/dashboard/refresh-if-stale"
 import { FlightsList } from "@/components/dashboard/flights-list"
 import { SignInPrompt } from "@/components/dashboard/sign-in-prompt"
 import { FLIGHT_PLAN_SUMMARY_COLUMNS, HISTORY_PAGE_SIZE, type FlightPlanSummary } from "@/lib/flight-plans"
@@ -98,6 +99,7 @@ export default async function DashboardPage() {
         </div>
       }
     >
+      <RefreshIfStale renderedAt={renderedAt} />
       <ActivityOverview exportTimes={exportTimes} />
 
       <section className="mt-8" aria-labelledby="my-flights-title">

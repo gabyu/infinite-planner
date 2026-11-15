@@ -21,6 +21,7 @@ function NavLink({
   hideOnMobile,
   matchPrefix,
   alwaysLink,
+  noPrefetch,
 }: {
   href: string
   icon?: React.ReactNode
@@ -30,6 +31,8 @@ function NavLink({
   matchPrefix?: boolean
   // Stays a link on its own page too (Explore: the way back to the Explore home).
   alwaysLink?: boolean
+  // Never prefetched: the page is per-user and must be fetched fresh when opened.
+  noPrefetch?: boolean
 }) {
   const pathname = usePathname()
   const isActive = matchPrefix ? pathname === href || pathname.startsWith(`${href}/`) : pathname === href
@@ -48,6 +51,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      prefetch={noPrefetch ? false : undefined}
       aria-current={isActive ? "true" : undefined}
       className={`${isActive ? `${activeNavLinkClass} no-underline` : navLinkClass} ${responsiveClass}`}
     >
@@ -83,7 +87,7 @@ export function SiteHeaderClient({ showExplore }: { showExplore: boolean }) {
               <span className="hidden sm:inline">{LIBRARY_NAV_LABEL}</span>
             </NavLink>
           )}
-          <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />}>
+          <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} noPrefetch>
             <span className="hidden sm:inline">Dashboard</span>
           </NavLink>
           {/* Fixed width: the avatar and the "Sign in" button take the same room. */}

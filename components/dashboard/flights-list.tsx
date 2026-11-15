@@ -28,6 +28,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { toast } from "@/hooks/use-toast"
 import { RelativeTime } from "@/components/relative-time"
 import { RouteArrow } from "@/components/route-arrow"
+import { SourceMark } from "@/components/editor/source-mark"
 import { PlanViewDialog } from "@/components/dashboard/plan-view-dialog"
 import { PlanDetailsDialog } from "@/components/dashboard/plan-details-dialog"
 import { aircraftCode } from "@/lib/aircraft"
@@ -42,7 +43,6 @@ import {
   formatFlightTime,
   isTrackerDerived,
   sourceLabel,
-  sourceShort,
   type FlightPlanSummary,
 } from "@/lib/flight-plans"
 
@@ -419,8 +419,8 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="inline-flex">
-                            <Badge variant="outline" className={TAG}>
-                              {sourceShort(plan.source)}
+                            <Badge variant="outline" className={cn(TAG, "px-1.5")} aria-label={sourceLabel(plan.source)}>
+                              <SourceMark source={plan.source} />
                             </Badge>
                           </span>
                         </TooltipTrigger>

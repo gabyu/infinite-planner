@@ -1821,7 +1821,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       return (
         <>
           Exported and saved: this plan is locked. Duplicate it from your{" "}
-          <Link href="/dashboard" className="link hover:text-foreground">
+          <Link href="/dashboard" prefetch={false} className="link hover:text-foreground">
             dashboard
           </Link>{" "}
           to change it.
@@ -1907,7 +1907,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
         <p className="mt-3 max-w-lg text-balance text-xs text-muted-foreground">
           <span>
             Signed in: your plans are saved as drafts while you edit, and kept in your{" "}
-            <Link href="/dashboard" className="link hover:text-foreground">
+            <Link href="/dashboard" prefetch={false} className="link hover:text-foreground">
               dashboard
             </Link>
             .
@@ -1972,7 +1972,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               <h2 className="text-sm font-medium">This draft can&apos;t be opened</h2>
               <p className="mt-1 max-w-sm text-sm text-muted-foreground">{resume.message}</p>
               <Button asChild variant="outline" className="mt-5">
-                <Link href="/dashboard" className="no-underline">
+                <Link href="/dashboard" prefetch={false} className="no-underline">
                   Go to your dashboard
                 </Link>
               </Button>
