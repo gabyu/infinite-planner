@@ -72,6 +72,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Recor
           aerohubId: parsed.meta.aerohubId,
           callsign: parsed.meta.callsign,
           flightUrl: parsed.meta.flightUrl,
+          logo: partner.logo ?? null,
         },
       }}
     />

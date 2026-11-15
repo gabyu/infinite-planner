@@ -23,7 +23,15 @@ const fixture = readFileSync("scripts/fixtures/aerohub-QR520-YPPH-EGLL.kml", "ut
   assert.equal(result.droppedMarkers, 2)
   assert.equal(result.route.waypoints.length, 115)
   assert.equal(result.route.source, "AeroHub")
-  assert.equal(result.route.waypoints[0].name, "001")
+  // The file's own names are kept (not 001, 002...): AVBAD is the 4th point, the runway points keep their name
+  // (without the space), the oceanic fixes too, and the planner-only markers are gone.
+  const names = result.route.waypoints.map((wp) => wp.name)
+  assert.deepEqual(names.slice(0, 5), ["YPPH", "RW21", "DPTRW21", "AVBAD", "TUVBA"])
+  assert.equal(result.route.waypoints[3].name, "AVBAD")
+  assert.ok(names.includes("OPEGA") && names.includes("JAVVI") && names.includes("2813S10950E") && names.includes("RW09L"))
+  assert.deepEqual(names.slice(-2), ["RW09L", "EGLL"])
+  assert.ok(!names.includes("TOC") && !names.includes("TOD"))
+  assert.ok(names.every((n) => n.length > 0 && !/\s/.test(n)))
   // First point is YPPH, last is EGLL.
   assert.ok(Math.abs(result.route.waypoints[0].lng - 115.966547) < 1e-9)
   assert.ok(Math.abs(result.route.waypoints.at(-1)!.lat - 51.471226) < 1e-9)
@@ -72,12 +80,24 @@ const fixture = readFileSync("scripts/fixtures/aerohub-QR520-YPPH-EGLL.kml", "ut
   assert.equal(badCoord.ok, false)
 }
 
+// A missing or empty name falls back to the point's number, only for that point.
+{
+  const r = parseAeroHubKml(fixture.replace("<name>AVBAD</name>", "<name>  </name>"), HOSTS)
+  assert.equal(r.ok, true)
+  if (r.ok) {
+    assert.equal(r.route.waypoints[3].name, "004")
+    assert.equal(r.route.waypoints[4].name, "TUVBA")
+  }
+}
+
 // Names that don't line up with the route are ignored: nothing is dropped by mistake.
 {
   const noFolder = fixture.replace(/<Folder>[\s\S]*<\/Folder>/, "")
   const r = parseAeroHubKml(noFolder, HOSTS)
   assert.equal(r.ok && r.droppedMarkers, 0)
   assert.equal(r.ok && r.route.waypoints.length, 117)
+  // No Folder, so no names: every point is numbered.
+  assert.equal(r.ok && r.route.waypoints[3].name, "004")
 }
 
 console.log("aerohub-parser: all checks passed")

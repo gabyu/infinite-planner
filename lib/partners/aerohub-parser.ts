@@ -90,24 +90,30 @@ export function parseAeroHubKml(xml: string, flightUrlHosts: readonly string[]):
 
   // Point names, only usable when they line up one to one with the route.
   const folder = children(document, "Folder").find((f) => child(f, "name")?.textContent?.trim() === "Waypoints")
-  const names = folder
-    ? children(folder, "Placemark").map((p) => child(p, "name")?.textContent?.trim().toUpperCase() ?? "")
-    : []
-  const aligned = names.length === route.length
+  const rawNames = folder ? children(folder, "Placemark").map((p) => child(p, "name")?.textContent ?? "") : []
+  const aligned = rawNames.length === route.length
+  const markerKeys = rawNames.map((n) => n.trim().toUpperCase())
 
   const kept: string[] = []
+  const nameByPoint = new Map<string, string>()
   let dropped = 0
   route.forEach((point, index) => {
-    if (aligned && MARKER_NAMES.has(names[index])) {
+    if (aligned && MARKER_NAMES.has(markerKeys[index])) {
       dropped++
       return
     }
     kept.push(`${point.lng},${point.lat},${point.alt}`)
+    const name = aligned ? cleanName(rawNames[index]) : ""
+    if (name) nameByPoint.set(pointKey(point.lat, point.lng), name)
   })
 
   const synthetic = `<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark><LineString><coordinates>${kept.join(" ")}</coordinates></LineString></Placemark></Document></kml>`
   const parsed = parseKML(synthetic) // no file name: nothing is added to the public flight statistics
   if (parsed.waypoints.length < 2) return { ok: false, code: "invalid_kml", detail: "route" }
+
+  // parseKML numbers every point (001, 002...). Put the file's own names back; a point without one keeps its number.
+  // Points are matched by position on the earth, so the ones parseKML merged or thinned out cannot shift the names.
+  const waypoints = parsed.waypoints.map((wp) => ({ ...wp, name: nameByPoint.get(pointKey(wp.lat, wp.lng)) ?? wp.name }))
 
   return {
     ok: true,
@@ -120,8 +126,15 @@ export function parseAeroHubKml(xml: string, flightUrlHosts: readonly string[]):
     },
     rawPointCount: route.length,
     droppedMarkers: dropped,
-    route: { ...parsed, source: "AeroHub" },
+    route: { ...parsed, waypoints, source: "AeroHub" },
   }
+}
+
+const pointKey = (lat: number, lng: number) => `${lat.toFixed(6)},${lng.toFixed(6)}`
+
+// A waypoint name as Infinite Flight takes it: no spaces ("DPT RW21" -> "DPTRW21"), upper case, a sane length.
+function cleanName(raw: string): string {
+  return raw.replace(/\s+/g, "").toUpperCase().slice(0, 20)
 }
 
 function safeFlightUrl(raw: string | undefined, hosts: readonly string[]): string | null {

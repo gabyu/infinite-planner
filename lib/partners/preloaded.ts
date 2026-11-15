@@ -7,5 +7,12 @@ export interface PreloadedImport {
   origin: string
   destination: string
   route: ReturnType<typeof parseKML>
-  banner: { attribution: string; aerohubId: string | null; callsign: string | null; flightUrl: string | null }
+  banner: {
+    attribution: string
+    aerohubId: string | null
+    callsign: string | null
+    flightUrl: string | null
+    /** Only present while the partner is enabled (config/partners.ts). */
+    logo: { lightBg: string; darkBg: string; alt: string; minHeightPx: number } | null
+  }
 }
