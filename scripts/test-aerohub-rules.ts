@@ -29,11 +29,11 @@ assert.equal(
 assert.equal(partnerImportCopy.expiredTitle, "This link has expired")
 assert.equal(partnerImportCopy.expiredBody, "Click 'Open in Infinite Planner' again on AeroHub Radar.")
 
-// The logo: configured for the real partner, at least 24 px, and gone with the kill switch (getPartner refuses a
+// The logo: configured for the real partner, and gone with the kill switch (getPartner refuses a
 // disabled partner, which is what the /import page asks first).
 const real = getPartner("aerohubradar")!
 assert.ok(real.logo)
-assert.ok(real.logo!.minHeightPx >= 24)
+assert.equal(real.logo!.heightPx, 20) // chosen by Gab on 2026-11-15; the authorization asks for 24 px or more
 assert.equal(real.logo!.alt, "AeroHub Radar")
 assert.ok(real.logo!.lightBg.endsWith("logo-light-bg.svg") && real.logo!.darkBg.endsWith("logo-dark-bg.svg"))
 const disabled = partners.map((p) => (p.id === "aerohubradar" ? { ...p, enabled: false } : p))

@@ -56,7 +56,7 @@ as the `preloaded` prop. Nothing public about the partnership: no changelog entr
 - `TOC` and `TOD` points are dropped; runway points and oceanic fixes stay (the editor detects the runways itself).
 - For an AeroHub plan the editor hides flight number, aircraft, flight time (and their chips) and the whole publishing block.
 - Logo (`config/partners.ts` -> `logo`): only in the import banner (top right of the route row, `PartnerLogo`), black file on
-  light, white on dark, 24 px high minimum, files in `public/partners/aerohubradar/` kept byte for byte (do not run SVGO or
+  light, white on dark, 20 px high (`heightPx`; the authorization asks for 24 px or more, Gab chose 20 on 2026-11-15 so it clears the panel's collapse button), files in `public/partners/aerohubradar/` kept byte for byte (do not run SVGO or
   recolour). Shown only while the partner is `enabled`. Terms of the partner's signed authorization (2026-11-06): nowhere else
   (not home, footer or navigation), no wording of endorsement or official status. A partner/resources section is for later.
 - Plans are saved with source `AeroHub` (tracker-style, not shareable). Needs `supabase/migrations/20261110000000_aerohub_source.sql`

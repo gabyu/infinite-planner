@@ -6,14 +6,14 @@ type Logo = NonNullable<PreloadedImport["banner"]["logo"]>
 
 // The partner's logo, exactly as supplied: the black file on light backgrounds, the white one on dark (switched with the
 // theme), never recoloured, cropped, redrawn or paired with another logo. Sized by height only, so its proportions
-// hold (the files are 200x30). At least `minHeightPx` tall so the tagline stays legible; on a very narrow panel it is
-// left out and the text line below still names the source.
+// hold (the files are 200x30). It ends 40 px before the row's right edge so it never runs under the panel's collapse
+// button; on a very narrow panel it is left out and the text line below still names the source.
 export function PartnerLogo({ logo }: { logo: Logo }) {
-  const height = logo.minHeightPx
+  const height = logo.heightPx
   const width = Math.round((height * 200) / 30)
   const common = { alt: logo.alt, height, width, style: { height, width: "auto" } } as const
   return (
-    <span className="hidden shrink-0 min-[340px]:block" data-partner-logo>
+    <span className="mr-10 hidden shrink-0 min-[340px]:block" data-partner-logo>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logo.lightBg} {...common} className="block dark:hidden" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
