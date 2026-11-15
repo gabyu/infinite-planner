@@ -17,10 +17,11 @@ export interface Partner {
   attribution: string
   /**
    * The partner's logo, as supplied (never recoloured or redrawn). Shown only in the import banner and only while the
-   * partner is `enabled`: the kill switch removes it with everything else. `minHeightPx` is the smallest height at which
-   * the tagline stays legible (a condition of the partner's authorization).
+   * partner is `enabled`: the kill switch removes it with everything else. `heightPx` is its height (width follows the
+   * original proportions). The partner's authorization asks for 24 px or more so the tagline stays legible; Gab chose
+   * 20 px on 2026-11-15 because 24 px did not fit beside the panel's collapse button.
    */
-  logo?: { lightBg: string; darkBg: string; alt: string; minHeightPx: number }
+  logo?: { lightBg: string; darkBg: string; alt: string; heightPx: number }
   /** Local testing only: allows http and one port on a host from allowedHosts. Never set on a real partner. */
   devOnly?: { port: number }
 }
@@ -40,7 +41,7 @@ export const partners: readonly Partner[] = [
       lightBg: "/partners/aerohubradar/logo-light-bg.svg",
       darkBg: "/partners/aerohubradar/logo-dark-bg.svg",
       alt: "AeroHub Radar",
-      minHeightPx: 24,
+      heightPx: 20,
     },
   },
   // Serves the committed fixture from this app's own dev server (app/api/dev/aerohub-fixture). Only on `next dev`:
@@ -59,7 +60,7 @@ export const partners: readonly Partner[] = [
       lightBg: "/partners/aerohubradar/logo-light-bg.svg",
       darkBg: "/partners/aerohubradar/logo-dark-bg.svg",
       alt: "AeroHub Radar",
-      minHeightPx: 24,
+      heightPx: 20,
     },
     devOnly: { port: 3000 },
   },

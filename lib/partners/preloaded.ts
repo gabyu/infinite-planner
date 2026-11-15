@@ -13,6 +13,6 @@ export interface PreloadedImport {
     callsign: string | null
     flightUrl: string | null
     /** Only present while the partner is enabled (config/partners.ts). */
-    logo: { lightBg: string; darkBg: string; alt: string; minHeightPx: number } | null
+    logo: { lightBg: string; darkBg: string; alt: string; heightPx: number } | null
   }
 }
