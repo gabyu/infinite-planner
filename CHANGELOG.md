@@ -5,6 +5,7 @@ All notable changes to Infinite Planner are documented here.
 ## Unreleased
 
 ### Added
+- **A warning when your plan's runway is not the ATIS's.** If the plan departs (or lands on) a runway the ATIS does not have in use, the airport card says so and points you to the runways in green. It disappears once the plan flies a listed runway (pick one, then apply a procedure).
 - **Edit a flight's details from the dashboard.** The row menu has **Edit details**: flight number, aircraft, departure runway and arrival runway, on drafts and exported plans alike (they live in our system, the route and the FPL never change). The runways are filled in by the editor when it detects them or when you pick a procedure or a runway, and show under the flight number in the list. Needs the `20261107000000_plan_details_and_admin_guides.sql` migration.
 - **Admin: procedures saved by members.** Admin → Procedures has a new **Saved by members** list: who saved each procedure and when, a small drawing of the path, a **Preview** that draws it on the map above (with the altitude of each point), and a Delete (plans that used it are untouched). They also count in the airport list and the coverage grid.
 - **Arrival procedures.** The Arrival tab now has the same procedures as Departure: your plan's arrival ("Arriving from North · 85 NM · 012°") can be saved, dated, applied to the runway you pick, and restored to the original. Needs the `20261106000000_runway_guides_arrival.sql` migration.

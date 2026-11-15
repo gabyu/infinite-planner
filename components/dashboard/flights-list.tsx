@@ -494,7 +494,11 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                     {!isDraft && plan.moderation_status === "hidden" && (
                       <span className="text-xs text-muted-foreground">{legalCopy.planNotAvailable}</span>
                     )}
-                    {!isDraft && plan.moderation_status !== "hidden" && notPublishable(plan) && (
+                    {!isDraft && plan.moderation_status !== "hidden" && notPublishable(plan) && plan.source === "AeroHub" && (
+                      // AeroHub plans are never offered for publishing: a plain label, no explanation bubble.
+                      <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">Private</span>
+                    )}
+                    {!isDraft && plan.moderation_status !== "hidden" && notPublishable(plan) && plan.source !== "AeroHub" && (
                       // No switch where publishing isn't possible: an info bubble says why.
                       <TooltipProvider delayDuration={100}>
                         <Tooltip>

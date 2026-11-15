@@ -23,7 +23,7 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
-import { PartnerBanner } from "@/components/import/partner-banner"
+import { PartnerBanner, PartnerLogo } from "@/components/import/partner-banner"
 import type { PreloadedImport } from "@/lib/partners/preloaded"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { saveFplInBrowser } from "@/lib/fpl-download"
@@ -242,6 +242,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [savedPlanId, setSavedPlanId] = useState<string | null>(null)
   const [importSource, setImportSource] = useState<FlightPlanSource | null>(null)
+  // A plan from AeroHub Radar: its file brings real waypoint names, and carries no flight number, aircraft or flight time
+  // (the ID in the file is an AeroHub ID, not a flight number). Those fields and the publishing block are not offered.
+  const isAeroHub = importSource === "AeroHub"
   // Every source a reopened draft comes from (flight_plans.origin_sources): a copy keeps the origin of the plan it was made from.
   const [originSources, setOriginSources] = useState<string[]>([])
   // The dashboard row this editing session saves to: the draft autosaves update it instead of piling up
@@ -477,7 +480,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     if (result.waypoints.length === 0) {
       setError("No valid waypoints found in the KML file. Please check the file format.")
     } else {
-      const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding)
+      const renamedWaypoints = applyWaypointNamingRules(result.waypoints, origin, destination, includeBranding, result.source === "AeroHub")
       setWaypoints(renamedWaypoints)
       // A new import is a new plan: it must not overwrite the one saved from the previous import.
       resetSavedPlan()
@@ -1333,13 +1336,21 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   // become MADE / WITH / INFINITE / PLANNER (locked, and remembered as branded so unticking
   // the checkbox can restore them). The same rule for Convert and Sketch: no length-based
   // "auto" branding any more, only the checkbox decides.
-  const applyWaypointNamingRules = (waypoints: Waypoint[], origin: string, destination: string, branding = false) => {
+  // `keepNames`: the waypoints already carry their real names (AeroHub files do), so only a missing one is numbered.
+  const applyWaypointNamingRules = (
+    waypoints: Waypoint[],
+    origin: string,
+    destination: string,
+    branding = false,
+    keepNames = isAeroHub,
+  ) => {
     if (waypoints.length === 0) return waypoints
 
     return waypoints.map((wp, index) => {
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
       const numbered = String(index).padStart(3, "0")
+      const ownName = keepNames && wp.name.trim() ? wp.name : numbered
 
       if (isFirst) {
         return { ...wp, name: origin || "ORIG", locked: true, branded: false, unbrandedName: undefined }
@@ -1355,11 +1366,11 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
           name: BRAND_NAMES[index - (waypoints.length - 5)],
           locked: true,
           branded: true,
-          unbrandedName: numbered,
+          unbrandedName: ownName,
         }
       }
 
-      return { ...wp, name: numbered, locked: false, branded: false, unbrandedName: undefined }
+      return { ...wp, name: ownName, locked: false, branded: false, unbrandedName: undefined }
     })
   }
 
@@ -1406,6 +1417,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   }
   // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
+  // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
+  const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
   const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
   // Stable (it only reads a ref), so effects that depend on it do not run again on every render.
@@ -1446,6 +1459,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       }
       const dep = origin ? extractDeparture(waypoints, origin, phaseSplit) : null
       const arr = destination ? extractArrival(waypoints, destination, phaseSplit) : null
+      setPlanRunways({
+        departure: dep && dep.confidence === "high" ? dep.runwayEnd : null,
+        arrival: arr && arr.confidence === "high" ? arr.runwayEnd : null,
+      })
       setDepartureRunway((current) =>
         pick(handRunways.departure, originAirport, origin, dep && dep.confidence === "high" ? dep.runwayEnd : null, current),
       )
@@ -1689,6 +1706,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   )
 
   const flightNumberSection = (inGrid: boolean, always = false) =>
+    !isAeroHub &&
     (canSave || always) && (
         <PanelSection
           label={copy.editor.flightNumbersLabel}
@@ -1700,6 +1718,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     )
 
   const aircraftSection = (inGrid: boolean, always = false) =>
+    !isAeroHub &&
     (canSave || always) && (
       <PanelSection label={copy.editor.aircraftLabel} className={inGrid ? exportSectionClass : undefined} help={copy.editor.aircraftHelp}>
         <AircraftField id="aircraft" value={aircraft} onChange={setAircraft} />
@@ -1707,6 +1726,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     )
 
   const flightTimeSection = (inGrid: boolean, always = false) =>
+    !isAeroHub &&
     (canSave || always) && (
         <PanelSection
           label="Flight time"
@@ -1728,7 +1748,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   // Where the plan came from and the flight number its filename carried (Convert only).
   const flightSummary =
-    mode === "import" && importSource ? (
+    mode === "import" && isAeroHub ? (
+      // AeroHub: no flight number or aircraft chips (nothing to add). The import banner carries the source.
+      preloaded ? null : <SourceMark source="AeroHub" className="text-xs text-muted-foreground" />
+    ) : mode === "import" && importSource ? (
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {detectedFlightNumber ? (
           <span className="rounded border bg-muted/50 px-1.5 py-0.5 font-mono text-foreground">
@@ -1830,11 +1853,11 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
           Export FPL
         </Button>
       </div>
-      {libraryOpen && trackerDerived && planShare.visibility !== "public" && (
+      {libraryOpen && !isAeroHub && trackerDerived && planShare.visibility !== "public" && (
         // A plan converted from a FlightRadar24 or FlightAware file can't be published: say so, no switch to offer.
         <p className="text-xs text-muted-foreground">{legalCopy.publishOnlyOwnDesigns}</p>
       )}
-      {libraryOpen && !(trackerDerived && planShare.visibility !== "public") && (
+      {libraryOpen && !isAeroHub && !(trackerDerived && planShare.visibility !== "public") && (
         <div>
           <VisibilitySwitch
             planId={savedPlanId ?? ""}
@@ -2070,6 +2093,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                   </p>
                   {flightSummary}
                 </div>
+                {preloaded?.banner.logo && <PartnerLogo logo={preloaded.banner.logo} />}
               </div>
               {preloaded && <PartnerBanner banner={preloaded.banner} />}
               {/* On a phone there is no bar under the map, so the figures stay here */}
@@ -2180,6 +2204,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                         valid={activeTab === "departure" ? icaoValidation.origin : icaoValidation.destination}
                         end={activeTab}
                         hand={handRunways[activeTab]}
+                        planRunway={planRunways[activeTab]}
                         onTap={(runway) =>
                           setHandRunways((current) => ({
                             ...current,

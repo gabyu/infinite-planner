@@ -51,7 +51,14 @@ timeout and a 1 MB streaming limit. The geometry goes through the same `parseKML
 as the `preloaded` prop. Nothing public about the partnership: no changelog entry, no UI text beyond the banner.
 - `departure`/`arrival` are mandatory and must be known ICAO codes, else an error page (no partial import).
 - `flightNumber` in the file is an **AeroHub ID**: shown with that label, never as a flight number.
+- Waypoint names come from `Folder "Waypoints"` (spaces removed: `DPT RW21` -> `DPTRW21`); a point with no name keeps its number.
+  The editor keeps them for AeroHub plans (`isAeroHub` in `flight-plan-editor.tsx`, `keepNames` in the naming rules).
 - `TOC` and `TOD` points are dropped; runway points and oceanic fixes stay (the editor detects the runways itself).
+- For an AeroHub plan the editor hides flight number, aircraft, flight time (and their chips) and the whole publishing block.
+- Logo (`config/partners.ts` -> `logo`): only in the import banner (top right of the route row, `PartnerLogo`), black file on
+  light, white on dark, 24 px high minimum, files in `public/partners/aerohubradar/` kept byte for byte (do not run SVGO or
+  recolour). Shown only while the partner is `enabled`. Terms of the partner's signed authorization (2026-11-06): nowhere else
+  (not home, footer or navigation), no wording of endorsement or official status. A partner/resources section is for later.
 - Plans are saved with source `AeroHub` (tracker-style, not shareable). Needs `supabase/migrations/20261110000000_aerohub_source.sql`
   on staging, then prod, before anyone saves such a plan.
 - Tracking: one JSON log line per import (`partner_import`, path only, never `exp`/`sig`) and one `partner_import_downloaded`
@@ -60,7 +67,7 @@ as the `preloaded` prop. Nothing public about the partnership: no changelog entr
   `scripts/fixtures/aerohub-QR520-YPPH-EGLL.kml` from `app/api/dev/aerohub-fixture/`:
   `http://localhost:3000/import?src=aerohubradar-dev&kml=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fdev%2Faerohub-fixture%2Fqr520.kml`
   (`expired.kml` answers 410).
-- Tests: `pnpm test:aerohub-parser`, `pnpm test:partner-url`, `pnpm test:import-fetch`.
+- Tests: `pnpm test:aerohub-parser`, `pnpm test:aerohub-rules`, `pnpm test:partner-url`, `pnpm test:import-fetch`.
 
 ## Gotchas
 - The service-role key and `IF_API_KEY` are server-only. Never prefix them `NEXT_PUBLIC_`, log them, or bundle them.
@@ -77,7 +84,9 @@ as the `preloaded` prop. Nothing public about the partnership: no changelog entr
 `PROD_ROLLOUT.local.md`, `PROD_MIGRATIONS*.local.sql`, `RELEASE_*.local.md` (per-feature release notes,
 useful history), `test-kml/`. Treat the `.local.md` files as sensitive.
 
-## Status (2026-11-06)
+## Status (2026-11-15)
+Branch `feature/aerohub-polish`: AeroHub real waypoint names, hidden flight fields/publishing, logo in the import banner (PR to staging).
+Earlier (2026-11-06)
 Branch `feature/aerohub-import`: the AeroHub `/import` flow is implemented and verified locally (PR #2 to staging; migration applied by Gab; partner URLs confirmed).
 The `partnerImportCopy` strings in `lib/copy.ts` were approved by Gab on 2026-11-06. Earlier status (2026-11-04):
 Active. Branch `staging`: the procedures feature, shared plans, admin nav/users and the new pages were committed on

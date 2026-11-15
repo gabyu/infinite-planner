@@ -38,3 +38,12 @@ export function tapRunway(hand: HandChoice | null, icao: string, runway: string)
 export function chipRunways(choice: EndChoice | null, runways: string[]): string[] {
   return choice && choice.by === "hand" && !runways.includes(choice.runway) ? [...runways, choice.runway] : runways
 }
+
+/**
+ * The plan flies a runway the ATIS does not list for this end: the ATIS runways when that is so, else null. Nothing to say when
+ * the plan's runway is unknown (the detection was not sure), when the ATIS lists no runway, or when the plan's runway is listed.
+ */
+export function planRunwayOutsideAtis(planRunway: string | null, atisRunways: string[]): string[] | null {
+  if (!planRunway || atisRunways.length === 0 || atisRunways.includes(planRunway)) return null
+  return atisRunways
+}

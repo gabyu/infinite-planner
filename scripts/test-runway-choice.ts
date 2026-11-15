@@ -1,6 +1,6 @@
 // Run with `pnpm test:runway-choice`. Plain asserts: the project has no test runner.
 import assert from "node:assert/strict"
-import { chipRunways, effectiveChoice, tapRunway, type HandChoice } from "@/lib/runway-choice"
+import { chipRunways, effectiveChoice, planRunwayOutsideAtis, tapRunway, type HandChoice } from "@/lib/runway-choice"
 
 // The ATIS names one runway: that is the choice, until the pilot taps.
 assert.deepEqual(effectiveChoice(null, "EHAM", ["18R"]), { runway: "18R", by: "atis", inAtis: true })
@@ -39,5 +39,12 @@ assert.equal(effectiveChoice({ icao: "EHAM", runway: "06" }, "KSFO", ["28L", "28
 assert.deepEqual(chipRunways(effectiveChoice({ icao: "X", runway: "06" }, "X", ["18R", "18L"]), ["18R", "18L"]), ["18R", "18L", "06"])
 assert.deepEqual(chipRunways(effectiveChoice({ icao: "X", runway: "18L" }, "X", ["18R", "18L"]), ["18R", "18L"]), ["18R", "18L"])
 assert.deepEqual(chipRunways(null, ["18R", "18L"]), ["18R", "18L"])
+
+// The plan's own runway against the ATIS: a warning only when it is known and the ATIS lists others.
+assert.deepEqual(planRunwayOutsideAtis("08L", ["26R"]), ["26R"])
+assert.deepEqual(planRunwayOutsideAtis("08L", ["26R", "26L"]), ["26R", "26L"])
+assert.equal(planRunwayOutsideAtis("26R", ["26R", "26L"]), null)
+assert.equal(planRunwayOutsideAtis(null, ["26R"]), null)
+assert.equal(planRunwayOutsideAtis("08L", []), null)
 
 console.log("runway-choice: all checks passed")
