@@ -40,7 +40,8 @@ export function SourceMark({ source, className }: { source: FlightPlanSource; cl
   const classes = cn("h-3.5 w-3.5 shrink-0", className)
   if (source === "FlightRadar24") return <FlightRadar24Mark className={classes} />
   if (source === "FlightAware") return <FlightAwareMark className={classes} />
-  if (source === "AeroHub") return <AeroHubMark className={classes} />
+  // The triangle fills its box more than the round marks do: 20% smaller to look the same size.
+  if (source === "AeroHub") return <AeroHubMark className={cn(classes, "h-[12.8px] w-[12.8px]")} />
   if (source === "Imported") return <FileUp aria-hidden className={classes} />
   if (source === "Sketch") return <PencilRuler aria-hidden className={classes} />
   return <span className={className}>{source}</span>
