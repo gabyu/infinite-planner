@@ -419,9 +419,9 @@ export function FlightsList({ initialPlans, total: initialTotal, library = false
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="inline-flex">
-                            <Badge variant="outline" className={cn(TAG, "px-1.5")} aria-label={sourceLabel(plan.source)}>
-                              <SourceMark source={plan.source} />
-                            </Badge>
+                            <span className="inline-flex h-5 cursor-default items-center px-0.5 text-muted-foreground" aria-label={sourceLabel(plan.source)}>
+                              <SourceMark source={plan.source} className="h-4 w-4" />
+                            </span>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>{sourceLabel(plan.source)}</TooltipContent>
