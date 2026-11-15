@@ -1,3 +1,4 @@
+import { FileUp, PencilRuler } from "lucide-react"
 import type { FlightPlanSource } from "@/lib/flight-plans"
 import { cn } from "@/lib/utils"
 
@@ -24,9 +25,23 @@ function FlightAwareMark({ className }: { className?: string }) {
   )
 }
 
+// AeroHub Radar's mark, as supplied (aerohub radar.svg), in the text colour.
+function AeroHubMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 52.5 53.15" fill="currentColor" role="img" aria-label="AeroHub Radar" className={className}>
+      <title>AeroHub Radar</title>
+      <path d="M22.4,2.38L.53,46.08c-1.9,3.78,1.6,8.02,5.68,6.88l11.02-3.1c5.9-1.66,12.14-1.66,18.04,0l11.02,3.1c4.08,1.14,7.58-3.1,5.68-6.88L30.1,2.38C28.52-.79,23.99-.79,22.4,2.38Z" />
+    </svg>
+  )
+}
+
+// Plans that don't come from a tracker: drawn in Route Sketch, or a file brought in by the user.
 export function SourceMark({ source, className }: { source: FlightPlanSource; className?: string }) {
   const classes = cn("h-3.5 w-3.5 shrink-0", className)
   if (source === "FlightRadar24") return <FlightRadar24Mark className={classes} />
   if (source === "FlightAware") return <FlightAwareMark className={classes} />
+  if (source === "AeroHub") return <AeroHubMark className={classes} />
+  if (source === "Imported") return <FileUp aria-hidden className={classes} />
+  if (source === "Sketch") return <PencilRuler aria-hidden className={classes} />
   return <span className={className}>{source}</span>
 }
