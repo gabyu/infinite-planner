@@ -10,11 +10,8 @@ export async function GET() {
       { count },
       {
         headers: {
-          // Prevent all caching
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-          Pragma: "no-cache",
-          Expires: "0",
-          "Surrogate-Control": "no-store",
+          // The footer total only needs to be roughly current: let the CDN answer for 5 minutes.
+          "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
           "Content-Type": "application/json",
         },
       },

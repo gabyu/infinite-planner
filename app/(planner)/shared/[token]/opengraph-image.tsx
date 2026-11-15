@@ -5,7 +5,10 @@ import { formatFlightTime } from "@/lib/flight-plans"
 import { getSharedPlan } from "@/lib/shared-plans"
 
 // The preview card of a shared link: the route drawn on a blue field, with the airports and
-// a few facts. Same lifecycle as the page: looked up live, never cached.
+// a few facts. Rendering this PNG is the most CPU-hungry thing the site does, and Discord/X/Slack bots
+// fetch it on every unfurl, so the CDN keeps it for an hour (and serves a stale copy for a day while
+// it refreshes). "Stop sharing" still cuts the page itself off at once; only the preview image can
+// linger for up to an hour.
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 export const alt = "Shared flight plan"
@@ -156,6 +159,7 @@ export default async function Image({ params }: { params: { token: string } }) {
     ),
     {
       ...size,
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
       fonts: [
         { name: "Inter", data: inter500, weight: 500, style: "normal" },
         { name: "Inter", data: inter700, weight: 700, style: "normal" },
