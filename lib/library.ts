@@ -46,5 +46,5 @@ export async function isLibraryOpenFor(viewer: Viewer): Promise<boolean> {
 // reads the flag directly.
 export const getLibraryLaunched = unstable_cache(() => fetchLibraryLaunched(true), ["library-launched"], {
   tags: ["library"],
-  revalidate: 300,
+  revalidate: 3600,
 })

@@ -10,12 +10,9 @@ export async function GET() {
       { count },
       {
         headers: {
-          // Prevent all caching
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-          Pragma: "no-cache",
-          Expires: "0",
-          "Surrogate-Control": "no-store",
-          "Content-Type": "application/json",
+          // Shared by every visitor: the CDN serves it for a minute, so the footer's polling costs one
+          // function run a minute in total instead of one per visitor every few seconds.
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
         },
       },
     )

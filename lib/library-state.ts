@@ -13,7 +13,7 @@ export function forgetLibraryState() {
 }
 
 // `cacheable` is for statically generated pages: the read goes through Next's data cache (tag `library`,
-// 5 minutes) instead of being forced to no-store, which would make those pages fail. Everything that
+// 1 hour) instead of being forced to no-store, which would make those pages fail. Everything that
 // must see a flip within seconds (middleware, API routes) leaves it off.
 export async function fetchLibraryLaunched(cacheable = false): Promise<boolean> {
   if (!cacheable && remembered && Date.now() - remembered.at < TTL_MS) return remembered.value
@@ -27,7 +27,7 @@ export async function fetchLibraryLaunched(cacheable = false): Promise<boolean> 
       method: "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: "{}",
-      ...(cacheable ? { next: { revalidate: 300, tags: ["library"] } } : { cache: "no-store" }),
+      ...(cacheable ? { next: { revalidate: 3600, tags: ["library"] } } : { cache: "no-store" }),
     })
     // Thrown for the cacheable read so a failure is never cached as "not launched"; the plain read fails closed.
     if (!response.ok) {
