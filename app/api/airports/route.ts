@@ -6,7 +6,7 @@ import { resolveAirportName, searchAirports } from "@/lib/airports"
 // `?codes=EHAM,KSFO` instead returns the names of those ICAO codes (homepage statistics).
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams
-  const headers = { "Cache-Control": "public, max-age=3600" }
+  const headers = { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400" }
 
   const codes = params.get("codes")
   if (codes !== null) {

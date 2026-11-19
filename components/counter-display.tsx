@@ -10,16 +10,8 @@ export function CounterDisplay({ initialCount }: { initialCount: number }) {
     // Function to fetch the latest count from API
     const fetchCount = async () => {
       try {
-        // Always fetch fresh data with cache-busting
-        const response = await fetch(`/api/counter?t=${Date.now()}`, {
-          method: "GET",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
-        })
+        // No cache-buster: the CDN answers from a one-minute cache (see /api/counter).
+        const response = await fetch("/api/counter")
 
         if (response.ok) {
           const data = await response.json()
@@ -38,8 +30,11 @@ export function CounterDisplay({ initialCount }: { initialCount: number }) {
     // Fetch immediately on mount to get the latest data
     fetchCount()
 
-    // Set up more frequent polling to show real-time updates (every 5 seconds)
-    const intervalId = setInterval(fetchCount, 5000)
+    // The server caches the count for a minute, so polling faster would only repeat the same answer.
+    // Skipped while the tab is hidden.
+    const intervalId = setInterval(() => {
+      if (!document.hidden) fetchCount()
+    }, 60_000)
 
     // Also listen for visibility change to refresh when user comes back to tab
     const handleVisibilityChange = () => {
