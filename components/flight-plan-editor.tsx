@@ -2198,7 +2198,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                   )}
 
                   {(activeTab === "departure" || activeTab === "arrival") && (
-                    <div className="shrink-0">
+                    <div className="max-h-[70%] shrink-0 overflow-y-auto overscroll-contain">
                       <AirportCard
                         key={activeTab}
                         icao={activeTab === "departure" ? originAirport : destinationAirport}

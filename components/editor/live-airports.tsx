@@ -291,24 +291,27 @@ export function AirportCard({ icao, valid, end, hand, onTap, planRunway = null, 
       {atis && open && (
         <div className="space-y-2 border-t px-3 py-2.5">
           <RunwayTiles runways={chips} choice={choice} onTap={onTap} titles={titles} tones={tones} detail={choice ? titles[choice.runway] : null} />
-          {choiceNote && <p className="text-xs text-muted-foreground">{choiceNote}</p>}
+          {(choiceNote || !notRead) && (
+            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
+              {choiceNote && <span>{choiceNote}</span>}
+              {!notRead && (
+                <button
+                  type="button"
+                  onClick={() => setShowText((value) => !value)}
+                  aria-expanded={showText}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {showText ? copy.live.hideText : copy.live.showText}
+                </button>
+              )}
+            </p>
+          )}
           {notRead && <p className="text-xs text-muted-foreground">{copy.live.runwaysNotRead}</p>}
           {(showText || notRead) && (
             <p className="whitespace-normal break-words rounded-md bg-muted p-2 text-xs leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
               {readableText(atis.text)}
             </p>
           )}
-          {!notRead && (
-            <button
-              type="button"
-              onClick={() => setShowText((value) => !value)}
-              aria-expanded={showText}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            >
-              {showText ? copy.live.hideText : copy.live.showText}
-            </button>
-          )}
-          <p className="text-xs text-muted-foreground">{copy.live.source}</p>
         </div>
       )}
 
