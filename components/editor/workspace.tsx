@@ -44,7 +44,7 @@ export function EditorWorkspace({ map, strip, header, body, footer, isMobile }: 
   return (
     <div
       ref={rootRef}
-      className="ip-map relative flex flex-col overflow-hidden border-y bg-muted"
+      className="ip-map relative isolate flex flex-col overflow-hidden border-y bg-muted"
       style={{ height: height ?? "calc(100dvh - 4.5rem)" }}
     >
       <div className="relative min-h-0 flex-1">
