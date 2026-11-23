@@ -278,7 +278,10 @@ export function RunwayGuides({
               <>
                 {pill(shown.runwayEnd)}
                 <p className="min-w-0 flex-1 font-medium text-foreground">
-                  {sideLabel} {SIDES[sideOf(shown.tocBearing)].text} · {guideLegText(shown.tocDistanceNm, shown.tocBearing)}
+                  <span className="block">
+                    {sideLabel} {SIDES[sideOf(shown.tocBearing)].text}
+                  </span>
+                  <span className="block text-muted-foreground">{guideLegText(shown.tocDistanceNm, shown.tocBearing)}</span>
                 </p>
               </>
             ) : (
