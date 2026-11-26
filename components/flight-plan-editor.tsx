@@ -82,7 +82,7 @@ import type { GuidePoint } from "@/lib/runway-guide"
 import { attachGuideToPlan, GuideError, type StoredGuide } from "@/lib/runway-guide-client"
 import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
 import type { HandChoice } from "@/lib/runway-choice"
-import { finishFlow, flowFor, type AirportFlow } from "@/lib/airport-steps"
+import { clearResult, finishFlow, flowFor, type AirportFlow } from "@/lib/airport-steps"
 import { PlanLock } from "@/components/editor/plan-lock"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
@@ -1383,6 +1383,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   // The two foldable groups of the Options tab.
   const [flightOpen, setFlightOpen] = useState(true)
   const [waypointsOpen, setWaypointsOpen] = useState(false)
+  const clearFlowResult = (end: TrimEnd) => setFlows((current) => ({ ...current, [end]: clearResult(current[end]) }))
   // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
   const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
 
@@ -1531,7 +1532,13 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     toast({
       title: copy.guides.appliedToast,
       action: (
-        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+        <ToastAction
+          altText={copy.editor.trimUndo}
+          onClick={() => {
+            waypointsHistory.undo()
+            clearFlowResult(arriving ? "arrival" : "departure")
+          }}
+        >
           {copy.editor.trimUndo}
         </ToastAction>
       ),
@@ -1545,6 +1552,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
     setWaypoints(applyWaypointNamingRules([...saved.waypoints, ...kept], originAirport, destinationAirport, includeBranding))
     originalDeparture.current = null
+    clearFlowResult("departure")
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
     toast({
@@ -1567,6 +1575,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     const head = waypoints.slice(0, firstApplied).map((wp) => ({ ...wp, selected: false }))
     setWaypoints(applyWaypointNamingRules([...head, ...saved.waypoints], originAirport, destinationAirport, includeBranding))
     originalArrival.current = null
+    clearFlowResult("arrival")
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
     toast({

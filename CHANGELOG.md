@@ -4,6 +4,15 @@ All notable changes to Infinite Planner are documented here.
 
 ## Unreleased
 
+### Changed
+- **A calmer editor panel.** The airport block now goes in two steps, runway then procedure, and folds into one line once you have applied, saved or kept one. The waypoint list shows one line per point (latitude and longitude appear on the selected row) and scrolls together with the block.
+- **A shorter export block.** **Without arrival** and **Publish on Explore** are one line each above **Export FPL**, with their explanation behind a (?). An exported plan shows a lock instead of a sentence.
+- **Options in two groups**, Flight and Waypoints. The taxi switches (departure and arrival) moved there.
+- Passing messages in the editor are now notifications; applying a procedure no longer asks for a second confirmation (Undo is still offered).
+
+### Fixed
+- The wind on a runway is shown in whole knots.
+
 ## 2026-11-26
 
 Everything released since 2026-10-01.

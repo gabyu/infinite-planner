@@ -27,9 +27,14 @@ export function reopenRunway(flow: AirportFlow): AirportFlow {
   return { ...flow, runway: null }
 }
 
-/** Apply, Save or Keep mine. */
+/** Apply, Save or Keep mine. `runway` is the one the plan flies, which "Keep mine" leaves different from step 1's. */
 export function finishFlow(flow: AirportFlow, runway: string, leg: string | null): AirportFlow {
-  return { ...flow, runway, done: { runway, leg }, open: false }
+  return { ...flow, runway: flow.runway ?? runway, done: { runway, leg }, open: false }
+}
+
+/** Undo or Restore took the procedure out of the plan: the result no longer holds. */
+export function clearResult(flow: AirportFlow | null): AirportFlow | null {
+  return flow && flow.done ? { ...flow, done: null, open: true } : flow
 }
 
 export function setFlowOpen(flow: AirportFlow, open: boolean): AirportFlow {

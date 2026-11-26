@@ -346,13 +346,13 @@ export function AirportCard({
           </div>
         )}
 
-        {steps && (
+        {steps && live.state !== "loading" && (
           <div className="border-t px-3 py-2">
             <StepHeading number={hasRunwayStep ? 2 : 1} label={copy.guides.stepProcedure} />
           </div>
         )}
         {/* Without step 1 (no live runways) there is nothing to confirm: step 2 is open straight away. */}
-        <div hidden={hasRunwayStep && !confirmed}>{children?.(true, confirmed ?? choice?.runway ?? null)}</div>
+        <div hidden={live.state === "loading" || (hasRunwayStep && !confirmed)}>{children?.(true, confirmed ?? choice?.runway ?? null)}</div>
       </div>
     </div>
   )

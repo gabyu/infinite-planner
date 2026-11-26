@@ -270,13 +270,13 @@ export function RunwayGuides({
 
   const sideText = (bearing: number) => SIDES[sideOf(bearing)].text
   const smallButton = "h-7 shrink-0 rounded-md border px-2 font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+  // The folded line shows what the plan really flies: its own runway when detected, else the one chosen above.
   const keep = () => {
-    const runway = target?.name ?? shown?.runwayEnd
+    const runway = shown?.runwayEnd ?? target?.name
     if (!runway) return
     setPreviewId(null)
     onPreview(null)
-    const own = shown && shown.runwayEnd === runway ? guideLegText(shown.tocDistanceNm, shown.tocBearing) : null
-    onDone(runway, own)
+    onDone(runway, shown?.runwayEnd ? guideLegText(shown.tocDistanceNm, shown.tocBearing) : null)
   }
 
   return (
