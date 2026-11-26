@@ -13,7 +13,7 @@ import {
   setBasemap,
   type BasemapChoice,
 } from "@/lib/map-tiles"
-import { altitudeBucket, hasAltitudeData, unwrapLongitudes } from "@/lib/route-render"
+import { altitudeBucket, CUT_MARKER_HTML, hasAltitudeData, unwrapLongitudes } from "@/lib/route-render"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -60,6 +60,10 @@ export interface MapPreviewProps {
   /** A path being previewed (a departure guide laid onto the plan): drawn as a dashed amber line over the route, and framed
    *  when it appears. Nothing is added to the plan. */
   ghostPath?: { lat: number; lng: number }[] | null
+  /** Export without arrival: the last waypoint kept before the arrival that is left out, marked with a badge. */
+  cutId?: string | null
+  /** The pilot is choosing another cut point: every dot is drawn so any of them can be clicked. */
+  pickingCut?: boolean
 }
 
 // Back into -180..180 (a point dragged or inserted beyond the date line).
@@ -95,6 +99,8 @@ export default function MapPreview({
   ghostIds,
   focus,
   ghostPath,
+  cutId = null,
+  pickingCut = false,
 }: MapPreviewProps) {
   // A route that crosses the antimeridian (Tokyo to San Francisco) has longitudes that jump from +140 to -122. The map
   // draws it continuous by carrying on past 180 (the tiles repeat), so the line goes over the Pacific and not across
@@ -599,11 +605,28 @@ export default function MapPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, isEditing, selectMode, L, isMapReady])
 
+  // Export without arrival: a badge on the cut point.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !cutId) return
+    const at = waypoints.find((wp) => wp.id === cutId)
+    if (!at) return
+    const marker = L.marker([at.lat, at.lng], {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 600,
+      icon: L.divIcon({ className: "ip-marker", iconSize: [0, 0], html: CUT_MARKER_HTML }),
+    }).addTo(map)
+    return () => {
+      marker.remove()
+    }
+  }, [waypoints, cutId, L, isMapReady])
+
   // The points: airports are large pills with their ICAO code, the rest small dots. Names show on hover or selection.
   useEffect(() => {
     const map = mapInstanceRef.current
     if (!map || !L) return
-    const thin = !isEditing && !selectMode && waypoints.length > DECLUTTER_MIN_POINTS
+    const thin = !isEditing && !selectMode && !pickingCut && waypoints.length > DECLUTTER_MIN_POINTS
     const step = dotStep(zoom)
     const currentIds = new Set<string>()
 
@@ -613,7 +636,7 @@ export default function MapPreview({
       const isLast = index === waypoints.length - 1
       const isAirport = isFirst || isLast
       const hovered = waypoint.id === hoveredId
-      const show = !thin || isAirport || waypoint.selected || hovered || index % step === 0
+      const show = !thin || isAirport || waypoint.selected || hovered || waypoint.id === cutId || index % step === 0
 
       const ghost = !!ghostIds?.has(waypoint.id)
       const html = isAirport
@@ -702,7 +725,7 @@ export default function MapPreview({
       }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, isEditing, selectMode, zoom, hoveredId, ghostIds, L, isMapReady])
+  }, [waypoints, isEditing, selectMode, zoom, hoveredId, ghostIds, cutId, pickingCut, L, isMapReady])
 
   // Lock panning and zooming while the user is selecting points, so a drag on
   // the map background can't be mistaken for a pan and pinch/scroll can't

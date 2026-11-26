@@ -209,3 +209,7 @@ export function altitudeHex(feet: number): string {
   const to = RAMP_DARK[index + 1]
   return `#${[0, 1, 2].map((i) => Math.round(channel(from, i) + (channel(to, i) - channel(from, i)) * mix).toString(16).padStart(2, "0")).join("")}`
 }
+
+/** The "cut point" badge both editor maps put on the last waypoint kept before a left-out arrival (styled by .ip-cut). */
+export const CUT_MARKER_HTML =
+  '<div class="ip-cut" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M8.1 8.1 12 12M20 4 8.1 15.9M14.8 14.8 20 20"/></svg></div>'

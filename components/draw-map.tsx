@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useTheme } from "next-themes"
 import { setBasemap } from "@/lib/map-tiles"
 import { sampleCubicBezier } from "@/lib/bezier"
+import { CUT_MARKER_HTML } from "@/lib/route-render"
 
 interface LatLngPoint {
   lat: number
@@ -37,9 +38,17 @@ interface DrawMapProps {
   onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
   onHandleDragEnd: (anchorId: string, which: "handleOut" | "handleIn", newPoint: LatLngPoint) => void
   onToggleWaypointSelect: (id: string) => void
+  /** Export without arrival: the last waypoint kept, marked with a badge. */
+  cutId?: string | null
+  /** Waypoints the export leaves out: drawn grey. */
+  removedIds?: Set<string>
+  /** The cut point is being moved: a click on a waypoint picks it and nothing is drawn or dragged. */
+  pickingCut?: boolean
+  onPickCut?: (id: string) => void
 }
 
 const SELECTION_COLOR = "#ea580c"
+const REMOVED_COLOR = "#858d99"
 const PREVIEW_COLOR = "#3B82F6"
 const HANDLE_COLOR = "#a855f7"
 const DRAG_THRESHOLD_PX = 4
@@ -52,6 +61,10 @@ export default function DrawMap({
   onWaypointDragEnd,
   onHandleDragEnd,
   onToggleWaypointSelect,
+  cutId = null,
+  removedIds,
+  pickingCut = false,
+  onPickCut,
 }: DrawMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -90,6 +103,10 @@ export default function DrawMap({
   const penDragRef = useRef<{ down: LatLngPoint; current: LatLngPoint } | null>(null)
 
   const justDraggedIdRef = useRef<string | null>(null)
+
+  // Set while the cut point is being moved; handlers bound once on a marker or on the map read it here.
+  const pickCutRef = useRef<((id: string) => void) | null>(null)
+  pickCutRef.current = pickingCut ? (onPickCut ?? null) : null
 
   // Reset any in-progress pen placement / hover preview when the tool changes.
   useEffect(() => {
@@ -192,12 +209,12 @@ export default function DrawMap({
     }
 
     const onClick = (e: any) => {
-      if (activeToolRef.current !== "line" || isOnMarker(e)) return
+      if (activeToolRef.current !== "line" || pickCutRef.current || isOnMarker(e)) return
       onAddPoints([{ lat: e.latlng.lat, lng: e.latlng.lng }])
     }
 
     const onMouseDown = (e: any) => {
-      if (activeToolRef.current !== "pen" || isOnMarker(e)) return
+      if (activeToolRef.current !== "pen" || pickCutRef.current || isOnMarker(e)) return
       const point = { lat: e.latlng.lat, lng: e.latlng.lng }
       penDragRef.current = { down: point, current: point }
       setPenDrag(penDragRef.current)
@@ -206,7 +223,7 @@ export default function DrawMap({
     const onMouseMove = (e: any) => {
       const mouse = { lat: e.latlng.lat, lng: e.latlng.lng }
 
-      if (activeToolRef.current !== "pen") {
+      if (activeToolRef.current !== "pen" || pickCutRef.current) {
         setHoverPoint(null)
         return
       }
@@ -308,6 +325,23 @@ export default function DrawMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [penDrag, hoverPoint, activeTool, waypoints, L])
 
+  // Export without arrival: a badge on the cut point.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !cutId) return
+    const at = waypoints.find((wp) => wp.id === cutId)
+    if (!at) return
+    const marker = L.marker([at.lat, at.lng], {
+      interactive: false,
+      keyboard: false,
+      zIndexOffset: 600,
+      icon: L.divIcon({ className: "ip-marker", iconSize: [0, 0], html: CUT_MARKER_HTML }),
+    }).addTo(map)
+    return () => {
+      marker.remove()
+    }
+  }, [waypoints, cutId, L])
+
   // Render the route + waypoint markers + (when relevant) handle markers.
   useEffect(() => {
     if (!mapInstanceRef.current || !L) return
@@ -327,7 +361,7 @@ export default function DrawMap({
     }
 
     const currentMarkerIds = new Set<string>()
-    const canEdit = activeTool === "select"
+    const canEdit = activeTool === "select" && !pickingCut
 
     waypoints.forEach((waypoint, index) => {
       currentMarkerIds.add(waypoint.id)
@@ -337,7 +371,10 @@ export default function DrawMap({
       let iconUrl: string
       let iconSize: [number, number]
 
-      if (waypoint.selected) {
+      if (removedIds?.has(waypoint.id)) {
+        iconUrl = getCustomIconSvg(REMOVED_COLOR, 16)
+        iconSize = [16, 16]
+      } else if (waypoint.selected) {
         iconUrl = getCustomIconSvg(SELECTION_COLOR, 26)
         iconSize = [26, 26]
       } else if (isFirst) {
@@ -374,6 +411,7 @@ export default function DrawMap({
             justDraggedIdRef.current = null
             return
           }
+          if (pickCutRef.current) return pickCutRef.current(waypoint.id)
           if (activeToolRef.current === "select") {
             onToggleWaypointSelect(waypoint.id)
           }
@@ -470,7 +508,7 @@ export default function DrawMap({
         handleMarkersRef.current.delete(id)
       }
     })
-  }, [waypoints, activeTool, L, onWaypointDragEnd, onToggleWaypointSelect, onHandleDragEnd])
+  }, [waypoints, activeTool, L, onWaypointDragEnd, onToggleWaypointSelect, onHandleDragEnd, removedIds, pickingCut])
 
   if (!isMapReady || !L) {
     return (
