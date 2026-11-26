@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs"
 import { getPartner, partners } from "@/config/partners"
 import { legalCopy, partnerImportCopy } from "@/lib/copy"
 import { FLIGHT_PLAN_SOURCES, SHAREABLE_SOURCES, isTrackerDerived, sourceLabel, sourceShort } from "@/lib/flight-plans"
+import { ownWaypointName } from "@/lib/waypoint-names"
 
 // Publishing: AeroHub is a tracker-style source, like FlightRadar24 and FlightAware (the database says the same through
 // app_settings.shareable_sources = {Sketch, Imported}).
@@ -54,5 +55,15 @@ for (const [file, ink] of [
   assert.ok(svg.includes(`fill="${ink}"`) && svg.includes('fill="#008BFD"'), file)
   assert.equal(readFileSync(`public${file}`).length, 17121, "unexpected size: was the file changed? " + file) // bytes, as supplied
 }
+
+// Waypoint names under the branding block. The naming rules run again over branded waypoints (airports change, map
+// editing, trimming), and unticking the box must still give the file's name back, never MADE/WITH/INFINITE/PLANNER.
+const branded = { name: "MADE", branded: true, unbrandedName: "SABER" }
+assert.equal(ownWaypointName(branded, 3, true), "SABER", "a second naming pass keeps the file's name")
+assert.equal(ownWaypointName({ ...branded, unbrandedName: "" }, 3, true), "003", "no name of its own: numbered")
+assert.equal(ownWaypointName({ name: "MADE", branded: true }, 3, true), "003")
+assert.equal(ownWaypointName({ name: "SABER" }, 3, true), "SABER")
+assert.equal(ownWaypointName({ name: " " }, 3, true), "003")
+assert.equal(ownWaypointName(branded, 3, false), "003", "numbered plans are renumbered")
 
 console.log("aerohub-rules: all checks passed")

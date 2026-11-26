@@ -81,6 +81,7 @@ import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
+import { ownWaypointName } from "@/lib/waypoint-names"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
@@ -1349,8 +1350,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     return waypoints.map((wp, index) => {
       const isFirst = index === 0
       const isLast = index === waypoints.length - 1
-      const numbered = String(index).padStart(3, "0")
-      const ownName = keepNames && wp.name.trim() ? wp.name : numbered
+      const ownName = ownWaypointName(wp, index, keepNames)
 
       if (isFirst) {
         return { ...wp, name: origin || "ORIG", locked: true, branded: false, unbrandedName: undefined }
