@@ -5,7 +5,7 @@
 //     nothing is chosen for the pilot, since all of them are in use;
 //   - the wind, only where there is no ATIS: the one runway end the wind clearly favours (lib/runway-wind.ts), pre-selected;
 //   - the pilot's own tap. It is stored on its own, apart from anything the ATIS says, so a later ATIS can never
-//     replace it. It only goes away when the pilot taps it again, or when the airport on that end changes.
+//     replace it. It only goes away when the pilot taps another runway, or when the airport on that end changes.
 
 /** What the pilot tapped: kept by the editor, one per end. */
 export type HandChoice = { icao: string; runway: string }
@@ -26,12 +26,6 @@ export function effectiveChoice(hand: HandChoice | null, icao: string, atisRunwa
   if (atisRunways.length === 1) return { runway: atisRunways[0], by: "atis", inAtis: true }
   if (atisRunways.length === 0 && windPick) return { runway: windPick, by: "wind", inAtis: true }
   return null
-}
-
-/** A tap on a runway: it becomes the pilot's choice; tapping the pilot's own choice again clears it. */
-export function tapRunway(hand: HandChoice | null, icao: string, runway: string): HandChoice | null {
-  if (hand && hand.icao === icao && hand.runway === runway) return null
-  return { icao, runway }
 }
 
 /** The runways to show as chips: the given list (the ATIS's, or every end of the airport), plus the pilot's own when it is not in it. */

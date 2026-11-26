@@ -10,6 +10,7 @@
     "start": "next start",
     "check:seo": "esbuild scripts/check-seo.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "check:copy": "node scripts/check-copy.mjs",
+    "test:airport-steps": "esbuild scripts/test-airport-steps.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:ground-trim": "esbuild scripts/test-ground-trim.ts --bundle --platform=node --format=cjs --alias:@=. | node",
     "test:export-trim": "esbuild scripts/test-export-trim.ts --bundle --platform=node --format=cjs --alias:@=. --conditions=react-server | node",
     "test:live-api": "esbuild scripts/test-live-api.ts --bundle --platform=node --format=cjs --alias:@=. | node",

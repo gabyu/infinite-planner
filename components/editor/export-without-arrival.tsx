@@ -1,11 +1,12 @@
 "use client"
 
+import { HelpTip } from "@/components/editor/help-tip"
 import { Switch } from "@/components/ui/switch"
 import type { ArrivalCutState } from "@/hooks/use-arrival-cut"
 import { copy, withoutArrivalSummary } from "@/lib/copy"
 
-// The switch above "Export FPL": download the plan without the airborne arrival. One line under it says what it is
-// for while off, and what will be left out while on.
+// The first row of the export block: download the plan without the airborne arrival. What it is for sits behind the
+// (?); only what the pilot has to act on is written under the row (what was left out is for screen readers).
 export function ExportWithoutArrival({
   arrival,
   destination,
@@ -16,8 +17,8 @@ export function ExportWithoutArrival({
   onStartPicking: () => void
 }) {
   const { enabled, loading, cut, picking } = arrival
-  const info = !enabled
-    ? copy.editor.withoutArrivalHint
+  const message = !enabled
+    ? null
     : loading
       ? copy.editor.trimLoading
       : cut && picking
@@ -25,28 +26,32 @@ export function ExportWithoutArrival({
         : // A cut that leaves nothing out (a sparse sketch) says so, rather than "0 waypoints removed".
           !cut || cut.removedIds.size === 0
           ? copy.editor.cutUnavailable
-          : withoutArrivalSummary(cut.removedIds.size, cut.distanceNm, destination, cut.estimated)
+          : null
+  const summary = enabled && cut && !message ? withoutArrivalSummary(cut.removedIds.size, cut.distanceNm, destination, cut.estimated) : null
 
   return (
-    <div className="rounded-lg border px-3 py-2">
-      <div className="flex min-h-6 items-center justify-between gap-3">
-        <label htmlFor="without-arrival" className="text-sm font-medium">
+    <div>
+      <div className="flex min-h-7 items-center gap-1">
+        <label htmlFor="without-arrival" className="whitespace-nowrap text-sm font-medium">
           {copy.editor.withoutArrival}
         </label>
-        <Switch id="without-arrival" checked={enabled} onCheckedChange={arrival.setEnabled} aria-describedby="without-arrival-info" />
+        <HelpTip label={`${copy.editor.exportHelp} ${copy.editor.withoutArrival}`}>{copy.editor.withoutArrivalHint}</HelpTip>
+        <div className="ml-auto flex items-center gap-3">
+          {cut && (
+            <button
+              type="button"
+              onClick={picking ? arrival.stopPicking : onStartPicking}
+              className="link inline-flex min-h-6 items-center whitespace-nowrap text-xs"
+            >
+              {picking ? copy.editor.trimCancel : copy.editor.moveCut}
+            </button>
+          )}
+          <Switch id="without-arrival" checked={enabled} onCheckedChange={arrival.setEnabled} aria-describedby="without-arrival-info" />
+        </div>
       </div>
-      <p id="without-arrival-info" role="status" className="text-xs text-muted-foreground">
-        {info}
+      <p id="without-arrival-info" role="status" className={message ? "text-xs text-muted-foreground" : "sr-only"}>
+        {message ?? summary}
       </p>
-      {cut && (
-        <button
-          type="button"
-          onClick={picking ? arrival.stopPicking : onStartPicking}
-          className="link mt-0.5 inline-flex min-h-6 items-center text-xs"
-        >
-          {picking ? copy.editor.trimCancel : copy.editor.moveCut}
-        </button>
-      )}
     </div>
   )
 }

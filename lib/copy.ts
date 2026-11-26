@@ -27,6 +27,8 @@ export const copy = {
     waypointLongitude: "Longitude",
     waypointLimit: "Over the 250 waypoint limit",
     optionsHeading: "Options",
+    groupFlight: "Flight",
+    groupWaypoints: "Waypoints",
     tabDeparture: "Departure",
     tabCruise: "Cruise",
     tabArrival: "Arrival",
@@ -46,7 +48,7 @@ export const copy = {
     sheetHandle: "Drag to resize the panel",
 
     // Export without arrival (above Export FPL)
-    withoutArrival: "Export without arrival",
+    withoutArrival: "Without arrival",
     withoutArrivalHint: "For AI ATC: add the arrival and approach in Infinite Flight.",
     moveCut: "Move cut point",
     pickCut: "Click the last waypoint to keep",
@@ -54,8 +56,16 @@ export const copy = {
     cutUnavailable: "No arrival to remove from this plan",
     cutBadge: "Cut",
 
+    // Export block
+    exportHelp: "About",
+    simplifiedTitle: "Waypoint simplification applied",
+    planLocked: "Exported and saved: this plan is locked.",
+    planLockedLabel: "This plan is locked",
+    dashboard: "Dashboard",
+
     // Ground movements (Options)
-    groundWaypoints: "Ground movement waypoints",
+    taxiDeparture: "Departure taxi",
+    taxiArrival: "Arrival taxi",
     groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.",
     trimApply: "Apply",
     trimCancel: "Cancel",
@@ -100,7 +110,6 @@ export const copy = {
   // Live airport information (editor Options). Every line below waits for Gabriel's approval.
   live: {
     heading: "Live airport info",
-    source: "Live from the Infinite Flight Expert Server. Simulation only.",
     departure: "Departure",
     arrival: "Arrival",
     loading: "Looking for the ATIS...",
@@ -113,17 +122,10 @@ export const copy = {
     showText: "Show the ATIS text",
     hideText: "Hide the ATIS text",
     runwayTap: "Tap a runway.",
-    runwayFromAtis: "From the ATIS.",
-    runwayYours: "Your choice.",
-    runwayYoursNotInAtis: "Not in the ATIS now.",
+
     noAtisShort: "No ATIS",
-    runwayIntoWind: "Into the wind.",
-    bestHeadwind: "Best headwind:",
-    lightWind: "Light wind: any runway.",
     noWeather: "No recent weather report nearby.",
     weatherUnavailable: "Weather isn't available right now.",
-    weatherCredit: "NOAA",
-    weatherCreditFull: "Weather: NOAA Aviation Weather Center.",
     toneGood: "Best headwind.",
     toneCaution: "Check the wind.",
     toneAvoid: "Tailwind.",
@@ -133,13 +135,15 @@ export const copy = {
   guides: {
     save: "Save procedure",
     saving: "Saving...",
-    saved: "Saved",
     inPlan: "In your plan", // aria-label of the check mark only
     original: "Original",
     restore: "Restore",
     restoredToast: "Original procedure restored",
-    yourProcedure: "Your procedure",
-    suggested: "Suggested procedures for",
+    stepRunway: "Runway",
+    stepProcedure: "Procedure",
+    change: "change",
+    yours: "Yours",
+    keepMine: "Keep mine",
     needsPlan: "Available once your plan is saved.",
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
     tapRunway: "Confirm your runway",
@@ -152,9 +156,7 @@ export const copy = {
     south: "South",
     west: "West",
     from: "from",
-    previewing: "Previewing on the map",
     apply: "Apply",
-    cancel: "Cancel",
     remove: "Delete",
     removeConfirm: "Delete?",
     joinWarning: "Different heading: check the terrain and obstacles on the joining leg.",
@@ -168,12 +170,6 @@ export const copy = {
   },
 } as const
 
-/** "Replaces your procedure (22L, 122 NM) with 22R, 98 NM. You can undo it." before an Apply. */
-export function replaceText(current: { runway: string | null; nm: number } | null, next: { runway: string | null; nm: number }) {
-  const label = (p: { runway: string | null; nm: number }) => `${p.runway ?? "?"}, ${p.nm}\u00A0NM`
-  return current ? `Replaces your procedure (${label(current)}) with ${label(next)}. You can undo it.` : `Applies ${label(next)} to your plan. You can undo it.`
-}
-
 /** "2 Nov" for the day a saved procedure was created (the year only when it is not this year's). */
 export function guideDateText(iso: string) {
   const date = new Date(iso)
@@ -182,10 +178,10 @@ export function guideDateText(iso: string) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }) })
 }
 
-/** Under the ATIS line when the plan's runway is not one the ATIS has in use ("Your plan departs 08L, but the ATIS has 26R, 26L in use. ..."). */
+/** "Plan lands on 26L; the ATIS uses 08R." when the plan's runway is not one the ATIS has in use. */
 export function planRunwayMismatchText(end: "departure" | "arrival", runway: string, atisRunways: string[]) {
   const verb = end === "departure" ? "departs" : "lands on"
-  return `Your plan ${verb} ${runway}, but the ATIS has ${atisRunways.join(", ")} in use. Pick a runway in green above, then use a procedure for it.`
+  return `Plan ${verb} ${runway}; the ATIS uses ${atisRunways.join(", ")}.`
 }
 
 /** "122 NM · 230°" for a path's distance to the top of climb and the bearing it heads (the arrow beside it shows the same). */
@@ -199,17 +195,13 @@ export function tileWindText(headwindKt: number, crosswindKt: number): [string, 
   return [head, `xw\u00A0${Math.round(Math.abs(crosswindKt))}`]
 }
 
-/** "METAR KSFO, 04:53Z" for the airport's own report, "From KOAK, 12 NM away, 04:53Z" for a neighbouring station. */
-export function weatherSourceText(report: { station: string; distanceNm: number; observedAt: string }) {
-  const time = `${report.observedAt.slice(11, 16)}Z`
-  return report.distanceNm === 0 ? `METAR ${report.station}, ${time}` : `From ${report.station}, ${report.distanceNm}\u00A0NM away, ${time}`
-}
-
 /** "28R: headwind 5 kt, crosswind 3 kt from the right." (tailwind and left likewise). */
 export function runwayComponentsText(runway: string, headwindKt: number, crosswindKt: number) {
   // Non-breaking spaces keep each word with its number and unit when the line wraps.
-  const head = headwindKt >= 0 ? `headwind\u00A0${headwindKt}\u00A0kt` : `tailwind\u00A0${-headwindKt}\u00A0kt`
-  const cross = crosswindKt === 0 ? "no crosswind" : `crosswind\u00A0${Math.abs(crosswindKt)}\u00A0kt from the ${crosswindKt > 0 ? "right" : "left"}`
+  const along = Math.round(headwindKt)
+  const across = Math.round(crosswindKt)
+  const head = along >= 0 ? `headwind\u00A0${Math.abs(along)}\u00A0kt` : `tailwind\u00A0${-along}\u00A0kt`
+  const cross = across === 0 ? "no crosswind" : `crosswind\u00A0${Math.abs(across)}\u00A0kt from the ${across > 0 ? "right" : "left"}`
   return `${runway}: ${head}, ${cross}.`
 }
 
