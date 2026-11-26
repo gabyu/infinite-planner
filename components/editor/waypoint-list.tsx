@@ -6,6 +6,7 @@ import { Mountain, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { CutBadge } from "@/components/editor/export-without-arrival"
 import { copy } from "@/lib/copy"
 import { cn } from "@/lib/utils"
 
@@ -38,6 +39,10 @@ interface WaypointListProps {
   onClearAltitudes: () => void
   /** Waypoints a ground trim would remove (preview): their rows are dimmed. */
   ghostIds?: Set<string>
+  /** Export without arrival: the row of the cut point carries a badge. */
+  cutId?: string | null
+  /** The cut point is being moved: the whole row, fields included, is one target. */
+  picking?: boolean
 }
 
 // Quiet inputs: they look like text until hovered or focused, so a row stays compact.
@@ -62,6 +67,8 @@ export function WaypointList({
   onDeleteSelected,
   onClearAltitudes,
   ghostIds,
+  cutId,
+  picking,
 }: WaypointListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const anySelected = waypoints.some((wp) => wp.selected)
@@ -127,21 +134,26 @@ export function WaypointList({
               hoveredId === waypoint.id && "bg-accent/60",
               waypoint.selected && "bg-accent",
               ghostIds?.has(waypoint.id) && "opacity-40",
+              // A disabled (locked) field would otherwise swallow the click.
+              picking && "[&_input]:pointer-events-none",
             )}
           >
             <span className="text-right font-mono text-[11px] text-muted-foreground">{offset + index + 1}</span>
-            <Input
-              id={`name-${waypoint.id}`}
-              aria-label={copy.editor.waypointName}
-              value={waypoint.name}
-              onChange={(e) => onUpdateWaypoint(waypoint.id, "name", e.target.value)}
-              onKeyDown={(e) => onTabKeyNavigation(e, waypoint.id, "name")}
-              onFocus={onInputFocus}
-              maxLength={12}
-              disabled={waypoint.locked}
-              readOnly={waypoint.locked}
-              className={cn("h-7 px-2 font-mono text-xs", quietInput, waypoint.locked && "text-muted-foreground")}
-            />
+            <div className="flex min-w-0 items-center gap-1">
+              <Input
+                id={`name-${waypoint.id}`}
+                aria-label={copy.editor.waypointName}
+                value={waypoint.name}
+                onChange={(e) => onUpdateWaypoint(waypoint.id, "name", e.target.value)}
+                onKeyDown={(e) => onTabKeyNavigation(e, waypoint.id, "name")}
+                onFocus={onInputFocus}
+                maxLength={12}
+                disabled={waypoint.locked}
+                readOnly={waypoint.locked}
+                className={cn("h-7 min-w-0 px-2 font-mono text-xs", quietInput, waypoint.locked && "text-muted-foreground")}
+              />
+              {waypoint.id === cutId && <CutBadge />}
+            </div>
             <Input
               type="number"
               aria-label={copy.editor.waypointAltitude}

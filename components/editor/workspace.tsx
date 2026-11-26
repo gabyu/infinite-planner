@@ -16,6 +16,8 @@ interface EditorWorkspaceProps {
   /** Always visible at the bottom of the panel (the Export button). */
   footer: React.ReactNode
   isMobile: boolean
+  /** Phone: each new value drops the sheet to its lowest position, so the map can be tapped. */
+  lowerSheet?: number
 }
 
 // Snap heights: the peek is measured (handle + header + Export button), half and full are shares of the map area.
@@ -24,7 +26,7 @@ const SNAPS = [0, 0.5, 0.88] as const
 // The editor screen: below the site header, a workspace that fills the viewport. The map fills it; the panel
 // floats over the left of the map (collapsible) on desktop, and is a bottom sheet with three snap points
 // (peek / half / full) on a phone. The Export button stays visible in both.
-export function EditorWorkspace({ map, strip, header, body, footer, isMobile }: EditorWorkspaceProps) {
+export function EditorWorkspace({ map, strip, header, body, footer, isMobile, lowerSheet }: EditorWorkspaceProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number | null>(null)
   const [collapsed, setCollapsed] = useState(false)
@@ -50,7 +52,7 @@ export function EditorWorkspace({ map, strip, header, body, footer, isMobile }: 
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0">{map}</div>
         {isMobile ? (
-          <BottomSheet header={header} body={body} footer={footer} />
+          <BottomSheet header={header} body={body} footer={footer} lowerSheet={lowerSheet} />
         ) : (
           <>
             <aside
@@ -92,10 +94,12 @@ function BottomSheet({
   header,
   body,
   footer,
+  lowerSheet,
 }: {
   header: React.ReactNode
   body: React.ReactNode
   footer: React.ReactNode
+  lowerSheet?: number
 }) {
   const sheetRef = useRef<HTMLDivElement>(null)
   const [snap, setSnap] = useState(0)
@@ -106,6 +110,10 @@ function BottomSheet({
   const headerRef = useRef<HTMLDivElement>(null)
   const footerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<{ startY: number; startHeight: number; moved: boolean } | null>(null)
+
+  useEffect(() => {
+    if (lowerSheet) setSnap(0)
+  }, [lowerSheet])
 
   useEffect(() => {
     const parent = sheetRef.current?.parentElement

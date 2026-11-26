@@ -278,7 +278,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [panelTab, setPanelTab] = useState<Phase | "options">("departure")
   // The waypoint ids and where the parts split, kept current for callbacks that must not go stale.
   const routeRef = useRef<{ ids: string[]; split: PhaseSplit }>({ ids: [], split: { departureEnd: -1, arrivalStart: 0 } })
+  // Set while the cut point is being moved. A ref, so that the click callback below stays stable.
+  const cutPickRef = useRef<((id: string) => void) | null>(null)
   const handleMapPointClick = useCallback((id: string) => {
+    if (cutPickRef.current) return cutPickRef.current(id)
     // A point on another part of the route: open that tab, then the list scrolls to the row.
     const { ids, split } = routeRef.current
     const index = ids.indexOf(id)
@@ -981,6 +984,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   // Toggle waypoint selection with shift+click support
   const handleRowClick = (e: React.MouseEvent, id: string, index: number) => {
+    if (cutPickRef.current) return cutPickRef.current(id)
+
     // Prevent if clicking on input fields
     if ((e.target as HTMLElement).tagName === "INPUT") {
       return
@@ -1404,7 +1409,6 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
   const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
-  const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
   // Stable (it only reads a ref), so effects that depend on it do not run again on every render.
   const loadAirport = useCallback(async (icao: string): Promise<TrimAirport | null> => {
@@ -1423,9 +1427,31 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const arrival = useArrivalCut({
     waypoints,
     destination: destinationAirport,
-    destinationValid: icaoValidation.destination,
+    // The code itself decides, not icaoValidation: a partner import fills the airports without setting that.
+    destinationValid: /^[A-Z]{4}$/.test(destinationAirport),
     loadAirport,
   })
+  // Waypoints drawn as "will not be there": a ground trim being previewed, and the arrival the export leaves out.
+  const ghostIds = useMemo(() => {
+    const ids = [...(trimPreview?.ids ?? []), ...(arrival.cut?.removedIds ?? [])]
+    return ids.length > 0 ? new Set(ids) : undefined
+  }, [trimPreview, arrival.cut])
+
+  // Moving the cut point: the next click on a map point or a list row picks it.
+  const pickCut = (id: string) => {
+    if (!arrival.pick(id)) toast({ title: copy.editor.pickCutOutside })
+  }
+  cutPickRef.current = arrival.picking ? pickCut : null
+  const [lowerSheet, setLowerSheet] = useState(0)
+  const startPickingCut = () => {
+    // Map editing and point selection use clicks for their own purpose.
+    if (isEditingMap) toggleMapEditing()
+    setLowerSheet((n) => n + 1)
+    arrival.startPicking()
+  }
+  useEffect(() => {
+    if (isEditingMap) arrival.stopPicking()
+  }, [isEditingMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The runways of the plan, kept with it: the one the pilot confirmed in the airport card, else the one the route shows (only when
   // the detection is sure), else the one already saved (while it still exists at that airport).
@@ -1840,7 +1866,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   const exportButtons = (
     <div className="space-y-2">
-      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={arrival.startPicking} />
+      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={startPickingCut} />
       <div className="flex gap-2">
         <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading || arrival.loading}>
           <Download />
@@ -2056,6 +2082,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       <TooltipProvider>
         <EditorWorkspace
           isMobile={isMobile}
+          lowerSheet={lowerSheet}
           map={
             <MapPreview
               waypoints={waypoints}
@@ -2073,6 +2100,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}
+              cutId={arrival.cut?.id}
+              pickingCut={arrival.picking}
             />
           }
           strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} stats={stats} />}
@@ -2263,6 +2292,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     onDeleteSelected={deleteSelectedWaypoints}
                     onClearAltitudes={clearSelectedAltitudes}
                     ghostIds={ghostIds}
+                    cutId={arrival.cut?.id}
+                    picking={arrival.picking}
                   />
                 </div>
               ) : (

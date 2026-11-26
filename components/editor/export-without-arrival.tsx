@@ -49,3 +49,12 @@ export function ExportWithoutArrival({
     </div>
   )
 }
+
+/** On the list row of the cut point. */
+export function CutBadge() {
+  return (
+    <span className="shrink-0 rounded border border-orange-600/50 bg-orange-500/10 px-1 text-[10px] font-medium uppercase text-orange-800 dark:text-orange-200">
+      {copy.editor.cutBadge}
+    </span>
+  )
+}
