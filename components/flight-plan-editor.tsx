@@ -28,6 +28,9 @@ import type { PreloadedImport } from "@/lib/partners/preloaded"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { saveFplInBrowser } from "@/lib/fpl-download"
 import { applyBrandingOverlay, isBrandingSlot } from "@/lib/branding"
+import { buildExportWaypoints } from "@/lib/export-trim"
+import { useArrivalCut } from "@/hooks/use-arrival-cut"
+import { ExportWithoutArrival } from "@/components/editor/export-without-arrival"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import {
   AUTOSAVE_INTERVAL_MS,
@@ -463,6 +466,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       setWaypoints(renamedWaypoints)
       // A new import is a new plan: it must not overwrite the one saved from the previous import.
       resetSavedPlan()
+      arrival.reset()
       setFlightNumberOverride(null)
       setFlightNumberEdit(undefined)
       setExtraFlightNumbers([])
@@ -900,7 +904,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     }
 
     try {
-      const fplContent = generateFPL(finalWaypoints)
+      // "Export without arrival" changes this file only: what is saved below is always the whole plan.
+      const fplContent = generateFPL(buildExportWaypoints(waypoints, { includeBranding, arrival: arrival.cut ?? undefined }))
       const fileName = fplFileName(originAirport, destinationAirport)
       saveFplInBrowser(fplContent, fileName)
       setExportedFingerprint(currentFingerprint)
@@ -1224,6 +1229,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     setWaypoints([])
     setCurveSegments([])
     resetSavedPlan()
+    arrival.reset()
   }, [])
 
   // Toggle a single waypoint's selection from the map (select mode)
@@ -1412,6 +1418,14 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       return null
     }
   }, [])
+
+  // Export without arrival: the switch above Export FPL and its cut point.
+  const arrival = useArrivalCut({
+    waypoints,
+    destination: destinationAirport,
+    destinationValid: icaoValidation.destination,
+    loadAirport,
+  })
 
   // The runways of the plan, kept with it: the one the pilot confirmed in the airport card, else the one the route shows (only when
   // the detection is sure), else the one already saved (while it still exists at that airport).
@@ -1826,8 +1840,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   const exportButtons = (
     <div className="space-y-2">
+      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={arrival.startPicking} />
       <div className="flex gap-2">
-        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading}>
+        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading || arrival.loading}>
           <Download />
           Export FPL
         </Button>
@@ -2329,7 +2344,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     onDeleteSelected={deleteSelectedWaypoints}
                     onClearAltitudes={clearSelectedAltitudes}
                     onExport={handleExportFPL}
-                    exportDisabled={!!exportBlockReason}
+                    exportDisabled={!!exportBlockReason || arrival.loading}
                     emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
                   />
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}
