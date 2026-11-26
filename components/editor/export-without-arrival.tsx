@@ -20,10 +20,11 @@ export function ExportWithoutArrival({
     ? copy.editor.withoutArrivalHint
     : loading
       ? copy.editor.trimLoading
-      : !cut
-        ? copy.editor.cutUnavailable
-        : picking
-          ? copy.editor.pickCut
+      : cut && picking
+        ? copy.editor.pickCut
+        : // A cut that leaves nothing out (a sparse sketch) says so, rather than "0 waypoints removed".
+          !cut || cut.removedIds.size === 0
+          ? copy.editor.cutUnavailable
           : withoutArrivalSummary(cut.removedIds.size, cut.distanceNm, destination, cut.estimated)
 
   return (
@@ -53,7 +54,7 @@ export function ExportWithoutArrival({
 /** On the list row of the cut point. */
 export function CutBadge() {
   return (
-    <span className="shrink-0 rounded border border-orange-600/50 bg-orange-500/10 px-1 text-[10px] font-medium uppercase text-orange-800 dark:text-orange-200">
+    <span className="shrink-0 rounded border border-[hsl(var(--route-selected,21_90%_48%))] bg-[hsl(var(--route-selected,21_90%_48%)/0.12)] px-1 text-[10px] font-medium uppercase text-foreground">
       {copy.editor.cutBadge}
     </span>
   )

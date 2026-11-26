@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 import { getPartner, partners } from "@/config/partners"
 import { legalCopy, partnerImportCopy } from "@/lib/copy"
 import { FLIGHT_PLAN_SOURCES, SHAREABLE_SOURCES, isTrackerDerived, sourceLabel, sourceShort } from "@/lib/flight-plans"
-import { ownWaypointName } from "@/lib/waypoint-names"
+import { applyNamingRules, ownWaypointName } from "@/lib/waypoint-names"
 
 // Publishing: AeroHub is a tracker-style source, like FlightRadar24 and FlightAware (the database says the same through
 // app_settings.shareable_sources = {Sketch, Imported}).
@@ -65,5 +65,26 @@ assert.equal(ownWaypointName({ name: "MADE", branded: true }, 3, true), "003")
 assert.equal(ownWaypointName({ name: "SABER" }, 3, true), "SABER")
 assert.equal(ownWaypointName({ name: " " }, 3, true), "003")
 assert.equal(ownWaypointName(branded, 3, false), "003", "numbered plans are renumbered")
+
+// The first and last waypoints show the airport's code. After a ground trim made another waypoint an end, putting the
+// ground movements back must give that waypoint its own name again, never a second YPPH or EGLL.
+const fileNames = ["YPPH", "RW21", "DPTRW21", "AVBAD", "TUVBA", "ORCHY", "SABER", "BRASO", "RW09L", "EGLL"]
+for (const branding of [false, true]) {
+  const rules = (waypoints: { name: string }[]) =>
+    applyNamingRules(waypoints, { origin: "YPPH", destination: "EGLL", branding, keepNames: true })
+  const names = (waypoints: { name: string }[]) => waypoints.map((wp) => wp.name)
+  const imported = rules(fileNames.map((name) => ({ name })))
+  const noDepartureGround = rules(imported.slice(2))
+  assert.equal(noDepartureGround[0].name, "YPPH")
+  assert.deepEqual(names(rules([...imported.slice(0, 2), ...noDepartureGround])), names(imported), `departure, branding ${branding}`)
+  const noArrivalGround = rules(imported.slice(0, -1))
+  assert.equal(noArrivalGround.at(-1)!.name, "EGLL")
+  assert.deepEqual(names(rules([...noArrivalGround, ...imported.slice(-1)])), names(imported), `arrival, branding ${branding}`)
+}
+// A numbered plan is renumbered, whatever a waypoint was called as an end.
+assert.deepEqual(
+  applyNamingRules([{ name: "a" }, { name: "YPPH", replacedName: "SABER" }, { name: "b" }], { origin: "YPPH", destination: "EGLL", branding: false, keepNames: false }).map((wp) => wp.name),
+  ["YPPH", "001", "EGLL"],
+)
 
 console.log("aerohub-rules: all checks passed")

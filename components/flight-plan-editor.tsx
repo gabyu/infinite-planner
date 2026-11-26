@@ -34,7 +34,6 @@ import { ExportWithoutArrival } from "@/components/editor/export-without-arrival
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import {
   AUTOSAVE_INTERVAL_MS,
-  BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
   PRIVATE_SHARE,
   isTrackerDerived,
@@ -85,7 +84,7 @@ import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
-import { ownWaypointName } from "@/lib/waypoint-names"
+import { applyNamingRules } from "@/lib/waypoint-names"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
@@ -118,6 +117,8 @@ interface Waypoint {
   // every name in the plan.
   branded?: boolean
   unbrandedName?: string
+  // Set on a first or last waypoint showing the airport's code: the name it had of its own (see lib/waypoint-names.ts).
+  replacedName?: string
   // Only set on waypoints placed with the pen tool that had their curve
   // handles dragged out - undefined/null means a plain corner point.
   handleOut?: LatLngPoint | null
@@ -523,8 +524,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   useEffect(() => {
     if (!preloaded || preloadedAppliedRef.current) return
     preloadedAppliedRef.current = true
-    setOriginAirport(preloaded.origin)
-    setDestinationToAirport(preloaded.destination)
+    // As if typed: this also marks the codes valid, which the ground switch and the airport cards depend on.
+    handleICAOChange("origin", preloaded.origin)
+    handleICAOChange("destination", preloaded.destination)
     applyParsedImport(preloaded.route, preloaded.origin, preloaded.destination)
     window.history.replaceState(null, "", "/convert")
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1321,48 +1323,15 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       .catch(() => setLibraryOpen(false))
   }, [authUser])
 
-  // Applies the naming rules: the first/last waypoints are locked to the origin/destination,
-  // everything else is numbered by position, and - when the branding checkbox is ticked and
-  // the plan has at least BRANDING_MIN_WAYPOINTS - the four waypoints before the destination
-  // become MADE / WITH / INFINITE / PLANNER (locked, and remembered as branded so unticking
-  // the checkbox can restore them). The same rule for Convert and Sketch: no length-based
-  // "auto" branding any more, only the checkbox decides.
-  // `keepNames`: the waypoints already carry their real names (AeroHub files do), so only a missing one is numbered.
+  // The naming rules (lib/waypoint-names.ts) for this plan. `keepNames`: the waypoints carry their real names (AeroHub
+  // files do).
   const applyWaypointNamingRules = (
     waypoints: Waypoint[],
     origin: string,
     destination: string,
     branding = false,
     keepNames = isAeroHub,
-  ) => {
-    if (waypoints.length === 0) return waypoints
-
-    return waypoints.map((wp, index) => {
-      const isFirst = index === 0
-      const isLast = index === waypoints.length - 1
-      const ownName = ownWaypointName(wp, index, keepNames)
-
-      if (isFirst) {
-        return { ...wp, name: origin || "ORIG", locked: true, branded: false, unbrandedName: undefined }
-      }
-
-      if (isLast) {
-        return { ...wp, name: destination || "DEST", locked: true, branded: false, unbrandedName: undefined }
-      }
-
-      if (branding && isBrandingSlot(index, waypoints.length)) {
-        return {
-          ...wp,
-          name: BRAND_NAMES[index - (waypoints.length - 5)],
-          locked: true,
-          branded: true,
-          unbrandedName: ownName,
-        }
-      }
-
-      return { ...wp, name: ownName, locked: false, branded: false, unbrandedName: undefined }
-    })
-  }
+  ) => applyNamingRules(waypoints, { origin, destination, branding, keepNames })
 
   // The checkbox in the export dialog. Only the four branding waypoints change.
   const handleBrandingChange = (checked: boolean) => {
@@ -1427,7 +1396,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const arrival = useArrivalCut({
     waypoints,
     destination: destinationAirport,
-    // The code itself decides, not icaoValidation: a partner import fills the airports without setting that.
+    // The code itself decides: a file name can fill the airports without updating icaoValidation.
     destinationValid: /^[A-Z]{4}$/.test(destinationAirport),
     loadAirport,
   })
