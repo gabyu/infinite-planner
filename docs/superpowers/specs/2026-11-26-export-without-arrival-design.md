@@ -181,6 +181,8 @@ Branch `feature/export-without-arrival` from `staging`.
 
 ## Built and reviewed (2026-11-26)
 
+Gab approved the on-screen wording on 2026-11-26; the strings are no longer marked provisional.
+
 Gab imported the four script-made test files (LFPG-KIAH and YPPH-EGLL, with and without taxi points) into Infinite
 Flight: all worked. A European short haul and a KJFK arrival are still to be tested.
 

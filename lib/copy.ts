@@ -46,13 +46,13 @@ export const copy = {
     sheetHandle: "Drag to resize the panel",
 
     // Export without arrival (above Export FPL)
-    withoutArrival: "Export without arrival", // PROVISIONAL
-    withoutArrivalHint: "For AI ATC: add the arrival and approach in Infinite Flight.", // PROVISIONAL
-    moveCut: "Move cut point", // PROVISIONAL
-    pickCut: "Click the last waypoint to keep", // PROVISIONAL
-    pickCutOutside: "Pick a waypoint between the departure and the landing", // PROVISIONAL
-    cutUnavailable: "No arrival to remove from this plan", // PROVISIONAL
-    cutBadge: "Cut", // PROVISIONAL
+    withoutArrival: "Export without arrival",
+    withoutArrivalHint: "For AI ATC: add the arrival and approach in Infinite Flight.",
+    moveCut: "Move cut point",
+    pickCut: "Click the last waypoint to keep",
+    pickCutOutside: "Pick a waypoint between the departure and the landing",
+    cutUnavailable: "No arrival to remove from this plan",
+    cutBadge: "Cut",
 
     // Ground movements (Options)
     groundWaypoints: "Ground movement waypoints",
@@ -230,9 +230,9 @@ export function trimPreviewText(count: number, end: "departure" | "arrival") {
 
 /** "14 waypoints removed · 62 NM before LFPG" under the Export without arrival switch. */
 export function withoutArrivalSummary(count: number, distanceNm: number, icao: string, estimated: boolean) {
-  const removed = `${count} waypoint${count === 1 ? "" : "s"} removed` // PROVISIONAL
-  const before = `${Math.round(distanceNm).toLocaleString("en-US")} NM before ${icao || "the destination"}` // PROVISIONAL
-  return estimated ? `${removed} · ${before} · estimated` : `${removed} · ${before}` // PROVISIONAL
+  const removed = `${count} waypoint${count === 1 ? "" : "s"} removed`
+  const before = `${Math.round(distanceNm).toLocaleString("en-US")} NM before ${icao || "the destination"}`
+  return estimated ? `${removed} · ${before} · estimated` : `${removed} · ${before}`
 }
 
 /** "12 waypoints removed" in the toast after applying. */
