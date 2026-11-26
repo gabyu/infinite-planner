@@ -43,8 +43,9 @@ next-env.d.ts
 # pnpm local build-approval config (machine-specific)
 pnpm-workspace.yaml
 
-# local Claude Code dev-server launch config (machine-specific)
-.claude/
+# Claude Code files are machine-specific (launch config, worktrees), except the shared project rules
+.claude/*
+!.claude/rules/
 *.local.sql
 
 # real tracker KMLs dropped in for local detection tests: never committed

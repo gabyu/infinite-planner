@@ -52,7 +52,7 @@ pnpm test:<name>         # route-phases, runway-choice, runway-wind, weather, pr
 - Exported plans are final. Only the generated plan is stored, never the imported KML.
 - `scripts/fixtures/aerohub-QR520-YPPH-EGLL.kml` is the partner's own export and is committed on purpose.
 - Real tracker KMLs in `test-kml/` and everything `*.local.*` are gitignored on purpose. Never commit them.
-- `pnpm-workspace.yaml` and `.claude/` are machine-specific and gitignored.
+- `pnpm-workspace.yaml` and `.claude/` are machine-specific and gitignored, except `.claude/rules/` (versioned).
 - One commit deleted `components/dashboard/library-overview.tsx` by mistake and it was restored. Check imports before deleting.
 
 ## Local-only files (not in git, back up with ~/Dev)
