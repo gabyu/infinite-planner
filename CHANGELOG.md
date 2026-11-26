@@ -4,6 +4,10 @@ All notable changes to Infinite Planner are documented here.
 
 ## Unreleased
 
+## 2026-11-26
+
+Everything released since 2026-10-01.
+
 ### Added
 - **Export without arrival.** A switch above **Export FPL** downloads the plan without the airborne arrival, so you can add the STAR and approach in Infinite Flight when AI ATC asks for a published approach. The cut starts after the top of descent (or about 120 NM out when the file has no altitudes) and you can move it on the map or in the list. Landing and taxi waypoints stay unless you removed them, the destination stays last, and your saved plan, dashboard and shared downloads keep the whole route.
 - **A warning when your plan's runway is not the ATIS's.** If the plan departs (or lands on) a runway the ATIS does not have in use, the airport card says so and points you to the runways in green. It disappears once the plan flies a listed runway (pick one, then apply a procedure).
