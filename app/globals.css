@@ -633,3 +633,70 @@ html body[data-scroll-locked] .right-scroll-bar-position {
   width: 14px;
   height: 14px;
 }
+
+/* "Export FPL": the fill while the file is made and saved, and the check that confirms it. */
+.ip-export-progress {
+  width: 92%;
+  animation: ip-export-progress 1.4s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.ip-export-check {
+  animation: ip-export-check 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes ip-export-progress {
+  from {
+    width: 0;
+  }
+}
+@keyframes ip-export-check {
+  from {
+    opacity: 0;
+    scale: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ip-export-progress,
+  .ip-export-check {
+    animation: none;
+  }
+}
+
+/* Runway numbers on the editor map: square tags at each threshold, coloured like the runway tiles of the panel. */
+.ip-map .ip-rwy {
+  position: absolute;
+  min-width: 34px;
+  height: 22px;
+  padding: 0 5px;
+  border: 2px solid #fff;
+  border-radius: 0;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.ip-map .ip-rwy--idle {
+  background: #6b7280;
+  color: #fff;
+}
+.ip-map .ip-rwy--good {
+  background: #047857;
+  color: #fff;
+}
+.ip-map .ip-rwy--caution {
+  background: #fbbf24;
+  color: #1f1300;
+}
+.ip-map .ip-rwy--avoid {
+  background: #b91c1c;
+  color: #fff;
+}
+.ip-map .ip-rwy--chosen {
+  outline: 3px solid hsl(221 83% 53%);
+}
+.ip-map .ip-rwy:focus-visible {
+  outline: 3px solid hsl(221 83% 53%);
+  outline-offset: 2px;
+}

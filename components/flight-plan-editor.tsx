@@ -19,7 +19,7 @@ import {
   AlertTriangle,
   LassoSelect,
   AlertCircle,
-  Info,
+  ChevronRight,
   RotateCcw,
 } from "lucide-react"
 import { parseKML } from "@/lib/kml-parser"
@@ -81,7 +81,12 @@ import { RunwayGuides } from "@/components/editor/runway-guides"
 import type { GuidePoint } from "@/lib/runway-guide"
 import { attachGuideToPlan, GuideError, type StoredGuide } from "@/lib/runway-guide-client"
 import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
-import { tapRunway, type HandChoice } from "@/lib/runway-choice"
+import type { HandChoice } from "@/lib/runway-choice"
+import { clearResult, confirmRunway, finishFlow, flowFor, type AirportFlow } from "@/lib/airport-steps"
+import { runwayLabels, type RunwayLiveInfo } from "@/lib/runway-labels"
+import { ExportButton, type ExportState } from "@/components/editor/export-button"
+import { PublishDialog } from "@/components/publish-dialog"
+import { PlanLock } from "@/components/editor/plan-lock"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
 import { applyNamingRules } from "@/lib/waypoint-names"
@@ -142,6 +147,11 @@ interface SimplificationInfo {
 
 const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
 
+const PUBLISH_INTENT_KEY = "infinite-planner:publish-on-export"
+// "Export FPL": the shortest time the progress shows, and how long the confirmation stays.
+const EXPORT_MIN_MS = 700
+const EXPORT_DONE_MS = 1800
+
 // Recomputes the interior sample waypoints of a curve segment from its
 // current anchor positions/handles, replacing them in place by id. Bails out
 // (returns the array unchanged) if either anchor is gone or the sample count
@@ -191,18 +201,6 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   }, [curveSegments])
   const isTouchPrimary = useIsTouchPrimary()
   const [simplificationInfo, setSimplificationInfo] = useState<SimplificationInfo | null>(null)
-  // The notices are passing messages: they fade out, then go, together with the "imported" line beside them.
-  const [fadingOut, setFadingOut] = useState(false)
-  useEffect(() => {
-    if (!simplificationInfo) return
-    setFadingOut(false)
-    const fade = window.setTimeout(() => setFadingOut(true), 6500)
-    const gone = window.setTimeout(() => setSimplificationInfo(null), 7000)
-    return () => {
-      window.clearTimeout(fade)
-      window.clearTimeout(gone)
-    }
-  }, [simplificationInfo])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -348,17 +346,13 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     return () => clearTimeout(timeout)
   }, [mode, waypoints, originAirport, destinationAirport])
 
-  // Clear success message after 5 seconds, fading out first
-  const [successFading, setSuccessFading] = useState(false)
+  // Clear success message after 5 seconds
   useEffect(() => {
     if (successMessage) {
-      setSuccessFading(false)
-      const fade = setTimeout(() => setSuccessFading(true), 4500)
       const timer = setTimeout(() => {
         setSuccessMessage(null)
       }, 5000)
       return () => {
-        clearTimeout(fade)
         clearTimeout(timer)
       }
     }
@@ -593,8 +587,32 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       setError("No waypoints to export")
       return
     }
-    performExport()
+    // The switch is on and the export is what will publish the plan: confirm first.
+    if (publishOnExport) setAskPublishOnExport(true)
+    else void performExport()
   }
+
+  // "Publish on Explore" before the export: the last choice made in this browser (off the first time).
+  const [publishIntent, setPublishIntentState] = useState(false)
+  useEffect(() => {
+    try {
+      setPublishIntentState(window.localStorage.getItem(PUBLISH_INTENT_KEY) === "1")
+    } catch {}
+  }, [])
+  const setPublishIntent = (on: boolean) => {
+    setPublishIntentState(on)
+    try {
+      window.localStorage.setItem(PUBLISH_INTENT_KEY, on ? "1" : "0")
+    } catch {}
+  }
+  const [askPublishOnExport, setAskPublishOnExport] = useState(false)
+  const [publishRequest, setPublishRequest] = useState<{ planId: string; declaration: boolean; nonce: number } | null>(null)
+
+  // "Export FPL": busy while the file is made and saved, then a short confirmation.
+  const [exportState, setExportState] = useState<ExportState>("idle")
+  const exportingRef = useRef(false)
+  const exportResetRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(exportResetRef.current), [])
 
   // The flight number the KML's filename reliably carries (FlightAware: FlightAware_KLM605_EHAM_KSFO_20260526,
   // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
@@ -898,7 +916,13 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   }, [authReady, authUser])
 
   // Downloads the FPL and, when signed in, saves the plan as exported (which locks it).
-  const performExport = async () => {
+  const performExport = async (publish?: { declaration: boolean }) => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    window.clearTimeout(exportResetRef.current)
+    setExportState("busy")
+    const started = Date.now()
+    let downloaded = false
     setError(null)
     setSuccessMessage(null)
 
@@ -914,6 +938,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       const fplContent = generateFPL(buildExportWaypoints(waypoints, { includeBranding, arrival: arrival.cut ?? undefined }))
       const fileName = fplFileName(originAirport, destinationAirport)
       saveFplInBrowser(fplContent, fileName)
+      downloaded = true
       setExportedFingerprint(currentFingerprint)
       if (preloaded) {
         // Lets the server log that this partner import ended in a download (no personal data, just the import id).
@@ -948,16 +973,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
         })
       }
 
-      if (!authUser) {
-        setSuccessMessage(`Flight plan exported as ${fileName}!`)
-        return
-      }
+      if (!authUser) return
 
       // Exporting the very plan that is already saved as exported again: nothing new to save.
-      if (savedStatusRef.current === "exported" && savedFingerprint === currentFingerprint) {
-        setSuccessMessage(`Flight plan exported again as ${fileName}.`)
-        return
-      }
+      if (savedStatusRef.current === "exported" && savedFingerprint === currentFingerprint) return
 
       savingRef.current = true
       setIsSaving(true)
@@ -968,11 +987,19 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
         setError(`Exported as ${fileName}, but it wasn't saved to your dashboard: ${saveError}`)
       } else {
         setAutosaveError(null)
-        setSuccessMessage(`Flight plan exported as ${fileName} and saved to your dashboard. It is now locked.`)
+        if (publish && savedPlanIdRef.current) {
+          setPublishRequest({ planId: savedPlanIdRef.current, declaration: publish.declaration, nonce: Date.now() })
+        }
       }
     } catch (error) {
       console.error("Error exporting FPL file:", error)
       setError(`Error exporting FPL file: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      // Long enough for the progress to be seen: the file itself is made at once.
+      await new Promise((resolve) => window.setTimeout(resolve, Math.max(0, EXPORT_MIN_MS - (Date.now() - started))))
+      exportingRef.current = false
+      setExportState(downloaded ? "done" : "idle")
+      if (downloaded) exportResetRef.current = window.setTimeout(() => setExportState("idle"), EXPORT_DONE_MS)
     }
   }
 
@@ -1342,12 +1369,28 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   // --- Ground trimming (Convert, Options): preview what a trim would remove, then apply it as one undoable step.
   const { toast } = useToast()
+  // In the workspace the passing notices are toasts, so they take no room in the panel (errors stay there). An import
+  // shows one: what the simplification did.
+  useEffect(() => {
+    if (mode !== "import" || !hasImported) return
+    if (simplificationInfo) {
+      const { originalCount, simplifiedCount, reason } = simplificationInfo
+      toast({ title: copy.editor.simplifiedTitle, description: `${originalCount} → ${simplifiedCount}. ${reason}` })
+      setSimplificationInfo(null)
+      setSuccessMessage(null)
+    } else if (successMessage) {
+      toast({ description: successMessage })
+      setSuccessMessage(null)
+    }
+  }, [mode, hasImported, simplificationInfo, successMessage, toast])
   const [trimPreview, setTrimPreview] = useState<{ end: TrimEnd; ids: string[]; approximate: boolean } | null>(null)
   const [trimBusy, setTrimBusy] = useState<TrimEnd | null>(null)
   const [trimmed, setTrimmed] = useState<Record<TrimEnd, boolean>>({ departure: false, arrival: false })
   const runwayCache = useRef(new Map<string, TrimAirport | null>())
   // What each trim took away, so switching the toggle back on can put it back.
-  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
+  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number; points?: { lat: number; lng: number }[] } | null>(null)
+  // The last route tab clicked: an airport that answers late does not move the map away from a newer one.
+  const latestTabRef = useRef<Phase | null>(null)
   const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
   // Where departure ends and arrival begins. Recomputed when the waypoints change shape (added, removed, trimmed, imported),
   // never on an altitude or name edit, so editing a row never makes it jump to another tab.
@@ -1367,15 +1410,43 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const selectTab = (tab: Phase | "options") => {
     setPanelTab(tab)
     if (tab === "options") return
+    // A taxi preview is applied or cancelled under its switch: leaving Options drops it.
+    setTrimPreview(null)
+    latestTabRef.current = tab
     const { items } = phaseSlice(tab)
     const inTab = new Set(items.map((wp) => wp.id))
     if (waypoints.some((wp) => wp.selected && !inTab.has(wp.id))) {
       setWaypoints(waypoints.map((wp) => (wp.selected && !inTab.has(wp.id) ? { ...wp, selected: false } : wp)))
     }
-    if (items.length > 0) setMapFocus((current) => ({ ids: items.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    const framePhase = () => {
+      if (items.length > 0) setMapFocus((current) => ({ ids: items.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    }
+    if (tab === "cruise") return framePhase()
+    // Departure and Arrival open on the airport itself, close enough to read its runway numbers.
+    const icao = tab === "departure" ? originAirport : destinationAirport
+    const valid = tab === "departure" ? icaoValidation.origin : icaoValidation.destination
+    if (!valid) return framePhase()
+    void loadAirport(icao).then((airport) => {
+      if (latestTabRef.current !== tab) return
+      const points = (airport?.runways ?? []).flatMap((row) => [
+        { lat: row[0], lng: row[1] },
+        { lat: row[2], lng: row[3] },
+      ])
+      if (points.length === 0) return framePhase()
+      setMapFocus((current) => ({ ids: [], points, nonce: (current?.nonce ?? 0) + 1 }))
+    })
   }
   // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
+  // Where each airport block stands in its two steps (lib/airport-steps.ts).
+  const [flows, setFlows] = useState<Record<TrimEnd, AirportFlow | null>>({ departure: null, arrival: null })
+  // What each airport block knows of its runways, for the numbers on the map, and the airport shown there.
+  const [runwayLive, setRunwayLive] = useState<Record<TrimEnd, (RunwayLiveInfo & { icao: string }) | null>>({ departure: null, arrival: null })
+  const [mapAirport, setMapAirport] = useState<{ icao: string; airport: TrimAirport } | null>(null)
+  // The two foldable groups of the Options tab.
+  const [flightOpen, setFlightOpen] = useState(true)
+  const [waypointsOpen, setWaypointsOpen] = useState(false)
+  const clearFlowResult = (end: TrimEnd) => setFlows((current) => ({ ...current, [end]: clearResult(current[end]) }))
   // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
   const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
 
@@ -1391,6 +1462,33 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       return null
     }
   }, [])
+
+  // The runway numbers on the map: those of the airport whose tab is open.
+  const mapEnd: TrimEnd | null = activeTab === "departure" || activeTab === "arrival" ? activeTab : null
+  const mapIcao =
+    mapEnd === "departure" && icaoValidation.origin ? originAirport : mapEnd === "arrival" && icaoValidation.destination ? destinationAirport : null
+  useEffect(() => {
+    if (!mapIcao || !hasImported) return
+    let cancelled = false
+    void loadAirport(mapIcao).then((airport) => !cancelled && airport && setMapAirport({ icao: mapIcao, airport }))
+    return () => {
+      cancelled = true
+    }
+  }, [mapIcao, hasImported, loadAirport])
+  const mapRunways = useMemo(() => {
+    if (!mapEnd || !mapIcao || mapAirport?.icao !== mapIcao) return undefined
+    const live = runwayLive[mapEnd]
+    const hand = handRunways[mapEnd]
+    return runwayLabels(
+      mapAirport.airport,
+      live && live.icao === mapIcao ? live : { inUse: null, tones: {}, chosen: hand?.icao === mapIcao ? hand.runway : null },
+    )
+  }, [mapEnd, mapIcao, mapAirport, runwayLive, handRunways])
+  const pickRunwayOnMap = (name: string) => {
+    if (!mapEnd || !mapIcao) return
+    setHandRunways((current) => ({ ...current, [mapEnd]: { icao: mapIcao, runway: name } }))
+    setFlows((current) => ({ ...current, [mapEnd]: confirmRunway(flowFor(current[mapEnd], mapIcao), name) }))
+  }
 
   // Export without arrival: the switch above Export FPL and its cut point.
   const arrival = useArrivalCut({
@@ -1524,7 +1622,13 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     toast({
       title: copy.guides.appliedToast,
       action: (
-        <ToastAction altText={copy.editor.trimUndo} onClick={() => waypointsHistory.undo()}>
+        <ToastAction
+          altText={copy.editor.trimUndo}
+          onClick={() => {
+            waypointsHistory.undo()
+            clearFlowResult(arriving ? "arrival" : "departure")
+          }}
+        >
           {copy.editor.trimUndo}
         </ToastAction>
       ),
@@ -1538,6 +1642,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     const kept = waypoints.slice(phaseSplit.departureEnd + 1).map((wp) => ({ ...wp, selected: false }))
     setWaypoints(applyWaypointNamingRules([...saved.waypoints, ...kept], originAirport, destinationAirport, includeBranding))
     originalDeparture.current = null
+    clearFlowResult("departure")
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
     toast({
@@ -1560,6 +1665,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     const head = waypoints.slice(0, firstApplied).map((wp) => ({ ...wp, selected: false }))
     setWaypoints(applyWaypointNamingRules([...head, ...saved.waypoints], originAirport, destinationAirport, includeBranding))
     originalArrival.current = null
+    clearFlowResult("arrival")
     setGuidePreview(null)
     setMapFocus((current) => ({ ids: saved.waypoints.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
     toast({
@@ -1603,7 +1709,6 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       toast({ title: copy.editor.trimNone })
       return
     }
-    setPanelTab(end)
     const ids = result.remove.map((index) => waypoints[index].id)
     setTrimPreview({ end, ids, approximate: result.approximate })
     // Straight to the waypoints that would go; the view stays there after Apply.
@@ -1752,6 +1857,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               type="button"
               onClick={() => {
                 setPanelTab("options")
+                setFlightOpen(true)
                 window.setTimeout(() => {
                   const field = document.getElementById("flight-number")
                   field?.scrollIntoView({ block: "center", behavior: "smooth" })
@@ -1781,6 +1887,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               aria-label={copy.editor.aircraftAdd}
               onClick={() => {
                 setPanelTab("options")
+                setFlightOpen(true)
                 window.setTimeout(() => {
                   const field = document.getElementById("aircraft")
                   field?.scrollIntoView({ block: "center", behavior: "smooth" })
@@ -1800,73 +1907,68 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   // Share needs an exported plan, and the page must still show that exact plan.
   const canSetVisibility = canSave && !!savedPlanId && savedStatus === "exported" && !isDirty
 
-  // Where the plan stands: draft autosave, or exported (locked).
-  const saveStatusLine = (() => {
-    if (!canSave) {
-      return authAvailable && authReady ? "Sign in with Discord (top right) to save drafts, keep a dashboard and share plans." : ""
-    }
-    if (savedStatus === "exported" && !isDirty) {
-      return (
-        <>
-          Exported and saved: this plan is locked. Duplicate it from your{" "}
-          <Link href="/dashboard" prefetch={false} className="link hover:text-foreground">
-            dashboard
-          </Link>{" "}
-          to change it.
-        </>
-      )
-    }
-    if (!draftArmed) {
-      return mode === "import"
-        ? "Your draft starts saving as soon as the plan is imported."
-        : "Your draft starts saving once the route has two points and both airports are set."
-    }
-    if (isSaving) return "Saving..."
-    if (autosaveError) return `Draft not saved: ${autosaveError}`
-    if (isDirty) {
-      return savedStatus === "exported"
-        ? "Unsaved changes. The exported plan is locked, so they are saved as a new draft."
-        : "Unsaved changes. Your draft autosaves every minute."
-    }
-    return lastSavedAt
-      ? `Draft saved at ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`
-      : "Draft saved."
-  })()
+  // An exported plan, as shown, is locked.
+  const locked = canSave && savedStatus === "exported" && !isDirty
+  // Plans converted from a tracker file can't be published: no switch at all (one already public keeps it).
+  const showPublish = libraryOpen && !isAeroHub && (!trackerDerived || planShare.visibility === "public")
+  const requiresDeclaration = [...originSources, ...(planSource ? [planSource] : [])].includes("Imported")
+  const publishOnExport = showPublish && !trackerDerived && publishIntent && !locked
+  const exportDisabled = waypoints.length === 0 || isLoading || arrival.loading
 
+  // The export block above the button: one line per switch.
+  const exportSwitches = (
+    <div className="space-y-1">
+      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={startPickingCut} />
+      {showPublish && (
+        <VisibilitySwitch
+          planId={savedPlanId ?? ""}
+          origin={originAirport || "ORIG"}
+          destination={destinationAirport || "DEST"}
+          flightNumber={detectedFlightNumber}
+          share={planShare}
+          onShareChange={(share) => {
+            setPlanShare(share)
+            setPublishIntent(share.visibility === "public")
+          }}
+          requiresDeclaration={requiresDeclaration}
+          disabled={trackerDerived}
+          disabledReason={legalCopy.publishOnlyOwnDesigns}
+          pending={canSetVisibility || trackerDerived ? undefined : { checked: publishIntent, onChange: setPublishIntent }}
+          publishRequest={publishRequest}
+        />
+      )}
+      {canSave && autosaveError && !locked && <p className="text-xs text-destructive">Draft not saved: {autosaveError}</p>}
+    </div>
+  )
+
+  // Sketch: the switches and the button in one box. (The workspace places them itself, the button edge to edge.)
   const exportButtons = (
     <div className="space-y-2">
-      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={startPickingCut} />
-      <div className="flex gap-2">
-        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading || arrival.loading}>
-          <Download />
-          Export FPL
-        </Button>
+      {exportSwitches}
+      <div className="flex items-center gap-2">
+        {/* In the workspace the lock sits beside the route; Sketch has no such line. */}
+        {locked && <PlanLock />}
+        <ExportButton state={exportState} disabled={exportDisabled} onClick={handleExportFPL} className="flex-1" />
       </div>
-      {libraryOpen && !isAeroHub && trackerDerived && planShare.visibility !== "public" && (
-        // A plan converted from a FlightRadar24 or FlightAware file can't be published: say so, no switch to offer.
-        <p className="text-xs text-muted-foreground">{legalCopy.publishOnlyOwnDesigns}</p>
-      )}
-      {libraryOpen && !isAeroHub && !(trackerDerived && planShare.visibility !== "public") && (
-        <div>
-          <VisibilitySwitch
-            planId={savedPlanId ?? ""}
-            origin={originAirport || "ORIG"}
-            destination={destinationAirport || "DEST"}
-            flightNumber={detectedFlightNumber}
-            share={planShare}
-            onShareChange={setPlanShare}
-            requiresDeclaration={[...originSources, ...(planSource ? [planSource] : [])].includes("Imported")}
-            disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty || trackerDerived}
-            disabledReason={
-              !canSave ? "Sign in with Discord to publish a flight plan" : "Export the flight plan first to make it public"
-            }
-          />
-        </div>
-      )}
-      <p className={cn("text-xs text-muted-foreground", autosaveError && canSave && "text-destructive")}>
-        {saveStatusLine}
-      </p>
     </div>
+  )
+
+  const publishOnExportDialog = (
+    <PublishDialog
+      open={askPublishOnExport}
+      needsDeclaration={requiresDeclaration}
+      busy={false}
+      // "Not now" (or closing): the file is still exported, and the plan stays private.
+      onClose={() => {
+        setAskPublishOnExport(false)
+        setPublishIntent(false)
+        void performExport()
+      }}
+      onConfirm={() => {
+        setAskPublishOnExport(false)
+        void performExport({ declaration: requiresDeclaration })
+      }}
+    />
   )
 
   // Result banners shared by Convert and Sketch: compact, neutral surface, colour only on the icon/title.
@@ -2045,8 +2147,6 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       </div>
     )
 
-    const hasAlerts = !!error || !!successMessage || !!simplificationInfo
-
     return (
       <TooltipProvider>
         <EditorWorkspace
@@ -2065,6 +2165,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               hoveredId={hoveredId}
               ghostIds={ghostIds}
               focus={mapFocus}
+              runways={isEditingMap || selectMode || arrival.picking ? undefined : mapRunways}
+              onRunwayClick={pickRunwayOnMap}
               ghostPath={guidePreview}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
@@ -2085,6 +2187,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     {destinationAirport || "DEST"}
                   </p>
                   {flightSummary}
+                  {locked && <PlanLock />}
                 </div>
                 {preloaded?.banner.logo && <PartnerLogo logo={preloaded.banner.logo} />}
               </div>
@@ -2136,114 +2239,69 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                 </div>
               </div>
 
+              {error && (
+                <p className="flex shrink-0 items-start gap-1.5 px-4 pb-2 text-xs text-destructive">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  {error}
+                </p>
+              )}
+
               {activeTab !== "options" ? (
-                <div className="flex min-h-0 flex-1 flex-col">
-                  {hasAlerts && (
-                    <div className="shrink-0 space-y-1.5 px-4 pb-2">
-                      {error && (
-                        <p className="flex items-start gap-1.5 text-xs text-destructive">
-                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          {error}
-                        </p>
-                      )}
-                      {successMessage && (
-                        <p className={cn("flex items-start gap-1.5 text-xs text-muted-foreground transition-opacity duration-500", successFading && "opacity-0")}>
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                          {successMessage}
-                        </p>
-                      )}
-                      {simplificationInfo && (
-                        <details className={cn("rounded-lg border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground transition-opacity duration-500", fadingOut && "opacity-0")}>
-                          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground">
-                            <Info className="h-3.5 w-3.5 text-primary" />
-                            Waypoint simplification applied
-                            <span className="ml-auto font-mono font-normal text-muted-foreground">
-                              {simplificationInfo.originalCount} → {simplificationInfo.simplifiedCount}
-                            </span>
-                          </summary>
-                          <div className="mt-2 space-y-0.5">
-                            <p>
-                              Imported file: <strong className="font-medium text-foreground">{importedFileName || "Unknown"}.kml</strong>
-                              {simplificationInfo.source && (
-                                <>
-                                  {" "}
-                                  from <strong className="font-medium text-foreground">{simplificationInfo.source}</strong>
-                                </>
-                              )}
-                            </p>
-                            <p>{simplificationInfo.reason}</p>
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  )}
-
-                  {trimPreview && (
-                    <div className="shrink-0">
-                      <GroundTrimBar
-                        text={trimPreviewText(trimPreview.ids.length, trimPreview.end)}
-                        approximate={trimPreview.approximate}
-                        onApply={applyTrim}
-                        onCancel={() => setTrimPreview(null)}
-                      />
-                    </div>
-                  )}
-
-                  {(activeTab === "departure" || activeTab === "arrival") && (
-                    <div className="max-h-[70%] shrink-0 overflow-y-auto overscroll-contain">
-                      <AirportCard
-                        key={activeTab}
-                        icao={activeTab === "departure" ? originAirport : destinationAirport}
-                        valid={activeTab === "departure" ? icaoValidation.origin : icaoValidation.destination}
-                        end={activeTab}
-                        hand={handRunways[activeTab]}
-                        planRunway={planRunways[activeTab]}
-                        onTap={(runway) =>
-                          setHandRunways((current) => ({
-                            ...current,
-                            [activeTab]: tapRunway(current[activeTab], activeTab === "departure" ? originAirport : destinationAirport, runway),
-                          }))
-                        }
-                        loadAirport={loadAirport}
-                        defaultOpen={!isMobile}
-                        className="mx-4 mb-3"
-                      >
-                        {(embedded, runway) => (
-                          <RunwayGuides
-                            kind={activeTab === "arrival" ? "arrival" : "departure"}
-                            supabase={guideSupabase}
-                            icao={activeTab === "arrival" ? destinationAirport : originAirport}
-                            valid={activeTab === "arrival" ? icaoValidation.destination : icaoValidation.origin}
-                            waypoints={waypoints}
-                            split={phaseSplit}
-                            loadAirport={loadAirport}
-                            planId={savedPlanId}
-                            planIsDraft={savedStatus === "draft"}
-                            targetRunway={runway}
-                            onPreview={setGuidePreview}
-                            onApply={applyGuideToPlan}
-                            onNotify={(title, description) => toast({ title, description })}
-                            destination={activeTab === "arrival" ? originAirport : destinationAirport}
-                            onRestore={activeTab === "arrival" ? restoreOriginalArrival : restoreOriginalDeparture}
-                            embedded={embedded}
-                          />
-                        )
-                        }
-                      </AirportCard>
-                      <GroundMovements
-                        end={activeTab}
-                        compact={isMobile}
-                        previewing={trimPreview?.end ?? null}
-                        busy={trimBusy}
-                        trimmed={trimmed}
-                        disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
-                        onToggle={toggleTrimPreview}
-                      />
-                    </div>
-                  )}
+                // The airport block and the list share one scroll area.
+                <div key={activeTab} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  {(activeTab === "departure" || activeTab === "arrival") &&
+                    (() => {
+                      const end: TrimEnd = activeTab
+                      const icao = end === "departure" ? originAirport : destinationAirport
+                      const valid = end === "departure" ? icaoValidation.origin : icaoValidation.destination
+                      const flow = flowFor(flows[end], icao)
+                      return (
+                        <AirportCard
+                          icao={icao}
+                          valid={valid}
+                          end={end}
+                          hand={handRunways[end]}
+                          planRunway={planRunways[end]}
+                          onTap={(runway) => setHandRunways((current) => ({ ...current, [end]: { icao, runway } }))}
+                          onRunways={(info) => setRunwayLive((current) => ({ ...current, [end]: { ...info, icao } }))}
+                          flow={flow}
+                          onFlow={(next) => {
+                            if (next.open === false) setGuidePreview(null)
+                            setFlows((current) => ({ ...current, [end]: next }))
+                          }}
+                          steps={guideSupabase !== null && valid}
+                          loadAirport={loadAirport}
+                          defaultOpen={!isMobile}
+                          className="mx-4 mb-3"
+                        >
+                          {(embedded, runway) => (
+                            <RunwayGuides
+                              kind={end}
+                              supabase={guideSupabase}
+                              icao={icao}
+                              valid={valid}
+                              waypoints={waypoints}
+                              split={phaseSplit}
+                              loadAirport={loadAirport}
+                              planId={savedPlanId}
+                              planIsDraft={savedStatus === "draft"}
+                              targetRunway={runway}
+                              onPreview={setGuidePreview}
+                              onApply={applyGuideToPlan}
+                              onNotify={(title, description) => toast({ title, description })}
+                              destination={end === "arrival" ? originAirport : destinationAirport}
+                              onRestore={end === "arrival" ? restoreOriginalArrival : restoreOriginalDeparture}
+                              onDone={(chosen, leg) =>
+                                setFlows((current) => ({ ...current, [end]: finishFlow(flowFor(current[end], icao), chosen, leg) }))
+                              }
+                              embedded={embedded}
+                            />
+                          )}
+                        </AirportCard>
+                      )
+                    })()}
 
                   <WaypointList
-                    key={activeTab}
                     waypoints={phaseSlice(activeTab).items}
                     offset={phaseSlice(activeTab).offset}
                     isLoading={isLoading}
@@ -2267,18 +2325,56 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                 </div>
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t">
-                  {/* Flight numbers and time are saved with a plan: only offered when signed in */}
-                  {flightNumberSection(false)}
-                  {aircraftSection(false)}
-                  {flightTimeSection(false)}
-                  {optionsContent}
-                  {brandingSection(false)}
+                  {/* Flight numbers, aircraft and time are saved with a plan: only offered when signed in */}
+                  {canSave && !isAeroHub && (
+                    <OptionsGroup title={copy.editor.groupFlight} open={flightOpen} onOpenChange={setFlightOpen}>
+                      {flightNumberSection(false)}
+                      {aircraftSection(false)}
+                      {flightTimeSection(false)}
+                    </OptionsGroup>
+                  )}
+                  <OptionsGroup title={copy.editor.groupWaypoints} open={waypointsOpen} onOpenChange={setWaypointsOpen}>
+                    <div className="space-y-2 border-b p-4">
+                      {(["departure", "arrival"] as const).map((end) => (
+                        <GroundMovements
+                          key={end}
+                          end={end}
+                          previewing={trimPreview?.end ?? null}
+                          busy={trimBusy}
+                          trimmed={trimmed}
+                          disabled={waypoints.length < 3 || !icaoValidation.origin || !icaoValidation.destination}
+                          onToggle={toggleTrimPreview}
+                        />
+                      ))}
+                      {trimPreview && (
+                        <GroundTrimBar
+                          text={trimPreviewText(trimPreview.ids.length, trimPreview.end)}
+                          approximate={trimPreview.approximate}
+                          onApply={applyTrim}
+                          onCancel={() => setTrimPreview(null)}
+                        />
+                      )}
+                    </div>
+                    {optionsContent}
+                    {brandingSection(false)}
+                  </OptionsGroup>
                 </div>
               )}
             </>
           }
-          footer={<div className="px-4 py-3">{exportButtons}</div>}
+          footer={
+            <>
+              <div className="px-4 py-2">{exportSwitches}</div>
+              <ExportButton
+                state={exportState}
+                disabled={exportDisabled}
+                onClick={handleExportFPL}
+                className="h-12 w-full rounded-none"
+              />
+            </>
+          }
         />
+        {publishOnExportDialog}
         <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -2420,6 +2516,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
           </div>
         )}
 
+        {publishOnExportDialog}
         <Toaster />
       </PageShell>
     </TooltipProvider>
@@ -2455,5 +2552,28 @@ function PanelSection({
       </div>
       {children}
     </div>
+  )
+}
+
+// One of the two foldable groups of the Options tab.
+function OptionsGroup({
+  title,
+  open,
+  onOpenChange,
+  children,
+}: {
+  title: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: React.ReactNode
+}) {
+  return (
+    <details className="group/options border-b" open={open} onToggle={(e) => onOpenChange(e.currentTarget.open)}>
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-2.5 text-sm font-medium hover:bg-accent/50 [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open/options:rotate-90 motion-reduce:transition-none" aria-hidden />
+        {title}
+      </summary>
+      <div className="border-t [&>*:last-child]:border-b-0">{children}</div>
+    </details>
   )
 }

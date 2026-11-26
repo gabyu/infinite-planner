@@ -32,11 +32,11 @@ export function FlightNumbersField({ id, value, onChange }: FlightNumbersFieldPr
   }
 
   return (
-    <div className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border bg-background px-2 py-1 focus-within:ring-2 focus-within:ring-ring">
+    <div className="flex min-h-[var(--control-h,2.25rem)] w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
       {value.map((number, index) => (
         <span
           key={number}
-          className="inline-flex items-center gap-1 rounded border bg-muted/50 py-0.5 pl-1.5 pr-0.5 font-mono text-xs"
+          className="inline-flex items-center gap-1 rounded border bg-muted/50 pl-1.5 pr-0.5 font-mono text-xs leading-5"
           title={index === 0 ? copy.editor.flightNumberPrimary : undefined}
         >
           {number}
@@ -75,7 +75,7 @@ export function FlightNumbersField({ id, value, onChange }: FlightNumbersFieldPr
           aria-label={copy.editor.flightNumbersLabel}
           autoComplete="off"
           spellCheck={false}
-          className="h-7 min-w-[7rem] flex-1 border-0 bg-transparent px-1 font-mono shadow-none focus-visible:ring-0"
+          className="h-[calc(var(--control-h,2.25rem)-2px)] min-w-[7rem] flex-1 border-0 bg-transparent px-1 font-mono shadow-none focus-visible:ring-0"
         />
       )}
     </div>

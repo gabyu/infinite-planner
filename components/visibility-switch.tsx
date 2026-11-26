@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
 import type { PlanShare, PlanVisibility } from "@/lib/flight-plans"
 import { PublishDialog } from "@/components/publish-dialog"
-import { visibilityCopy } from "@/lib/copy"
+import { HelpTip } from "@/components/editor/help-tip"
+import { copy, visibilityCopy } from "@/lib/copy"
 import { cn } from "@/lib/utils"
 
 interface VisibilitySwitchProps {
@@ -17,9 +18,8 @@ interface VisibilitySwitchProps {
   share: PlanShare
   // Called with the new state once the server has applied it.
   onShareChange: (share: PlanShare) => void
-  // "field": the label and the switch on one line, a sentence under them that says what the switch does now, and
-  // "Copy link" at the end of that sentence once public. "inline": just the label and the switch (table rows and
-  // the plan page, where the link and the sentence are elsewhere).
+  // "field": one full-width line (the editor's export block): the label, a (?) that says what the switch does now, and
+  // the switch. "inline": just the label and the switch (table rows and the plan page).
   layout?: "field" | "inline"
   // A shorter label where the column already says "Visibility" (the dashboard table).
   short?: boolean
@@ -27,6 +27,11 @@ interface VisibilitySwitchProps {
   requiresDeclaration?: boolean
   disabled?: boolean
   disabledReason?: string
+  // The editor, before the plan is exported: the switch only records the wish to publish, which the export carries out.
+  pending?: { checked: boolean; onChange: (checked: boolean) => void }
+  // Publish this plan now (it has just been exported with the switch on, and the publish dialog confirmed). A new
+  // `nonce` asks again.
+  publishRequest?: { planId: string; declaration: boolean; nonce: number } | null
   className?: string
 }
 
@@ -43,6 +48,8 @@ export function VisibilitySwitch({
   requiresDeclaration = false,
   disabled,
   disabledReason,
+  pending,
+  publishRequest,
   className,
 }: VisibilitySwitchProps) {
   const [busy, setBusy] = useState(false)
@@ -97,31 +104,54 @@ export function VisibilitySwitch({
     await choose("public", declarationGiven)
   }
 
+  const handled = useRef(0)
+  useEffect(() => {
+    if (!publishRequest || publishRequest.planId !== planId || handled.current === publishRequest.nonce) return
+    handled.current = publishRequest.nonce
+    setDeclarationGiven(publishRequest.declaration)
+    void choose("public", publishRequest.declaration)
+    // `choose` is rebuilt on every render; only a new request matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishRequest, planId])
+
   const t = visibilityCopy
-  const helper = disabled && disabledReason ? disabledReason : isPublic ? t.helperPublic : t.helperPrivate
+  const checked = pending ? pending.checked : isPublic
+  const off = !pending && disabled
+  const helper = pending
+    ? pending.checked
+      ? t.helperPending
+      : t.helperPrivate
+    : off && disabledReason
+      ? disabledReason
+      : isPublic
+        ? t.helperPublic
+        : t.helperPrivate
 
   return (
     <div className={cn(layout === "field" ? "w-full" : "flex flex-wrap items-center gap-2", className)}>
       {/* The label says what turning the switch on does; the switch is always on the right, in the same place. */}
-      <div className={cn("flex items-center gap-3", layout === "field" && "justify-between")}>
+      <div className={cn("flex items-center", layout === "field" ? "min-h-7 gap-1" : "gap-3")}>
         <label htmlFor={`visibility-${planId}`} className="whitespace-nowrap text-sm font-medium">
           {short ? t.labelShort : t.label}
         </label>
+        {layout === "field" && (
+          <>
+            <HelpTip label={`${copy.editor.exportHelp} ${t.label}`}>{helper}</HelpTip>
+            <span id={`visibility-help-${planId}`} className="sr-only">
+              {helper}
+            </span>
+          </>
+        )}
         <Switch
           id={`visibility-${planId}`}
-          checked={isPublic}
-          disabled={disabled || busy}
-          onCheckedChange={(checked) => (checked ? setAskPublish(true) : choose("private"))}
+          className={cn(layout === "field" && "ml-auto")}
+          checked={checked}
+          disabled={off || busy}
+          onCheckedChange={(next) => (pending ? pending.onChange(next) : next ? setAskPublish(true) : choose("private"))}
           aria-describedby={layout === "field" ? `visibility-help-${planId}` : undefined}
         />
       </div>
 
-      {layout === "field" && (
-        // One line, always there, so the panel never moves when the plan goes public.
-        <div className="mt-1 flex min-h-[1.25rem] items-center justify-between gap-3 text-xs text-muted-foreground">
-          <span id={`visibility-help-${planId}`}>{helper}</span>
-        </div>
-      )}
       {layout === "inline" && disabled && disabledReason && (
         // Where the switch can't be used, the row says why in one line (the field layout has its helper line).
         <p className="basis-full text-xs text-muted-foreground">{disabledReason}</p>

@@ -49,7 +49,8 @@ interface WaypointListProps {
 const quietInput =
   "border-transparent bg-transparent shadow-none hover:border-input focus-visible:border-input focus-visible:bg-background"
 
-// The compact waypoint list of the editor panel: index, name, altitude, coordinates as a second line. Same
+// The compact waypoint list of the editor panel: one line per point (index, name, altitude), the coordinates as a second
+// line on the selected or focused row. Same
 // editing as the old table (row click selects, shift-click ranges, every field editable). Hovering a row
 // highlights its point on the map; clicking a point on the map scrolls the list to its row.
 export function WaypointList({
@@ -80,8 +81,9 @@ export function WaypointList({
   }, [scrollTarget])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
+    <div>
+      {/* Stays at the top of the panel's one scroll area while the rows pass under it. */}
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-y bg-card px-4 py-1.5">
         <div className="flex items-center gap-2.5">
           <Checkbox
             id="selectAll"
@@ -119,7 +121,7 @@ export function WaypointList({
         </div>
       </div>
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div ref={listRef}>
         {waypoints.map((waypoint, index) => (
           <div
             key={waypoint.id}
@@ -129,8 +131,8 @@ export function WaypointList({
             onMouseEnter={() => onHover(waypoint.id)}
             onMouseLeave={() => onHover(null)}
             className={cn(
-              "grid cursor-pointer grid-cols-[1.75rem_1fr_5.5rem] items-center gap-x-1 border-b border-border/60 px-3 py-1.5",
-              "[content-visibility:auto] [contain-intrinsic-size:auto_52px]",
+              "group grid scroll-mt-12 cursor-pointer grid-cols-[1.75rem_1fr_5.5rem] items-center gap-x-1 border-b border-border/60 px-3 py-1",
+              "[content-visibility:auto] [contain-intrinsic-size:auto_37px]",
               hoveredId === waypoint.id && "bg-accent/60",
               waypoint.selected && "bg-accent",
               ghostIds?.has(waypoint.id) && "opacity-40",
@@ -173,8 +175,13 @@ export function WaypointList({
               onFocus={onInputFocus}
               className={cn("h-7 px-2 text-right font-mono text-xs", quietInput)}
             />
-            <span />
-            <div className="col-span-2 flex items-center gap-1">
+            {/* Latitude and longitude only on the selected row, or the one being edited. */}
+            <div
+              className={cn(
+                "col-span-2 col-start-2 items-center gap-1 group-focus-within:flex",
+                waypoint.selected ? "flex" : "hidden",
+              )}
+            >
               <Input
                 type="number"
                 step="0.0001"

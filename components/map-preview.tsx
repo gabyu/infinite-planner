@@ -13,6 +13,8 @@ import {
   setBasemap,
   type BasemapChoice,
 } from "@/lib/map-tiles"
+import type { RunwayLabel } from "@/lib/runway-labels"
+import { layoutRunwayTags } from "@/lib/runway-label-layout"
 import { altitudeBucket, CUT_MARKER_HTML, hasAltitudeData, unwrapLongitudes } from "@/lib/route-render"
 import {
   DropdownMenu,
@@ -56,7 +58,10 @@ export interface MapPreviewProps {
   ghostIds?: Set<string>
   /** Zoom to these waypoints (and the kept ones next to them). A new `nonce` asks again. The view then stays where it is
    *  (no refit when the plan changes) until "Fit route" is pressed. */
-  focus?: { ids: string[]; nonce: number } | null
+  focus?: { ids: string[]; nonce: number; points?: { lat: number; lng: number }[] } | null
+  /** The runway numbers of the airport being worked on: shown only when the map is zoomed in enough to tell them apart. */
+  runways?: RunwayLabel[]
+  onRunwayClick?: (name: string) => void
   /** A path being previewed (a departure guide laid onto the plan): drawn as a dashed amber line over the route, and framed
    *  when it appears. Nothing is added to the plan. */
   ghostPath?: { lat: number; lng: number }[] | null
@@ -68,6 +73,21 @@ export interface MapPreviewProps {
 
 // Back into -180..180 (a point dragged or inserted beyond the date line).
 const foldLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180
+
+// A longitude moved by whole turns next to the route as drawn (which runs past 180 over the antimeridian).
+function nearLng(lng: number, route: { lng: number }[]) {
+  const ends = route.length > 0 ? [route[0].lng, route[route.length - 1].lng] : []
+  let best = lng
+  let gap = Infinity
+  for (const end of ends) {
+    const candidate = lng + Math.round((end - lng) / 360) * 360
+    if (Math.abs(candidate - end) < gap) {
+      best = candidate
+      gap = Math.abs(candidate - end)
+    }
+  }
+  return best
+}
 
 const escapeHtml = (text: string) =>
   text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
@@ -82,6 +102,9 @@ const DECLUTTER_MIN_POINTS = 60
 const dotStep = (zoom: number) => (zoom >= 10 ? 1 : zoom >= 8 ? 2 : zoom >= 6 ? 4 : 8)
 const CHEVRON_MIN_ZOOM = 6
 const CHEVRON_SPACING_PX = 150
+// Below this the numbers of one airport pile up on each other.
+const RUNWAY_MIN_ZOOM = 13
+const RUNWAY_MAX_FIT_ZOOM = 15
 
 export default function MapPreview({
   waypoints: rawWaypoints,
@@ -98,6 +121,8 @@ export default function MapPreview({
   toolbarLeading,
   ghostIds,
   focus,
+  runways,
+  onRunwayClick,
   ghostPath,
   cutId = null,
   pickingCut = false,
@@ -141,8 +166,8 @@ export default function MapPreview({
   const viewLockedRef = useRef(false)
 
   // Handlers bound once on marker creation read the latest callbacks from here.
-  const callbacksRef = useRef({ onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd })
-  callbacksRef.current = { onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd }
+  const callbacksRef = useRef({ onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd, onRunwayClick })
+  callbacksRef.current = { onHoverWaypoint, onWaypointClick, onToggleWaypointSelect, onWaypointDragEnd, onRunwayClick }
 
   // Refs mirroring latest props so marker event handlers (bound once, on marker
   // creation) never read stale closures when select mode or selection changes.
@@ -475,7 +500,22 @@ export default function MapPreview({
   // Zoom to the waypoints of a ground trim (and the kept one beside them), like the Departure / Arrival buttons do.
   useEffect(() => {
     const map = mapInstanceRef.current
-    if (!map || !L || !focus || focus.ids.length === 0) return
+    if (!map || !L || !focus) return
+    if (focus.points && focus.points.length > 0) {
+      // An airport: framed on its runways, but never so far out that their numbers would be hidden.
+      const bounds = L.latLngBounds(focus.points.map((point) => [point.lat, nearLng(point.lng, waypointsRef.current)]))
+      const phone = window.innerWidth < 1024
+      const topLeft = L.point(phone ? 24 : 392, phone ? 80 : 64)
+      const bottomRight = L.point(phone ? 24 : 80, phone ? 260 : 64)
+      const fit = map.getBoundsZoom(bounds, false, topLeft.add(bottomRight))
+      const level = Math.max(RUNWAY_MIN_ZOOM, Math.min(RUNWAY_MAX_FIT_ZOOM, fit))
+      // The centre of the free part of the map, not of the whole map.
+      const centre = map.project(bounds.getCenter(), level).add(bottomRight.subtract(topLeft).divideBy(2))
+      viewLockedRef.current = true
+      map.setView(map.unproject(centre, level), level)
+      return
+    }
+    if (focus.ids.length === 0) return
     const wanted = new Set(focus.ids)
     const indices = waypoints.map((wp, i) => (wanted.has(wp.id) ? i : -1)).filter((i) => i >= 0)
     if (indices.length === 0) return
@@ -604,6 +644,38 @@ export default function MapPreview({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, isEditing, selectMode, L, isMapReady])
+
+  // Runway numbers at each threshold, set just outside the runway so they do not cover it.
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    if (!map || !L || !runways || runways.length === 0 || zoom < RUNWAY_MIN_ZOOM) return
+    const layer = L.layerGroup().addTo(map)
+    const placed = runways.map((runway) => ({ ...runway, lng: nearLng(runway.lng, waypoints) }))
+    const shifts = layoutRunwayTags(
+      placed.map((runway) => {
+        const { x, y } = map.project([runway.lat, runway.lng], zoom)
+        return { name: runway.name, x, y, headingTrue: runway.headingTrue, rank: runway.chosen ? 0 : runway.tone ? 1 : 2 }
+      }),
+    )
+    for (const runway of placed) {
+      const { dx, dy } = shifts[runway.name]
+      const name = escapeHtml(runway.name)
+      L.marker([runway.lat, runway.lng], {
+        keyboard: false,
+        zIndexOffset: runway.chosen ? 950 : runway.tone ? 900 : 850,
+        icon: L.divIcon({
+          className: "ip-marker",
+          iconSize: [0, 0],
+          html: `<button type="button" class="ip-rwy ip-rwy--${runway.tone ?? "idle"}${runway.chosen ? " ip-rwy--chosen" : ""}" style="transform:translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))" aria-label="${copy.editor.runwayOnMap} ${name}" aria-pressed="${runway.chosen}">${name}</button>`,
+        }),
+      })
+        .on("click", () => callbacksRef.current.onRunwayClick?.(runway.name))
+        .addTo(layer)
+    }
+    return () => {
+      layer.remove()
+    }
+  }, [runways, waypoints, zoom, L, isMapReady])
 
   // Export without arrival: a badge on the cut point.
   useEffect(() => {

@@ -20,7 +20,7 @@
 - Reads the flight number from the KML's file name when it can be done reliably (never guessed).
 - Interactive map with a **Select Points** mode: drag a box around waypoints to select and delete them in one tap. Works on phones and tablets.
 - Exports a ready-to-use **FPL** file.
-- **Export without arrival** (Convert and Sketch): leaves the airborne arrival out of the download so the STAR and approach can be added in Infinite Flight. The saved plan stays whole.
+- **Without arrival** (Convert and Sketch): leaves the airborne arrival out of the download so the STAR and approach can be added in Infinite Flight. The saved plan stays whole.
 
 ### Route Sketch
 - **Line** tool for straight legs, **Pen** tool (Illustrator-style: click for a corner, click-and-drag for a curve) for sweeping turns.
