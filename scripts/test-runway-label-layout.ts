@@ -17,18 +17,25 @@ const overlaps = (at: ReturnType<typeof place>) => {
   )
 }
 
-// KIAH at zoom 13, north-west corner: 15L and 15R end close together, with 08R right beside them.
+// KIAH at zoom 13, north-west corner: 15L and 15R end close together, with 08R just above them (pixels from the airport data).
 const kiah: RunwayTag[] = [
-  { name: "15L", x: 390, y: 244, headingTrue: 150, rank: 2 },
-  { name: "15R", x: 372, y: 234, headingTrue: 150, rank: 2 },
-  { name: "08R", x: 409, y: 233, headingTrue: 90, rank: 2 },
+  { name: "15L", x: 547, y: 363, headingTrue: 150, rank: 2 },
+  { name: "15R", x: 527, y: 363, headingTrue: 150, rank: 2 },
+  { name: "08R", x: 564, y: 326, headingTrue: 90, rank: 2 },
 ]
 const at = place(kiah)
 // The two parallels sit side by side, touching, in the order of their runways (15R to the west).
 assert.equal(at["15L"].y, at["15R"].y)
 assert.equal(at["15L"].x - at["15R"].x, RUNWAY_TAG.width)
+// The block stays at the end of its runways (just outside them, on their line), not pushed off to one side.
+const centre = (at["15L"].x + at["15R"].x) / 2
+assert.ok(Math.abs(centre - 529) <= 6, `block centre ${centre}`)
+assert.ok(at["15L"].y >= 340 && at["15L"].y <= 356, `block height ${at["15L"].y}`)
+// Each tag is the nearer one to its own runway end.
+assert.ok(Math.abs(at["15R"].x - 527) < Math.abs(at["15L"].x - 527))
+assert.ok(Math.abs(at["15L"].x - 547) < Math.abs(at["15R"].x - 547))
 // 08R stays by its own end, and nothing covers anything.
-assert.deepEqual(at["08R"], { x: 389, y: 233 })
+assert.deepEqual(at["08R"], { x: 544, y: 326 })
 assert.deepEqual(overlaps(at), [])
 
 // Parallels that end far apart keep their own place.

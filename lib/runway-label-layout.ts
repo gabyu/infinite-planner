@@ -2,7 +2,8 @@
 //
 // A tag sits just outside its end of the runway, on the runway's own line. Parallel runways that end close together
 // (15L and 15R) are placed as one block, side by side in the order of the runways, so that no other tag comes between
-// them. A tag or block with no room moves further out, then aside.
+// them. A tag or block with no room takes the free place nearest to its own end, moving along the runway's line rather
+// than off to one side.
 
 export interface RunwayTag {
   name: string
@@ -19,8 +20,11 @@ export const RUNWAY_TAG = { width: 38, height: 24 }
 const OFFSET_PX = 20
 /** Parallel ends no further apart than this form one block. */
 const GROUP_PX = 70
-// Where to try, in steps of OFFSET_PX: [further out along the runway, to its side].
-const PLACES: [number, number][] = [[1, 0], [2, 0], [3, 0], [1, 1.5], [1, -1.5], [2, 1.5], [2, -1.5], [4, 0], [1, 2.5], [1, -2.5]]
+// How far a tag may move to find room, how finely, and what each direction costs: along the runway's line is best
+// (away from the runway before over it), sideways last, since a tag off its line reads as another runway's.
+const SEARCH_PX = 90
+const SEARCH_STEP_PX = 2
+const COST = { out: 1, in: 1.5, side: 3 }
 
 const number = (name: string) => name.replace(/[LCR]$/, "")
 
@@ -58,15 +62,29 @@ export function layoutRunwayTags(tags: RunwayTag[]): Record<string, { dx: number
       x: members.reduce((sum, tag) => sum + tag.x, 0) / members.length,
       y: members.reduce((sum, tag) => sum + tag.y, 0) / members.length,
     }
-    const away = heading + Math.PI
-    const at = ([out, side]: [number, number]): Box => ({
-      x: Math.round(middle.x + (Math.sin(away) * out + Math.cos(away) * side) * OFFSET_PX),
-      y: Math.round(middle.y + (-Math.cos(away) * out + Math.sin(away) * side) * OFFSET_PX),
-      width,
-      height,
-    })
-    // The first place clear of the others; with none, the closest one.
-    const box = PLACES.map(at).find((candidate) => !taken.some((other) => collide(candidate, other))) ?? at(PLACES[0])
+    // Unit vectors on screen: away from the runway, and across it.
+    const out = { x: -Math.sin(heading), y: Math.cos(heading) }
+    const across = { x: Math.cos(heading), y: Math.sin(heading) }
+    const ideal = { x: middle.x + out.x * OFFSET_PX, y: middle.y + out.y * OFFSET_PX }
+    const at = (dx: number, dy: number): Box => ({ x: Math.round(ideal.x + dx), y: Math.round(ideal.y + dy), width, height })
+    const free = (box: Box) => !taken.some((other) => collide(box, other))
+    // The cheapest free place; with none, the ideal one.
+    let box = at(0, 0)
+    if (!free(box)) {
+      let best = Infinity
+      for (let dx = -SEARCH_PX; dx <= SEARCH_PX; dx += SEARCH_STEP_PX) {
+        for (let dy = -SEARCH_PX; dy <= SEARCH_PX; dy += SEARCH_STEP_PX) {
+          const along = dx * out.x + dy * out.y
+          const cost = (along >= 0 ? along * COST.out : -along * COST.in) + Math.abs(dx * across.x + dy * across.y) * COST.side
+          if (cost >= best) continue
+          const candidate = at(dx, dy)
+          if (free(candidate)) {
+            best = cost
+            box = candidate
+          }
+        }
+      }
+    }
     taken.push(box)
     members.forEach((tag, index) => {
       const slot = index - (members.length - 1) / 2
