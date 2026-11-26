@@ -49,3 +49,6 @@ pnpm-workspace.yaml
 
 # real tracker KMLs dropped in for local detection tests: never committed
 /test-kml/
+
+# Claude status history (local only)
+STATUS_HISTORY.local.md

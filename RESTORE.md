@@ -2,10 +2,17 @@
 
 ## Prerequisites
 ```bash
-brew install node pnpm gh
+brew install node pnpm gh esbuild
 cd ~/Dev/infinite-planner && pnpm install
 ```
 `pnpm-workspace.yaml` is machine-specific (build-approval config). If pnpm asks to approve build scripts, run `pnpm approve-builds`.
+
+The `pnpm test:*` scripts call `esbuild`, which is not in `package.json`, hence the Homebrew install. Some tests also
+import `server-only`, a sub-dependency esbuild cannot see (`Could not resolve "server-only"`). Run this once per
+terminal session, from the project folder:
+```bash
+export NODE_PATH="$PWD/node_modules/.pnpm/node_modules"
+```
 
 ## Secrets: `.env.local` (gitignored, copy came back with ~/Dev; if lost, recreate)
 | Name | Where to get it |
@@ -38,4 +45,5 @@ Local branches (many `feature/*`) exist only if they were pushed or are in the `
 - [ ] Convert: import a KML, export an `.fpl`
 - [ ] Sign in with Discord works locally (redirect allow-list includes localhost)
 - [ ] `pnpm lint` and `pnpm check:copy` pass
+- [ ] `pnpm test:aerohub-parser` passes (with the `NODE_PATH` line above)
 - [ ] `git push --dry-run` works
