@@ -1,6 +1,6 @@
 # Export without arrival: design and implementation plan
 
-Date: 2026-11-26. Status: **approved by Gab on 2026-11-26. No product code written.**
+Date: 2026-11-26. Status: **approved by Gab and built on 2026-11-26** (results and known limits at the end).
 
 ## Goal
 
