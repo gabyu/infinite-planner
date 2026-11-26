@@ -21,23 +21,59 @@ export interface PhaseSplit {
 
 export type Phase = "departure" | "cruise" | "arrival"
 
+/** Points within this many feet of each other are level. */
+export const LEVEL_BAND_FT = 1000
+/** A level stretch counts as cruise from this share of the highest altitude. */
+export const LEVEL_FLOOR_SHARE = 0.6
 const MIN_CRUISE_FT = 10_000
 const CRUISE_SHARE = 0.9
-const LEVEL_BAND_FT = 1000
 const LEVEL_MIN_NM = 15
 const LEVEL_MIN_SHARE = 0.1
-const LEVEL_FLOOR_SHARE = 0.6
 const MIN_ALTITUDE_POINTS = 3
 const NM_M = 1852
 const END_MAX_NM = 60
 const END_MAX_SHARE = 0.25
 
+/**
+ * First and last index on a cruise level: a run of points within LEVEL_BAND_FT of each other that lasts at least
+ * `minLevelM` and is high enough (LEVEL_FLOOR_SHARE of the highest altitude). `alongM[i]` is the route distance to
+ * point i. Null when no run qualifies.
+ */
+export function cruiseLevels(altitudes: number[], alongM: number[], minLevelM: number): { first: number; last: number } | null {
+  if (altitudes.length === 0) return null
+  const floor = Math.max(...altitudes) * LEVEL_FLOOR_SHARE
+  let first = -1
+  let last = -1
+  let start = 0
+  let low = altitudes[0]
+  let high = altitudes[0]
+  const closeRun = (end: number) => {
+    if (low >= floor && alongM[end] - alongM[start] >= minLevelM) {
+      if (first < 0) first = start
+      last = end
+    }
+  }
+  for (let i = 1; i < altitudes.length; i++) {
+    const nextLow = Math.min(low, altitudes[i])
+    const nextHigh = Math.max(high, altitudes[i])
+    if (nextHigh - nextLow <= LEVEL_BAND_FT) {
+      low = nextLow
+      high = nextHigh
+      continue
+    }
+    closeRun(i - 1)
+    start = i
+    low = high = altitudes[i]
+  }
+  closeRun(altitudes.length - 1)
+  return first < 0 ? null : { first, last }
+}
+
 // Climb and descent are found by how far the aircraft flies level, not by the highest altitude: a flight that climbs
 // in steps (FL300, then FL340...) reaches 90% of its top long after the real top of climb, and one that descends in
-// steps leaves it long before the real top of descent. A level stretch is a run of points within LEVEL_BAND_FT of each
-// other that lasts at least LEVEL_MIN_NM (or a tenth of the flight, for a short one), high enough to be cruise and
-// not a hold at 3,000 ft. The departure ends where the first one starts, the arrival begins where the last one ends,
-// so every step in between is cruise.
+// steps leaves it long before the real top of descent. A level stretch lasts at least LEVEL_MIN_NM (or a tenth of the
+// flight, for a short one), high enough to be cruise and not a hold at 3,000 ft. The departure ends where the first one
+// starts, the arrival begins where the last one ends, so every step in between is cruise.
 function byAltitude(points: PhasePoint[]): PhaseSplit | null {
   const withAltitude = points.filter((p) => p.altitude > 0)
   if (withAltitude.length < MIN_ALTITUDE_POINTS) return null
@@ -47,38 +83,19 @@ function byAltitude(points: PhasePoint[]): PhaseSplit | null {
   const along = [0]
   for (let i = 1; i < points.length; i++) along.push(along[i - 1] + distanceM(points[i - 1], points[i]))
   const minLevelM = Math.min(LEVEL_MIN_NM * NM_M, along[along.length - 1] * LEVEL_MIN_SHARE)
-
-  let first = -1
-  let last = -1
-  let start = 0
-  let low = points[0].altitude
-  let high = points[0].altitude
-  const closeRun = (end: number) => {
-    if (low >= top * LEVEL_FLOOR_SHARE && along[end] - along[start] >= minLevelM) {
-      if (first < 0) first = start
-      last = end
-    }
-  }
-  for (let i = 1; i < points.length; i++) {
-    const nextLow = Math.min(low, points[i].altitude)
-    const nextHigh = Math.max(high, points[i].altitude)
-    if (nextHigh - nextLow <= LEVEL_BAND_FT) {
-      low = nextLow
-      high = nextHigh
-      continue
-    }
-    closeRun(i - 1)
-    start = i
-    low = high = points[i].altitude
-  }
-  closeRun(points.length - 1)
-
-  if (first >= 0) return { departureEnd: first, arrivalStart: last > first ? last : first + 1 }
+  const level = cruiseLevels(
+    points.map((p) => p.altitude),
+    along,
+    minLevelM,
+  )
+  if (level) return { departureEnd: level.first, arrivalStart: level.last > level.first ? level.last : level.first + 1 }
 
   // No level stretch (a flight that climbs and descends without cruising): split around its highest point.
-  const level = top * CRUISE_SHARE
+  const near = top * CRUISE_SHARE
+  let first = -1
+  let last = -1
   points.forEach((p, i) => {
-    if (p.altitude >= level) {
+    if (p.altitude >= near) {
       if (first < 0) first = i
       last = i
     }

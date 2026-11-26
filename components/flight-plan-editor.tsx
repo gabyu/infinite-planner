@@ -27,6 +27,7 @@ import { PartnerBanner, PartnerLogo } from "@/components/import/partner-banner"
 import type { PreloadedImport } from "@/lib/partners/preloaded"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { saveFplInBrowser } from "@/lib/fpl-download"
+import { applyBrandingOverlay, isBrandingSlot } from "@/lib/branding"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import {
   AUTOSAVE_INTERVAL_MS,
@@ -135,28 +136,6 @@ interface SimplificationInfo {
 }
 
 const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
-
-// The branding block is the four waypoints just before the destination.
-function isBrandingSlot(index: number, total: number) {
-  return total >= BRANDING_MIN_WAYPOINTS && index >= total - 5 && index <= total - 2
-}
-
-// Puts the MADE/WITH/INFINITE/PLANNER block on (or takes it off) without touching any other
-// name. Idempotent: it first restores every branded waypoint, then re-brands the current
-// last-four-before-the-destination, so it also repairs a block that edits have shifted.
-function applyBrandingOverlay(waypoints: Waypoint[], include: boolean): Waypoint[] {
-  const restored = waypoints.map((wp, index) =>
-    wp.branded
-      ? { ...wp, name: wp.unbrandedName ?? String(index).padStart(3, "0"), locked: false, branded: false, unbrandedName: undefined }
-      : wp,
-  )
-  if (!include) return restored
-  return restored.map((wp, index) =>
-    isBrandingSlot(index, restored.length)
-      ? { ...wp, unbrandedName: wp.name, name: BRAND_NAMES[index - (restored.length - 5)], locked: true, branded: true }
-      : wp,
-  )
-}
 
 // Recomputes the interior sample waypoints of a curve segment from its
 // current anchor positions/handles, replacing them in place by id. Bails out
