@@ -178,3 +178,17 @@ Branch `feature/export-without-arrival` from `staging`.
 
 `pnpm test:*` needs `esbuild` from Homebrew (see `RESTORE.md`). It is installed on this Mac and
 `pnpm test:route-phases` passes (2026-11-26).
+
+## Built and reviewed (2026-11-26)
+
+Gab imported the four script-made test files (LFPG-KIAH and YPPH-EGLL, with and without taxi points) into Infinite
+Flight: all worked. A European short haul and a KJFK arrival are still to be tested.
+
+Independent review: nothing critical or important. Known limits, not fixed:
+
+- A sparse Sketch often shows "0 waypoints removed": its last point is already 120 NM or more from the destination.
+- A file ending mid-cruise, with no runway data, can keep one or two cruise points as ground points.
+- In Convert the cut point can't be moved with the keyboard.
+- The summary is a live region and may be announced again after waypoint edits.
+- The list badge uses Tailwind orange classes, not the `--route-selected` token.
+- In Sketch, one Escape cancels both a pen drag and pick mode.
