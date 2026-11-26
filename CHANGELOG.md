@@ -4,15 +4,18 @@ All notable changes to Infinite Planner are documented here.
 
 ## Unreleased
 
+## 2026-11-26 (editor panel)
+
+### Added
+- **Runway numbers on the map.** Departure and Arrival zoom to the airport and write each runway number at its end, coloured by the ATIS or the wind; click one to choose it. They show only when zoomed in.
+- **Publish on Explore before exporting.** For plans that can be published, switch it on at any time; the plan is published when you export it (after the usual confirmation).
+
 ### Changed
 - **A calmer editor panel.** The airport block now goes in two steps, runway then procedure, and folds into one line once you have applied, saved or kept one. The waypoint list shows one line per point (latitude and longitude appear on the selected row) and scrolls together with the block.
-- **A shorter export block.** **Without arrival** and **Publish on Explore** are one line each above **Export FPL**, with their explanation behind a (?). An exported plan shows a lock instead of a sentence.
+- **A shorter export block.** **Without arrival** and **Publish on Explore** are one line each, with their explanation behind a (?). **Export FPL** spans the panel, shows its progress, then a confirmation. An exported plan shows a lock instead of a sentence.
+- Plans from a tracker file no longer show the publish switch.
 - **Options in two groups**, Flight and Waypoints. The taxi switches (departure and arrival) moved there.
 - Passing messages in the editor are now notifications; applying a procedure no longer asks for a second confirmation (Undo is still offered).
-
-- **Runway numbers on the map.** Departure and Arrival zoom to the airport and write each runway number at its end, coloured by the ATIS or the wind; click one to choose it. They show only when zoomed in.
-- **Publish on Explore before exporting.** For plans that can be published, switch it on at any time; the plan is published when you export it (after the usual confirmation). Plans from a tracker file no longer show the switch.
-- **Export FPL** spans the panel and shows its progress, then a confirmation.
 
 ### Fixed
 - The wind on a runway is shown in whole knots.
