@@ -138,7 +138,18 @@ export function WaypointList({
               picking && "[&_input]:pointer-events-none",
             )}
           >
-            <span className="text-right font-mono text-[11px] text-muted-foreground">{offset + index + 1}</span>
+            {picking ? (
+              // The keyboard's way to pick: its click reaches the row like any other.
+              <button
+                type="button"
+                aria-label={`${offset + index + 1} ${waypoint.name}, ${copy.editor.moveCut}`}
+                className="min-h-6 rounded text-right font-mono text-[11px] text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {offset + index + 1}
+              </button>
+            ) : (
+              <span className="text-right font-mono text-[11px] text-muted-foreground">{offset + index + 1}</span>
+            )}
             <div className="flex min-w-0 items-center gap-1">
               <Input
                 id={`name-${waypoint.id}`}

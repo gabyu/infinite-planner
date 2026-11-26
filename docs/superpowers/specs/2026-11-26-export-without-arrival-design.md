@@ -76,7 +76,8 @@ Rules:
    level-offs. Step climbs and step downs in cruise are therefore handled wherever they happen. If there is no
    cruise level at all: the last point within `TOD_BAND_FT` of the highest altitude.
 4. Ground start comes from `planTrim(points, airport, "arrival")`: the waypoint before the first one it would
-   remove (touchdown), or the destination if it would remove nothing. Everything from there on is kept.
+   remove (touchdown), or the destination if it would remove nothing. Everything from there on is kept. A ground start
+   above 15,000 ft is ignored: it is a file that stops in cruise, with no runway data.
 5. Default cut = first waypoint after TOD. If none lies before the ground start, the TOD waypoint.
 6. Altitudes unusable (fewer than 3 usable points, spread under 1,000 ft, or nothing below the TOD altitude minus the band after TOD):
    last waypoint at least `FALLBACK_DISTANCE_NM` from the destination **along the route**, flagged estimated.
@@ -186,11 +187,12 @@ Gab approved the on-screen wording on 2026-11-26; the strings are no longer mark
 Gab imported the four script-made test files (LFPG-KIAH and YPPH-EGLL, with and without taxi points) into Infinite
 Flight: all worked. A European short haul and a KJFK arrival are still to be tested.
 
-Independent review: nothing critical or important. Known limits, not fixed:
+Independent review: nothing critical or important. Followed up the same day: a cut that leaves nothing out now says
+there is no arrival to remove; high cruise points are no longer read as ground movements; the cut can be picked with
+the keyboard in Convert; the list badge uses the map's colour token.
 
-- A sparse Sketch often shows "0 waypoints removed": its last point is already 120 NM or more from the destination.
-- A file ending mid-cruise, with no runway data, can keep one or two cruise points as ground points.
-- In Convert the cut point can't be moved with the keyboard.
+Known limits, not fixed:
+
 - The summary is a live region and may be announced again after waypoint edits.
-- The list badge uses Tailwind orange classes, not the `--route-selected` token.
 - In Sketch, one Escape cancels both a pen drag and pick mode.
+- A saved AeroHub draft reopened with the branding shows numbers once unticked: only the branded names are stored.

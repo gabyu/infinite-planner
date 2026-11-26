@@ -16,6 +16,8 @@ export const WITHOUT_ARRIVAL_KEY = "infinite-planner:export-without-arrival"
 // A short route cannot hold a 40 NM level: a tenth of it is enough there.
 const CRUISE_LEVEL_MIN_SHARE = 0.1
 const MIN_USABLE_POINTS = 3
+// No runway is this high (the highest are about 14,500 ft).
+const MAX_GROUND_FT = 15_000
 const NM_M = 1852
 
 export interface ArrivalCutOptions {
@@ -79,7 +81,9 @@ export function fallbackAirport(points: PhasePoint[]): TrimAirport {
 export function arrivalGroundStart(points: PhasePoint[], airport: TrimAirport): number {
   // planTrim lists what comes after the touchdown point.
   const { remove } = planTrim(points, airport, "arrival")
-  return remove.length > 0 ? Math.min(...remove) - 1 : points.length - 1
+  const start = remove.length > 0 ? Math.min(...remove) - 1 : points.length - 1
+  // Without runway data, points crowding the end of a file that stops in cruise look like ground movements.
+  return points[start].altitude > MAX_GROUND_FT ? points.length - 1 : start
 }
 
 /** Where the plan can be cut, and where it is cut by default. Null when there is no arrival to leave out. */

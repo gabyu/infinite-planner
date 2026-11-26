@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs"
 import { generateFPL } from "@/lib/fpl-generator"
 import { parseAeroHubKml } from "@/lib/partners/aerohub-parser"
 import {
-  arrivalCutOptions, buildExportWaypoints, fallbackAirport, loadWithoutArrival, resolveCut, topOfDescent, trimRoute,
+  arrivalCutOptions, arrivalGroundStart, buildExportWaypoints, fallbackAirport, loadWithoutArrival, resolveCut, topOfDescent, trimRoute,
 } from "@/lib/export-trim"
 
 // [nautical miles from the origin, feet], due east along the equator.
@@ -55,6 +55,13 @@ assert.equal(options([[0,1000],[100,35000],[500,35000],[900,35000]])!.defaultInd
 // route shorter than 120 NM, and nothing to cut
 assert.deepEqual(options([[0,0],[30,0],[60,0],[100,0]]), { min: 1, max: 2, defaultIndex: 1, estimated: true, resumeAt: 3 })
 assert.equal(options([[0,0],[100,0]]), null)
+
+// A file that stops in cruise, with no runway data: points crowded at its end are not ground movements
+const STOPS_HIGH: Profile = [[0,1000],[100,35000],...Array.from({ length: 12 }, (_, i) => [897.8 + i * 0.2, 35000] as [number, number])]
+assert.equal(arrivalGroundStart(line(STOPS_HIGH), fallbackAirport(line(STOPS_HIGH))), STOPS_HIGH.length - 1)
+// ...while taxiing at one of the highest airports still is
+const HIGH_FIELD: Profile = [[0,1000],[100,35000],[880,35000],[960,20000],[999,14470],[999.5,14470],[1000,14470]]
+assert.equal(arrivalGroundStart(line(HIGH_FIELD), { ...fallbackAirport(line(HIGH_FIELD)), elevationFt: 14470 }), 4)
 
 // A picked cut: used inside the range, ignored outside it
 const range = { min: 1, max: 4, defaultIndex: 3, estimated: true, resumeAt: 5 }
