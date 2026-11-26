@@ -14,6 +14,7 @@ import {
   type BasemapChoice,
 } from "@/lib/map-tiles"
 import type { RunwayLabel } from "@/lib/runway-labels"
+import { layoutRunwayTags } from "@/lib/runway-label-layout"
 import { altitudeBucket, CUT_MARKER_HTML, hasAltitudeData, unwrapLongitudes } from "@/lib/route-render"
 import {
   DropdownMenu,
@@ -104,10 +105,6 @@ const CHEVRON_SPACING_PX = 150
 // Below this the numbers of one airport pile up on each other.
 const RUNWAY_MIN_ZOOM = 13
 const RUNWAY_MAX_FIT_ZOOM = 15
-const RUNWAY_LABEL_OFFSET_PX = 20
-// The room one tag takes, and where a tag may go to find it, in steps [further out along the runway, to its side].
-const RUNWAY_LABEL_SIZE_PX = { width: 38, height: 24 }
-const RUNWAY_LABEL_PLACES: [number, number][] = [[1, 0], [2, 0], [1, 1.5], [1, -1.5], [3, 0], [2, 1.5], [2, -1.5], [1, 2.5], [1, -2.5], [4, 0]]
 
 export default function MapPreview({
   waypoints: rawWaypoints,
@@ -653,25 +650,17 @@ export default function MapPreview({
     const map = mapInstanceRef.current
     if (!map || !L || !runways || runways.length === 0 || zoom < RUNWAY_MIN_ZOOM) return
     const layer = L.layerGroup().addTo(map)
-    // Where tags already sit (in pixels at this zoom): crossing and parallel runways can end very close together.
-    const taken: { x: number; y: number }[] = []
-    const overlaps = (x: number, y: number) =>
-      taken.some((other) => Math.abs(other.x - x) < RUNWAY_LABEL_SIZE_PX.width && Math.abs(other.y - y) < RUNWAY_LABEL_SIZE_PX.height)
-    // The chosen runway and the coloured ones are placed first, so they are the ones that stay closest to their end.
-    const rank = (runway: RunwayLabel) => (runway.chosen ? 0 : runway.tone ? 1 : 2)
-    for (const runway of [...runways].sort((a, b) => rank(a) - rank(b))) {
-      const away = ((runway.headingTrue + 180) * Math.PI) / 180
-      const lng = nearLng(runway.lng, waypoints)
-      const end = map.project([runway.lat, lng], zoom)
-      const at = ([out, side]: [number, number]) => ({
-        dx: Math.round((Math.sin(away) * out + Math.cos(away) * side) * RUNWAY_LABEL_OFFSET_PX),
-        dy: Math.round((-Math.cos(away) * out + Math.sin(away) * side) * RUNWAY_LABEL_OFFSET_PX),
-      })
-      // The first place clear of the other tags; with none, the closest one.
-      const { dx, dy } = RUNWAY_LABEL_PLACES.map(at).find((place) => !overlaps(end.x + place.dx, end.y + place.dy)) ?? at([1, 0])
-      taken.push({ x: end.x + dx, y: end.y + dy })
+    const placed = runways.map((runway) => ({ ...runway, lng: nearLng(runway.lng, waypoints) }))
+    const shifts = layoutRunwayTags(
+      placed.map((runway) => {
+        const { x, y } = map.project([runway.lat, runway.lng], zoom)
+        return { name: runway.name, x, y, headingTrue: runway.headingTrue, rank: runway.chosen ? 0 : runway.tone ? 1 : 2 }
+      }),
+    )
+    for (const runway of placed) {
+      const { dx, dy } = shifts[runway.name]
       const name = escapeHtml(runway.name)
-      L.marker([runway.lat, lng], {
+      L.marker([runway.lat, runway.lng], {
         keyboard: false,
         zIndexOffset: runway.chosen ? 950 : runway.tone ? 900 : 850,
         icon: L.divIcon({
