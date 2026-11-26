@@ -605,3 +605,31 @@ html body[data-scroll-locked] .right-scroll-bar-position {
   stroke-dasharray: 2 7;
   stroke-linecap: round;
 }
+
+/* Export without arrival: the badge sitting above the cut point. Not scoped to .ip-map: the Sketch map uses it too. */
+.ip-cut {
+  position: absolute;
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, calc(-100% - 10px));
+  border: 2px solid hsl(var(--route-dot-ring, 0 0% 100%));
+  border-radius: 9999px;
+  background: hsl(var(--route-selected, 21 90% 48%));
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.3);
+  color: #fff;
+  pointer-events: none;
+}
+.ip-cut::after {
+  position: absolute;
+  top: 100%;
+  border: 5px solid transparent;
+  border-top-color: hsl(var(--route-selected, 21 90% 48%));
+  content: "";
+}
+.ip-cut svg {
+  width: 14px;
+  height: 14px;
+}

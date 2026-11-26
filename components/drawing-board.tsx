@@ -63,6 +63,13 @@ interface DrawingBoardProps {
   icaoValidation: { origin: boolean; destination: boolean }
   onICAOChange: (field: "origin" | "destination", value: string) => void
   isTouchPrimary: boolean
+  /** Export without arrival: the last waypoint kept, marked with a badge. */
+  cutId?: string | null
+  /** Waypoints the export leaves out: drawn grey. */
+  removedIds?: Set<string>
+  /** The cut point is being moved: a click on a waypoint picks it and nothing is drawn or dragged. */
+  pickingCut?: boolean
+  onPickCut?: (id: string) => void
 }
 
 export function DrawingBoard({
@@ -83,6 +90,10 @@ export function DrawingBoard({
   icaoValidation,
   onICAOChange,
   isTouchPrimary,
+  cutId,
+  removedIds,
+  pickingCut,
+  onPickCut,
 }: DrawingBoardProps) {
   const [activeTool, setActiveTool] = useState<DrawTool>("select")
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -148,6 +159,10 @@ export function DrawingBoard({
       {/* Drawing canvas with floating toolbar */}
       <div className="relative h-[75vh] min-h-[500px] max-h-[900px] w-full overflow-hidden rounded-md border">
         <DrawMap
+          cutId={cutId}
+          removedIds={removedIds}
+          pickingCut={pickingCut}
+          onPickCut={onPickCut}
           waypoints={waypoints}
           activeTool={activeTool}
           onAddPoints={onAddPoints}

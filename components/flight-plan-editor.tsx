@@ -27,10 +27,13 @@ import { PartnerBanner, PartnerLogo } from "@/components/import/partner-banner"
 import type { PreloadedImport } from "@/lib/partners/preloaded"
 import { generateFPL, fplFileName } from "@/lib/fpl-generator"
 import { saveFplInBrowser } from "@/lib/fpl-download"
+import { applyBrandingOverlay, isBrandingSlot } from "@/lib/branding"
+import { buildExportWaypoints } from "@/lib/export-trim"
+import { useArrivalCut } from "@/hooks/use-arrival-cut"
+import { ExportWithoutArrival } from "@/components/editor/export-without-arrival"
 import { parseFlightFilename, saveFlightData } from "@/lib/flight-stats-service"
 import {
   AUTOSAVE_INTERVAL_MS,
-  BRAND_NAMES,
   BRANDING_MIN_WAYPOINTS,
   PRIVATE_SHARE,
   isTrackerDerived,
@@ -81,6 +84,7 @@ import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@
 import { tapRunway, type HandChoice } from "@/lib/runway-choice"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
+import { applyNamingRules } from "@/lib/waypoint-names"
 import { useToast } from "@/hooks/use-toast"
 import { ToastAction } from "@/components/ui/toast"
 
@@ -113,6 +117,8 @@ interface Waypoint {
   // every name in the plan.
   branded?: boolean
   unbrandedName?: string
+  // Set on a first or last waypoint showing the airport's code: the name it had of its own (see lib/waypoint-names.ts).
+  replacedName?: string
   // Only set on waypoints placed with the pen tool that had their curve
   // handles dragged out - undefined/null means a plain corner point.
   handleOut?: LatLngPoint | null
@@ -135,28 +141,6 @@ interface SimplificationInfo {
 }
 
 const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
-
-// The branding block is the four waypoints just before the destination.
-function isBrandingSlot(index: number, total: number) {
-  return total >= BRANDING_MIN_WAYPOINTS && index >= total - 5 && index <= total - 2
-}
-
-// Puts the MADE/WITH/INFINITE/PLANNER block on (or takes it off) without touching any other
-// name. Idempotent: it first restores every branded waypoint, then re-brands the current
-// last-four-before-the-destination, so it also repairs a block that edits have shifted.
-function applyBrandingOverlay(waypoints: Waypoint[], include: boolean): Waypoint[] {
-  const restored = waypoints.map((wp, index) =>
-    wp.branded
-      ? { ...wp, name: wp.unbrandedName ?? String(index).padStart(3, "0"), locked: false, branded: false, unbrandedName: undefined }
-      : wp,
-  )
-  if (!include) return restored
-  return restored.map((wp, index) =>
-    isBrandingSlot(index, restored.length)
-      ? { ...wp, unbrandedName: wp.name, name: BRAND_NAMES[index - (restored.length - 5)], locked: true, branded: true }
-      : wp,
-  )
-}
 
 // Recomputes the interior sample waypoints of a curve segment from its
 // current anchor positions/handles, replacing them in place by id. Bails out
@@ -296,7 +280,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [panelTab, setPanelTab] = useState<Phase | "options">("departure")
   // The waypoint ids and where the parts split, kept current for callbacks that must not go stale.
   const routeRef = useRef<{ ids: string[]; split: PhaseSplit }>({ ids: [], split: { departureEnd: -1, arrivalStart: 0 } })
+  // Set while the cut point is being moved. A ref, so that the click callback below stays stable.
+  const cutPickRef = useRef<((id: string) => void) | null>(null)
   const handleMapPointClick = useCallback((id: string) => {
+    if (cutPickRef.current) return cutPickRef.current(id)
     // A point on another part of the route: open that tab, then the list scrolls to the row.
     const { ids, split } = routeRef.current
     const index = ids.indexOf(id)
@@ -484,6 +471,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       setWaypoints(renamedWaypoints)
       // A new import is a new plan: it must not overwrite the one saved from the previous import.
       resetSavedPlan()
+      arrival.reset()
       setFlightNumberOverride(null)
       setFlightNumberEdit(undefined)
       setExtraFlightNumbers([])
@@ -536,8 +524,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   useEffect(() => {
     if (!preloaded || preloadedAppliedRef.current) return
     preloadedAppliedRef.current = true
-    setOriginAirport(preloaded.origin)
-    setDestinationToAirport(preloaded.destination)
+    // As if typed: this also marks the codes valid, which the ground switch and the airport cards depend on.
+    handleICAOChange("origin", preloaded.origin)
+    handleICAOChange("destination", preloaded.destination)
     applyParsedImport(preloaded.route, preloaded.origin, preloaded.destination)
     window.history.replaceState(null, "", "/convert")
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -921,7 +910,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     }
 
     try {
-      const fplContent = generateFPL(finalWaypoints)
+      // "Export without arrival" changes this file only: what is saved below is always the whole plan.
+      const fplContent = generateFPL(buildExportWaypoints(waypoints, { includeBranding, arrival: arrival.cut ?? undefined }))
       const fileName = fplFileName(originAirport, destinationAirport)
       saveFplInBrowser(fplContent, fileName)
       setExportedFingerprint(currentFingerprint)
@@ -997,6 +987,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   // Toggle waypoint selection with shift+click support
   const handleRowClick = (e: React.MouseEvent, id: string, index: number) => {
+    if (cutPickRef.current) return cutPickRef.current(id)
+
     // Prevent if clicking on input fields
     if ((e.target as HTMLElement).tagName === "INPUT") {
       return
@@ -1245,6 +1237,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     setWaypoints([])
     setCurveSegments([])
     resetSavedPlan()
+    arrival.reset()
   }, [])
 
   // Toggle a single waypoint's selection from the map (select mode)
@@ -1330,49 +1323,15 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       .catch(() => setLibraryOpen(false))
   }, [authUser])
 
-  // Applies the naming rules: the first/last waypoints are locked to the origin/destination,
-  // everything else is numbered by position, and - when the branding checkbox is ticked and
-  // the plan has at least BRANDING_MIN_WAYPOINTS - the four waypoints before the destination
-  // become MADE / WITH / INFINITE / PLANNER (locked, and remembered as branded so unticking
-  // the checkbox can restore them). The same rule for Convert and Sketch: no length-based
-  // "auto" branding any more, only the checkbox decides.
-  // `keepNames`: the waypoints already carry their real names (AeroHub files do), so only a missing one is numbered.
+  // The naming rules (lib/waypoint-names.ts) for this plan. `keepNames`: the waypoints carry their real names (AeroHub
+  // files do).
   const applyWaypointNamingRules = (
     waypoints: Waypoint[],
     origin: string,
     destination: string,
     branding = false,
     keepNames = isAeroHub,
-  ) => {
-    if (waypoints.length === 0) return waypoints
-
-    return waypoints.map((wp, index) => {
-      const isFirst = index === 0
-      const isLast = index === waypoints.length - 1
-      const numbered = String(index).padStart(3, "0")
-      const ownName = keepNames && wp.name.trim() ? wp.name : numbered
-
-      if (isFirst) {
-        return { ...wp, name: origin || "ORIG", locked: true, branded: false, unbrandedName: undefined }
-      }
-
-      if (isLast) {
-        return { ...wp, name: destination || "DEST", locked: true, branded: false, unbrandedName: undefined }
-      }
-
-      if (branding && isBrandingSlot(index, waypoints.length)) {
-        return {
-          ...wp,
-          name: BRAND_NAMES[index - (waypoints.length - 5)],
-          locked: true,
-          branded: true,
-          unbrandedName: ownName,
-        }
-      }
-
-      return { ...wp, name: ownName, locked: false, branded: false, unbrandedName: undefined }
-    })
-  }
+  ) => applyNamingRules(waypoints, { origin, destination, branding, keepNames })
 
   // The checkbox in the export dialog. Only the four branding waypoints change.
   const handleBrandingChange = (checked: boolean) => {
@@ -1419,7 +1378,6 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   // The runway each end of the plan really flies, when the detection is sure (whatever the pilot tapped): the airport card warns when the ATIS does not list it.
   const [planRunways, setPlanRunways] = useState<Record<TrimEnd, string | null>>({ departure: null, arrival: null })
-  const ghostIds = useMemo(() => (trimPreview ? new Set(trimPreview.ids) : undefined), [trimPreview])
 
   // Stable (it only reads a ref), so effects that depend on it do not run again on every render.
   const loadAirport = useCallback(async (icao: string): Promise<TrimAirport | null> => {
@@ -1433,6 +1391,36 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       return null
     }
   }, [])
+
+  // Export without arrival: the switch above Export FPL and its cut point.
+  const arrival = useArrivalCut({
+    waypoints,
+    destination: destinationAirport,
+    // The code itself decides: a file name can fill the airports without updating icaoValidation.
+    destinationValid: /^[A-Z]{4}$/.test(destinationAirport),
+    loadAirport,
+  })
+  // Waypoints drawn as "will not be there": a ground trim being previewed, and the arrival the export leaves out.
+  const ghostIds = useMemo(() => {
+    const ids = [...(trimPreview?.ids ?? []), ...(arrival.cut?.removedIds ?? [])]
+    return ids.length > 0 ? new Set(ids) : undefined
+  }, [trimPreview, arrival.cut])
+
+  // Moving the cut point: the next click on a map point or a list row picks it.
+  const pickCut = (id: string) => {
+    if (!arrival.pick(id)) toast({ title: copy.editor.pickCutOutside })
+  }
+  cutPickRef.current = arrival.picking ? pickCut : null
+  const [lowerSheet, setLowerSheet] = useState(0)
+  const startPickingCut = () => {
+    // Map editing and point selection use clicks for their own purpose.
+    if (isEditingMap) toggleMapEditing()
+    setLowerSheet((n) => n + 1)
+    arrival.startPicking()
+  }
+  useEffect(() => {
+    if (isEditingMap) arrival.stopPicking()
+  }, [isEditingMap]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The runways of the plan, kept with it: the one the pilot confirmed in the airport card, else the one the route shows (only when
   // the detection is sure), else the one already saved (while it still exists at that airport).
@@ -1847,8 +1835,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   const exportButtons = (
     <div className="space-y-2">
+      <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={startPickingCut} />
       <div className="flex gap-2">
-        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading}>
+        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading || arrival.loading}>
           <Download />
           Export FPL
         </Button>
@@ -2062,6 +2051,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       <TooltipProvider>
         <EditorWorkspace
           isMobile={isMobile}
+          lowerSheet={lowerSheet}
           map={
             <MapPreview
               waypoints={waypoints}
@@ -2079,6 +2069,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
               toolbarLeading={toolbar}
+              cutId={arrival.cut?.id}
+              pickingCut={arrival.picking}
             />
           }
           strip={<AltitudeStrip waypoints={waypoints} hoveredId={hoveredId} onHover={setHoveredId} stats={stats} />}
@@ -2269,6 +2261,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     onDeleteSelected={deleteSelectedWaypoints}
                     onClearAltitudes={clearSelectedAltitudes}
                     ghostIds={ghostIds}
+                    cutId={arrival.cut?.id}
+                    picking={arrival.picking}
                   />
                 </div>
               ) : (
@@ -2333,6 +2327,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                   icaoValidation={icaoValidation}
                   onICAOChange={handleICAOChange}
                   isTouchPrimary={isTouchPrimary}
+                  cutId={arrival.cut?.id}
+                  removedIds={arrival.cut?.removedIds}
+                  pickingCut={arrival.picking}
+                  onPickCut={pickCut}
                 />
 
                 {(error || successMessage) && <div className="mt-4">{alerts}</div>}
@@ -2350,7 +2348,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     onDeleteSelected={deleteSelectedWaypoints}
                     onClearAltitudes={clearSelectedAltitudes}
                     onExport={handleExportFPL}
-                    exportDisabled={!!exportBlockReason}
+                    exportDisabled={!!exportBlockReason || arrival.loading}
+                    cutId={arrival.cut?.id}
+                    ghostIds={ghostIds}
+                    picking={arrival.picking}
                     emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
                   />
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Download, Trash2, Mountain, Map } from "lucide-react"
+import { CutBadge } from "@/components/editor/export-without-arrival"
+import { cn } from "@/lib/utils"
 
 interface Waypoint {
   id: string
@@ -34,6 +36,11 @@ interface WaypointTableProps {
   leftActions?: React.ReactNode
   onShowMap?: () => void
   emptyStateMessage?: string
+  /** Export without arrival: the row of the cut point carries a badge, the left-out rows are dimmed. */
+  cutId?: string | null
+  ghostIds?: Set<string>
+  /** The cut point is being moved: the whole row, fields included, is one target. */
+  picking?: boolean
 }
 
 export function WaypointTable({
@@ -52,6 +59,9 @@ export function WaypointTable({
   leftActions,
   onShowMap,
   emptyStateMessage = "No waypoints yet.",
+  cutId,
+  ghostIds,
+  picking,
 }: WaypointTableProps) {
   return (
     <>
@@ -138,7 +148,12 @@ export function WaypointTable({
                 <TableRow
                   key={waypoint.id}
                   data-state={waypoint.selected ? "selected" : undefined}
-                  className="cursor-pointer hover:bg-accent/60 data-[state=selected]:bg-accent"
+                  className={cn(
+                    "cursor-pointer hover:bg-accent/60 data-[state=selected]:bg-accent",
+                    ghostIds?.has(waypoint.id) && "opacity-40",
+                    // A disabled (locked) field would otherwise swallow the click.
+                    picking && "[&_input]:pointer-events-none",
+                  )}
                   onClick={(e) => onRowClick(e, waypoint.id, index)}
                 >
                   <TableCell className="w-12 py-1 pl-3 pr-2">
@@ -150,19 +165,22 @@ export function WaypointTable({
                     />
                   </TableCell>
                   <TableCell className="py-1">
-                    <Input
-                      id={`name-${waypoint.id}`}
-                      value={waypoint.name}
-                      onChange={(e) => onUpdateWaypoint(waypoint.id, "name", e.target.value)}
-                      onKeyDown={(e) => onTabKeyNavigation(e, waypoint.id, "name")}
-                      onFocus={onInputFocus}
-                      className={`h-7 w-full max-w-[12ch] font-mono text-xs ${
-                        waypoint.locked ? "cursor-not-allowed bg-muted text-muted-foreground" : ""
-                      }`}
-                      disabled={waypoint.locked}
-                      readOnly={waypoint.locked}
-                      maxLength={12}
-                    />
+                    <div className="flex items-center gap-1">
+                      <Input
+                        id={`name-${waypoint.id}`}
+                        value={waypoint.name}
+                        onChange={(e) => onUpdateWaypoint(waypoint.id, "name", e.target.value)}
+                        onKeyDown={(e) => onTabKeyNavigation(e, waypoint.id, "name")}
+                        onFocus={onInputFocus}
+                        className={`h-7 w-full max-w-[12ch] font-mono text-xs ${
+                          waypoint.locked ? "cursor-not-allowed bg-muted text-muted-foreground" : ""
+                        }`}
+                        disabled={waypoint.locked}
+                        readOnly={waypoint.locked}
+                        maxLength={12}
+                      />
+                      {waypoint.id === cutId && <CutBadge />}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden w-40 py-1 md:table-cell">
                     <Input

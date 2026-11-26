@@ -45,6 +45,15 @@ export const copy = {
     flightNumbersHelp: "Optional. Read from the file name when it carries one. Add the other numbers the flight goes by (codeshares), then press Enter. The first is the main one. Letters and digits, up to 12 each, up to 6. Saved with the plan.",
     sheetHandle: "Drag to resize the panel",
 
+    // Export without arrival (above Export FPL)
+    withoutArrival: "Export without arrival",
+    withoutArrivalHint: "For AI ATC: add the arrival and approach in Infinite Flight.",
+    moveCut: "Move cut point",
+    pickCut: "Click the last waypoint to keep",
+    pickCutOutside: "Pick a waypoint between the departure and the landing",
+    cutUnavailable: "No arrival to remove from this plan",
+    cutBadge: "Cut",
+
     // Ground movements (Options)
     groundWaypoints: "Ground movement waypoints",
     groundHint: "On keeps the taxi before take-off and after landing. Turn off to remove it.",
@@ -217,6 +226,13 @@ export function atisWindText(wind: { from: number | null; speedKt: number; gustK
 export function trimPreviewText(count: number, end: "departure" | "arrival") {
   const where = end === "departure" ? "before take-off" : "after landing"
   return `${count} waypoint${count === 1 ? "" : "s"} will be removed ${where}`
+}
+
+/** "14 waypoints removed · 62 NM before LFPG" under the Export without arrival switch. */
+export function withoutArrivalSummary(count: number, distanceNm: number, icao: string, estimated: boolean) {
+  const removed = `${count} waypoint${count === 1 ? "" : "s"} removed`
+  const before = `${Math.round(distanceNm).toLocaleString("en-US")} NM before ${icao || "the destination"}`
+  return estimated ? `${removed} · ${before} · estimated` : `${removed} · ${before}`
 }
 
 /** "12 waypoints removed" in the toast after applying. */
