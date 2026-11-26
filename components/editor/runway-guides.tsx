@@ -373,7 +373,7 @@ export function RunwayGuides({
       {embedded && (target || shown?.runwayEnd) && (
         <div className="flex justify-end">
           <button type="button" onClick={keep} className="link inline-flex min-h-6 items-center">
-            {copy.guides.keepMine}
+            {guides && ranked.length === 0 ? copy.guides.useCurrent : copy.guides.keepMine}
           </button>
         </div>
       )}

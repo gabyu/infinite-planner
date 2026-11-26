@@ -85,6 +85,17 @@ In the Convert panel, success messages and "Waypoint simplification applied" bec
 `Departure taxi` · `Arrival taxi` · `Plan lands on 26L; the ATIS uses 08R.` /
 `Plan departs 26L; the ATIS uses 08R.` · `Exported and saved: this plan is locked.`
 
+## Retouches after the first staging test (2026-11-26, Gab's answers)
+- Map: only square runway-number tags (no runway drawing), one per end, for the open Departure or Arrival tab, shown
+  from zoom 13. With an ATIS only its runways are coloured (wind verdict), others grey; without, all follow the wind.
+  A click chooses the runway. Opening the tab zooms to the airport.
+- No procedure for the runway: "No suggested procedures" and "Use current".
+- Options fields share one height.
+- Publish on Explore: hidden for tracker-derived plans. Before export it is a stored wish (last choice of the browser,
+  off the first time), confirmed in the publish dialog on Export; "Not now" exports privately and switches it off.
+- Export FPL: edge to edge at the bottom of the panel; "Exporting...", then "Downloaded", then the button again. The
+  export success messages go.
+
 ## Checks and delivery
 `pnpm lint`, `pnpm check:copy`, runway/export tests, a local browser pass (desktop and phone width). Then merge into
 `staging` and push, so Gab tests there. No migration. `main` and production are not touched.

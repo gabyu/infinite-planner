@@ -82,7 +82,10 @@ import type { GuidePoint } from "@/lib/runway-guide"
 import { attachGuideToPlan, GuideError, type StoredGuide } from "@/lib/runway-guide-client"
 import { phaseOf, phaseRange, splitPhases, type Phase, type PhaseSplit } from "@/lib/route-phases"
 import type { HandChoice } from "@/lib/runway-choice"
-import { clearResult, finishFlow, flowFor, type AirportFlow } from "@/lib/airport-steps"
+import { clearResult, confirmRunway, finishFlow, flowFor, type AirportFlow } from "@/lib/airport-steps"
+import { runwayLabels, type RunwayLiveInfo } from "@/lib/runway-labels"
+import { ExportButton, type ExportState } from "@/components/editor/export-button"
+import { PublishDialog } from "@/components/publish-dialog"
 import { PlanLock } from "@/components/editor/plan-lock"
 import { extractArrival, extractDeparture, findRunwayEnd } from "@/lib/runway-guide"
 import { planTrim, type TrimAirport, type TrimEnd } from "@/lib/ground-trim"
@@ -143,6 +146,11 @@ interface SimplificationInfo {
 }
 
 const DRAFT_STORAGE_KEY = "infinite-planner:draft-flightplan"
+
+const PUBLISH_INTENT_KEY = "infinite-planner:publish-on-export"
+// "Export FPL": the shortest time the progress shows, and how long the confirmation stays.
+const EXPORT_MIN_MS = 700
+const EXPORT_DONE_MS = 1800
 
 // Recomputes the interior sample waypoints of a curve segment from its
 // current anchor positions/handles, replacing them in place by id. Bails out
@@ -579,8 +587,32 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       setError("No waypoints to export")
       return
     }
-    performExport()
+    // The switch is on and the export is what will publish the plan: confirm first.
+    if (publishOnExport) setAskPublishOnExport(true)
+    else void performExport()
   }
+
+  // "Publish on Explore" before the export: the last choice made in this browser (off the first time).
+  const [publishIntent, setPublishIntentState] = useState(false)
+  useEffect(() => {
+    try {
+      setPublishIntentState(window.localStorage.getItem(PUBLISH_INTENT_KEY) === "1")
+    } catch {}
+  }, [])
+  const setPublishIntent = (on: boolean) => {
+    setPublishIntentState(on)
+    try {
+      window.localStorage.setItem(PUBLISH_INTENT_KEY, on ? "1" : "0")
+    } catch {}
+  }
+  const [askPublishOnExport, setAskPublishOnExport] = useState(false)
+  const [publishRequest, setPublishRequest] = useState<{ planId: string; declaration: boolean; nonce: number } | null>(null)
+
+  // "Export FPL": busy while the file is made and saved, then a short confirmation.
+  const [exportState, setExportState] = useState<ExportState>("idle")
+  const exportingRef = useRef(false)
+  const exportResetRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(exportResetRef.current), [])
 
   // The flight number the KML's filename reliably carries (FlightAware: FlightAware_KLM605_EHAM_KSFO_20260526,
   // FlightRadar24: AF186-41db2d6c), else null. parseFlightFilename sets `source` only for those two
@@ -884,7 +916,13 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   }, [authReady, authUser])
 
   // Downloads the FPL and, when signed in, saves the plan as exported (which locks it).
-  const performExport = async () => {
+  const performExport = async (publish?: { declaration: boolean }) => {
+    if (exportingRef.current) return
+    exportingRef.current = true
+    window.clearTimeout(exportResetRef.current)
+    setExportState("busy")
+    const started = Date.now()
+    let downloaded = false
     setError(null)
     setSuccessMessage(null)
 
@@ -900,6 +938,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       const fplContent = generateFPL(buildExportWaypoints(waypoints, { includeBranding, arrival: arrival.cut ?? undefined }))
       const fileName = fplFileName(originAirport, destinationAirport)
       saveFplInBrowser(fplContent, fileName)
+      downloaded = true
       setExportedFingerprint(currentFingerprint)
       if (preloaded) {
         // Lets the server log that this partner import ended in a download (no personal data, just the import id).
@@ -934,16 +973,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
         })
       }
 
-      if (!authUser) {
-        setSuccessMessage(`Flight plan exported as ${fileName}!`)
-        return
-      }
+      if (!authUser) return
 
       // Exporting the very plan that is already saved as exported again: nothing new to save.
-      if (savedStatusRef.current === "exported" && savedFingerprint === currentFingerprint) {
-        setSuccessMessage(`Flight plan exported again as ${fileName}.`)
-        return
-      }
+      if (savedStatusRef.current === "exported" && savedFingerprint === currentFingerprint) return
 
       savingRef.current = true
       setIsSaving(true)
@@ -954,11 +987,19 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
         setError(`Exported as ${fileName}, but it wasn't saved to your dashboard: ${saveError}`)
       } else {
         setAutosaveError(null)
-        setSuccessMessage(`Flight plan exported as ${fileName} and saved to your dashboard. It is now locked.`)
+        if (publish && savedPlanIdRef.current) {
+          setPublishRequest({ planId: savedPlanIdRef.current, declaration: publish.declaration, nonce: Date.now() })
+        }
       }
     } catch (error) {
       console.error("Error exporting FPL file:", error)
       setError(`Error exporting FPL file: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      // Long enough for the progress to be seen: the file itself is made at once.
+      await new Promise((resolve) => window.setTimeout(resolve, Math.max(0, EXPORT_MIN_MS - (Date.now() - started))))
+      exportingRef.current = false
+      setExportState(downloaded ? "done" : "idle")
+      if (downloaded) exportResetRef.current = window.setTimeout(() => setExportState("idle"), EXPORT_DONE_MS)
     }
   }
 
@@ -1347,7 +1388,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
   const [trimmed, setTrimmed] = useState<Record<TrimEnd, boolean>>({ departure: false, arrival: false })
   const runwayCache = useRef(new Map<string, TrimAirport | null>())
   // What each trim took away, so switching the toggle back on can put it back.
-  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number } | null>(null)
+  const [mapFocus, setMapFocus] = useState<{ ids: string[]; nonce: number; points?: { lat: number; lng: number }[] } | null>(null)
+  // The last route tab clicked: an airport that answers late does not move the map away from a newer one.
+  const latestTabRef = useRef<Phase | null>(null)
   const trimRemoved = useRef<Partial<Record<TrimEnd, Waypoint[]>>>({})
   // Where departure ends and arrival begins. Recomputed when the waypoints change shape (added, removed, trimmed, imported),
   // never on an altitude or name edit, so editing a row never makes it jump to another tab.
@@ -1369,17 +1412,37 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
     if (tab === "options") return
     // A taxi preview is applied or cancelled under its switch: leaving Options drops it.
     setTrimPreview(null)
+    latestTabRef.current = tab
     const { items } = phaseSlice(tab)
     const inTab = new Set(items.map((wp) => wp.id))
     if (waypoints.some((wp) => wp.selected && !inTab.has(wp.id))) {
       setWaypoints(waypoints.map((wp) => (wp.selected && !inTab.has(wp.id) ? { ...wp, selected: false } : wp)))
     }
-    if (items.length > 0) setMapFocus((current) => ({ ids: items.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    const framePhase = () => {
+      if (items.length > 0) setMapFocus((current) => ({ ids: items.map((wp) => wp.id), nonce: (current?.nonce ?? 0) + 1 }))
+    }
+    if (tab === "cruise") return framePhase()
+    // Departure and Arrival open on the airport itself, close enough to read its runway numbers.
+    const icao = tab === "departure" ? originAirport : destinationAirport
+    const valid = tab === "departure" ? icaoValidation.origin : icaoValidation.destination
+    if (!valid) return framePhase()
+    void loadAirport(icao).then((airport) => {
+      if (latestTabRef.current !== tab) return
+      const points = (airport?.runways ?? []).flatMap((row) => [
+        { lat: row[0], lng: row[1] },
+        { lat: row[2], lng: row[3] },
+      ])
+      if (points.length === 0) return framePhase()
+      setMapFocus((current) => ({ ids: [], points, nonce: (current?.nonce ?? 0) + 1 }))
+    })
   }
   // The runways the pilot tapped in the live airport block (see lib/runway-choice.ts): never replaced by the ATIS.
   const [handRunways, setHandRunways] = useState<Record<TrimEnd, HandChoice | null>>({ departure: null, arrival: null })
   // Where each airport block stands in its two steps (lib/airport-steps.ts).
   const [flows, setFlows] = useState<Record<TrimEnd, AirportFlow | null>>({ departure: null, arrival: null })
+  // What each airport block knows of its runways, for the numbers on the map, and the airport shown there.
+  const [runwayLive, setRunwayLive] = useState<Record<TrimEnd, (RunwayLiveInfo & { icao: string }) | null>>({ departure: null, arrival: null })
+  const [mapAirport, setMapAirport] = useState<{ icao: string; airport: TrimAirport } | null>(null)
   // The two foldable groups of the Options tab.
   const [flightOpen, setFlightOpen] = useState(true)
   const [waypointsOpen, setWaypointsOpen] = useState(false)
@@ -1399,6 +1462,33 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
       return null
     }
   }, [])
+
+  // The runway numbers on the map: those of the airport whose tab is open.
+  const mapEnd: TrimEnd | null = activeTab === "departure" || activeTab === "arrival" ? activeTab : null
+  const mapIcao =
+    mapEnd === "departure" && icaoValidation.origin ? originAirport : mapEnd === "arrival" && icaoValidation.destination ? destinationAirport : null
+  useEffect(() => {
+    if (!mapIcao || !hasImported) return
+    let cancelled = false
+    void loadAirport(mapIcao).then((airport) => !cancelled && airport && setMapAirport({ icao: mapIcao, airport }))
+    return () => {
+      cancelled = true
+    }
+  }, [mapIcao, hasImported, loadAirport])
+  const mapRunways = useMemo(() => {
+    if (!mapEnd || !mapIcao || mapAirport?.icao !== mapIcao) return undefined
+    const live = runwayLive[mapEnd]
+    const hand = handRunways[mapEnd]
+    return runwayLabels(
+      mapAirport.airport,
+      live && live.icao === mapIcao ? live : { inUse: null, tones: {}, chosen: hand?.icao === mapIcao ? hand.runway : null },
+    )
+  }, [mapEnd, mapIcao, mapAirport, runwayLive, handRunways])
+  const pickRunwayOnMap = (name: string) => {
+    if (!mapEnd || !mapIcao) return
+    setHandRunways((current) => ({ ...current, [mapEnd]: { icao: mapIcao, runway: name } }))
+    setFlows((current) => ({ ...current, [mapEnd]: confirmRunway(flowFor(current[mapEnd], mapIcao), name) }))
+  }
 
   // Export without arrival: the switch above Export FPL and its cut point.
   const arrival = useArrivalCut({
@@ -1819,42 +1909,66 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
 
   // An exported plan, as shown, is locked.
   const locked = canSave && savedStatus === "exported" && !isDirty
-  // A plan converted from a tracker file can't be published: the switch stays off and its (?) says why.
-  const publishBlockedBySource = trackerDerived && planShare.visibility !== "public"
+  // Plans converted from a tracker file can't be published: no switch at all (one already public keeps it).
+  const showPublish = libraryOpen && !isAeroHub && (!trackerDerived || planShare.visibility === "public")
+  const requiresDeclaration = [...originSources, ...(planSource ? [planSource] : [])].includes("Imported")
+  const publishOnExport = showPublish && !trackerDerived && publishIntent && !locked
+  const exportDisabled = waypoints.length === 0 || isLoading || arrival.loading
 
-  // The export block: one line per switch, then the button.
-  const exportButtons = (
+  // The export block above the button: one line per switch.
+  const exportSwitches = (
     <div className="space-y-1">
       <ExportWithoutArrival arrival={arrival} destination={destinationAirport} onStartPicking={startPickingCut} />
-      {libraryOpen && !isAeroHub && (
+      {showPublish && (
         <VisibilitySwitch
           planId={savedPlanId ?? ""}
           origin={originAirport || "ORIG"}
           destination={destinationAirport || "DEST"}
           flightNumber={detectedFlightNumber}
           share={planShare}
-          onShareChange={setPlanShare}
-          requiresDeclaration={[...originSources, ...(planSource ? [planSource] : [])].includes("Imported")}
-          disabled={!canSetVisibility || !savedPlanId || savedStatus !== "exported" || isDirty || trackerDerived}
-          disabledReason={
-            publishBlockedBySource
-              ? legalCopy.publishOnlyOwnDesigns
-              : !canSave
-                ? "Sign in with Discord to publish a flight plan"
-                : "Export the flight plan first to make it public"
-          }
+          onShareChange={(share) => {
+            setPlanShare(share)
+            setPublishIntent(share.visibility === "public")
+          }}
+          requiresDeclaration={requiresDeclaration}
+          disabled={trackerDerived}
+          disabledReason={legalCopy.publishOnlyOwnDesigns}
+          pending={canSetVisibility || trackerDerived ? undefined : { checked: publishIntent, onChange: setPublishIntent }}
+          publishRequest={publishRequest}
         />
       )}
-      <div className="flex items-center gap-2 pt-1.5">
-        {/* In the workspace the lock sits beside the route; Sketch has no such line. */}
-        {mode === "draw" && locked && <PlanLock />}
-        <Button onClick={handleExportFPL} className="flex-1" disabled={waypoints.length === 0 || isLoading || arrival.loading}>
-          <Download />
-          Export FPL
-        </Button>
-      </div>
       {canSave && autosaveError && !locked && <p className="text-xs text-destructive">Draft not saved: {autosaveError}</p>}
     </div>
+  )
+
+  // Sketch: the switches and the button in one box. (The workspace places them itself, the button edge to edge.)
+  const exportButtons = (
+    <div className="space-y-2">
+      {exportSwitches}
+      <div className="flex items-center gap-2">
+        {/* In the workspace the lock sits beside the route; Sketch has no such line. */}
+        {locked && <PlanLock />}
+        <ExportButton state={exportState} disabled={exportDisabled} onClick={handleExportFPL} className="flex-1" />
+      </div>
+    </div>
+  )
+
+  const publishOnExportDialog = (
+    <PublishDialog
+      open={askPublishOnExport}
+      needsDeclaration={requiresDeclaration}
+      busy={false}
+      // "Not now" (or closing): the file is still exported, and the plan stays private.
+      onClose={() => {
+        setAskPublishOnExport(false)
+        setPublishIntent(false)
+        void performExport()
+      }}
+      onConfirm={() => {
+        setAskPublishOnExport(false)
+        void performExport({ declaration: requiresDeclaration })
+      }}
+    />
   )
 
   // Result banners shared by Convert and Sketch: compact, neutral surface, colour only on the icon/title.
@@ -2051,6 +2165,8 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               hoveredId={hoveredId}
               ghostIds={ghostIds}
               focus={mapFocus}
+              runways={isEditingMap || selectMode || arrival.picking ? undefined : mapRunways}
+              onRunwayClick={pickRunwayOnMap}
               ghostPath={guidePreview}
               onHoverWaypoint={setHoveredId}
               onWaypointClick={handleMapPointClick}
@@ -2147,6 +2263,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                           hand={handRunways[end]}
                           planRunway={planRunways[end]}
                           onTap={(runway) => setHandRunways((current) => ({ ...current, [end]: { icao, runway } }))}
+                          onRunways={(info) => setRunwayLive((current) => ({ ...current, [end]: { ...info, icao } }))}
                           flow={flow}
                           onFlow={(next) => {
                             if (next.open === false) setGuidePreview(null)
@@ -2245,8 +2362,19 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
               )}
             </>
           }
-          footer={<div className="px-4 py-3">{exportButtons}</div>}
+          footer={
+            <>
+              <div className="px-4 py-2">{exportSwitches}</div>
+              <ExportButton
+                state={exportState}
+                disabled={exportDisabled}
+                onClick={handleExportFPL}
+                className="h-12 w-full rounded-none"
+              />
+            </>
+          }
         />
+        {publishOnExportDialog}
         <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -2388,6 +2516,7 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
           </div>
         )}
 
+        {publishOnExportDialog}
         <Toaster />
       </PageShell>
     </TooltipProvider>

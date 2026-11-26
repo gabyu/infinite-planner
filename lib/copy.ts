@@ -57,6 +57,10 @@ export const copy = {
     cutBadge: "Cut",
 
     // Export block
+    exportFpl: "Export FPL",
+    exportBusy: "Exporting...",
+    exportDone: "Downloaded",
+    runwayOnMap: "Runway",
     exportHelp: "About",
     simplifiedTitle: "Waypoint simplification applied",
     planLocked: "Exported and saved: this plan is locked.",
@@ -144,10 +148,11 @@ export const copy = {
     change: "change",
     yours: "Yours",
     keepMine: "Keep mine",
+    useCurrent: "Use current",
     needsPlan: "Available once your plan is saved.",
     lowConfidence: "Couldn't tell which runway this departure used. Pick the runway above, then save.",
     tapRunway: "Confirm your runway",
-    noGuides: "No suggested procedures for this runway yet.",
+    noGuides: "No suggested procedures",
     departing: "Departing",
     arriving: "Arriving from",
     lowConfidenceArrival: "Couldn't tell which runway this arrival used. Pick the runway above, then save.",
@@ -242,6 +247,7 @@ export const visibilityCopy = {
   label: `Publish on ${LIBRARY_NAV_LABEL}`,
   labelShort: "Public",
   helperPrivate: "Only you can see this plan.",
+  helperPending: "It will be published when you export.",
   helperPublic: `Everyone can see it on ${LIBRARY_NAV_LABEL}.`,
 }
 

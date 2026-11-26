@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useState, type ReactNode } from "react"
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import { AlertTriangle, Check, ChevronDown, Loader2 } from "lucide-react"
 import type { AirportFlow } from "@/lib/airport-steps"
 import { confirmRunway, reopenRunway, setFlowOpen } from "@/lib/airport-steps"
@@ -9,6 +9,7 @@ import type { TrimAirport } from "@/lib/ground-trim"
 import type { WeatherState } from "@/lib/live-api/airport"
 import { chipRunways, effectiveChoice, planRunwayOutsideAtis, type EndChoice, type HandChoice } from "@/lib/runway-choice"
 import { runwayEnds } from "@/lib/runway-guide"
+import type { RunwayLiveInfo } from "@/lib/runway-labels"
 import { adviseRunways, endTone, type EndTone } from "@/lib/runway-wind"
 import { cn } from "@/lib/utils"
 
@@ -129,6 +130,15 @@ function RunwayTiles({
   )
 }
 
+// Tells the editor what the map should show, each time it changes.
+function ReportRunways({ info, onReport }: { info: RunwayLiveInfo; onReport: (info: RunwayLiveInfo) => void }) {
+  const key = JSON.stringify(info)
+  const report = useRef(onReport)
+  report.current = onReport
+  useEffect(() => report.current(JSON.parse(key) as RunwayLiveInfo), [key])
+  return null
+}
+
 interface AirportCardProps {
   icao: string
   /** The code is a valid, complete ICAO code: nothing is asked of the server otherwise. */
@@ -137,6 +147,8 @@ interface AirportCardProps {
   /** The runway the pilot tapped for this end, if any. Kept by the editor so it survives switching tabs. */
   hand: HandChoice | null
   onTap: (runway: string) => void
+  /** What is known of the runways (ATIS, wind, the one chosen), for the numbers on the map. */
+  onRunways?: (info: RunwayLiveInfo) => void
   /** The two steps' state for this airport (lib/airport-steps.ts), kept by the editor. */
   flow: AirportFlow
   onFlow: (flow: AirportFlow) => void
@@ -184,6 +196,7 @@ export function AirportCard({
   end,
   hand,
   onTap,
+  onRunways,
   flow,
   onFlow,
   steps,
@@ -281,6 +294,12 @@ export function AirportCard({
 
   return (
     <div className={cn("rounded-lg border", className)} aria-live="polite">
+      {onRunways && (
+        <ReportRunways
+          info={{ inUse: atis ? runways : null, tones, chosen: confirmed ?? choice?.runway ?? null }}
+          onReport={onRunways}
+        />
+      )}
       <button
         type="button"
         disabled={!expandable}

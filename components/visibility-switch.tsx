@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
@@ -27,6 +27,11 @@ interface VisibilitySwitchProps {
   requiresDeclaration?: boolean
   disabled?: boolean
   disabledReason?: string
+  // The editor, before the plan is exported: the switch only records the wish to publish, which the export carries out.
+  pending?: { checked: boolean; onChange: (checked: boolean) => void }
+  // Publish this plan now (it has just been exported with the switch on, and the publish dialog confirmed). A new
+  // `nonce` asks again.
+  publishRequest?: { planId: string; declaration: boolean; nonce: number } | null
   className?: string
 }
 
@@ -43,6 +48,8 @@ export function VisibilitySwitch({
   requiresDeclaration = false,
   disabled,
   disabledReason,
+  pending,
+  publishRequest,
   className,
 }: VisibilitySwitchProps) {
   const [busy, setBusy] = useState(false)
@@ -97,8 +104,28 @@ export function VisibilitySwitch({
     await choose("public", declarationGiven)
   }
 
+  const handled = useRef(0)
+  useEffect(() => {
+    if (!publishRequest || publishRequest.planId !== planId || handled.current === publishRequest.nonce) return
+    handled.current = publishRequest.nonce
+    setDeclarationGiven(publishRequest.declaration)
+    void choose("public", publishRequest.declaration)
+    // `choose` is rebuilt on every render; only a new request matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publishRequest, planId])
+
   const t = visibilityCopy
-  const helper = disabled && disabledReason ? disabledReason : isPublic ? t.helperPublic : t.helperPrivate
+  const checked = pending ? pending.checked : isPublic
+  const off = !pending && disabled
+  const helper = pending
+    ? pending.checked
+      ? t.helperPending
+      : t.helperPrivate
+    : off && disabledReason
+      ? disabledReason
+      : isPublic
+        ? t.helperPublic
+        : t.helperPrivate
 
   return (
     <div className={cn(layout === "field" ? "w-full" : "flex flex-wrap items-center gap-2", className)}>
@@ -118,9 +145,9 @@ export function VisibilitySwitch({
         <Switch
           id={`visibility-${planId}`}
           className={cn(layout === "field" && "ml-auto")}
-          checked={isPublic}
-          disabled={disabled || busy}
-          onCheckedChange={(checked) => (checked ? setAskPublish(true) : choose("private"))}
+          checked={checked}
+          disabled={off || busy}
+          onCheckedChange={(next) => (pending ? pending.onChange(next) : next ? setAskPublish(true) : choose("private"))}
           aria-describedby={layout === "field" ? `visibility-help-${planId}` : undefined}
         />
       </div>

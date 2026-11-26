@@ -10,8 +10,13 @@ All notable changes to Infinite Planner are documented here.
 - **Options in two groups**, Flight and Waypoints. The taxi switches (departure and arrival) moved there.
 - Passing messages in the editor are now notifications; applying a procedure no longer asks for a second confirmation (Undo is still offered).
 
+- **Runway numbers on the map.** Departure and Arrival zoom to the airport and write each runway number at its end, coloured by the ATIS or the wind; click one to choose it. They show only when zoomed in.
+- **Publish on Explore before exporting.** For plans that can be published, switch it on at any time; the plan is published when you export it (after the usual confirmation). Plans from a tracker file no longer show the switch.
+- **Export FPL** spans the panel and shows its progress, then a confirmation.
+
 ### Fixed
 - The wind on a runway is shown in whole knots.
+- The fields of the Options tab all have the same height.
 
 ## 2026-11-26
 
