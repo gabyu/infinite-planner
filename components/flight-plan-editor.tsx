@@ -2358,6 +2358,10 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                   icaoValidation={icaoValidation}
                   onICAOChange={handleICAOChange}
                   isTouchPrimary={isTouchPrimary}
+                  cutId={arrival.cut?.id}
+                  removedIds={arrival.cut?.removedIds}
+                  pickingCut={arrival.picking}
+                  onPickCut={pickCut}
                 />
 
                 {(error || successMessage) && <div className="mt-4">{alerts}</div>}
@@ -2376,6 +2380,9 @@ export function FlightPlanEditor({ initialMode, preloaded }: FlightPlanEditorPro
                     onClearAltitudes={clearSelectedAltitudes}
                     onExport={handleExportFPL}
                     exportDisabled={!!exportBlockReason || arrival.loading}
+                    cutId={arrival.cut?.id}
+                    ghostIds={ghostIds}
+                    picking={arrival.picking}
                     emptyStateMessage="No waypoints yet. Draw a route on the map above to get started."
                   />
                   {exportBlockReason && <p className="mt-2 text-xs text-muted-foreground">{exportBlockReason}</p>}

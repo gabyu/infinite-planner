@@ -35,6 +35,13 @@ interface DrawMapWrapperProps {
   onWaypointDragEnd: (id: string, newLat: number, newLng: number) => void
   onHandleDragEnd: (anchorId: string, which: "handleOut" | "handleIn", newPoint: LatLngPoint) => void
   onToggleWaypointSelect: (id: string) => void
+  /** Export without arrival: the last waypoint kept, marked with a badge. */
+  cutId?: string | null
+  /** Waypoints the export leaves out: drawn grey. */
+  removedIds?: Set<string>
+  /** The cut point is being moved: a click on a waypoint picks it and nothing is drawn or dragged. */
+  pickingCut?: boolean
+  onPickCut?: (id: string) => void
 }
 
 export default function DrawMapWrapper(props: DrawMapWrapperProps) {
